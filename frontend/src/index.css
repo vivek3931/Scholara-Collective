@@ -1,0 +1,92 @@
+/* Import Poppins font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+
+/* Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-text-primary: 51 51 51; /* charcoal for light mode */
+  --color-text-secondary: 51 51 51; /* charcoal for light mode */
+  --color-bg-primary: 244 244 244; /* platinum */
+  --color-bg-secondary: 244 244 244 / 0.9; /* platinum/90 */
+  --color-border: 28 37 38; /* onyx */
+  --color-orange-400: 249 115 22; /* orange-400 */
+  --color-amber-50: 255 251 235; /* amber-50 */
+  --color-amber-200: 252 211 77; /* amber-200 */
+  --color-amber-300: 251 191 36; /* amber-300 */
+  --color-amber-400: 245 158 11; /* amber-400 */
+  --color-amber-500: 217 119 6; /* amber-500 */
+  --color-amber-600: 180 83 9; /* amber-600 */
+  --color-amber-950: 69 26 3; /* amber-950 */
+  --color-yellow-500: 234 179 8; 
+}
+
+.dark {
+  --color-text-primary: 255 255 255; /* platinum for dark mode */
+  --color-text-secondary: 229 231 235; /* platinum */
+  --color-bg-primary: 28 37 38; /* onyx */
+  --color-bg-secondary: 28 37 38 / 0.9; /* onyx/90 */
+  --color-border: 28 37 38; /* onyx */
+  --color-orange-400: 249 115 22; /* orange-400 */
+  --color-amber-50: 255 251 235; /* amber-50 */
+  --color-amber-200: 252 211 77; /* amber-200 */
+  --color-amber-300: 251 191 36; /* amber-300 */
+  --color-amber-400: 245 158 11; /* amber-400 */
+  --color-amber-500: 217 119 6; /* amber-500 */
+  --color-amber-600: 180 83 9; /* amber-600 */
+  --color-amber-950: 69 26 3; /* amber-950 */
+  --color-yellow-500: 234 179 8; /* yellow-500 */
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
+  min-height: 100vh;
+}
+.backdrop-fallback {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Custom utility for shadow-glow-sm */
+@layer utilities {
+  .shadow-glow-sm {
+    box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.1), 0 2px 4px -1px rgba(245, 158, 11, 0.06);
+  }
+
+  /* Custom animation for fade-in */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer utilities {
+  .animate-fade-in-up {
+    animation: fadeInUp 0.5s ease-in-out;
+  }
+
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .delay-400 {
+    animation-delay: 400ms;
+  }
+}
