@@ -19,7 +19,8 @@ const app = express();
 app.use(cors({
   origin: [
     'http://localhost:5173', // Your primary frontend URL
-    'http://localhost:3000'  // Add any other potential frontend origins
+    'http://localhost:3000',  // Add any other potential frontend origins
+    'https://scholara-collective.onrender.com'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
