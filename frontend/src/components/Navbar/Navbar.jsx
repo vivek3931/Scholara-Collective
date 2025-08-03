@@ -280,7 +280,7 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
             </div>
 
             {/* Navigation Content */}
-            <div className="flex flex-col h-[calc(100vh-64px)]">
+            <div className="flex flex-col h-[calc(100dvh-64px)]">
               {/* Navigation Links */}
               <div className="flex-1 p-4 space-y-1 overflow-y-auto bg-white/90 dark:bg-onyx backdrop-blur-sm">
                 <nav className="space-y-1">
