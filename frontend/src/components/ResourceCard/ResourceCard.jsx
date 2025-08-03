@@ -8,7 +8,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
 
-  pdfjs.GlobalWorkerOptions.workerSrc = `../../../public/workers/pdf.worker.min.mjs`;
+  pdfjs.GlobalWorkerOptions.workerSrc = `../../../public/workers/pdf.worker.min.js`;
 
 
 const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
