@@ -36,9 +36,7 @@ jspm_packages/
 *.key
 *.crt
 
-# Tailwind CSS output
-tailwind.config.js
-tailwind.config.cjs
+
 
 
 
