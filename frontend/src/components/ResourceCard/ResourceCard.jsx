@@ -7,7 +7,9 @@ import { useAuth } from '../../context/AuthContext/AuthContext';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `/node_modules/pdfjs-dist/build/pdf.worker.min.mjs`;
+
+  pdfjs.GlobalWorkerOptions.workerSrc = `../../../public/workers/pdf.worker.min.mjs`;
+
 
 const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
   const { token } = useAuth();
