@@ -40,9 +40,7 @@ jspm_packages/
 tailwind.config.js
 tailwind.config.cjs
 
-# React specific
-*.jsx
-*.tsx
+
 
 # Coverage directory
 coverage/
