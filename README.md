@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Scholara Collective** (formerly PaperPal) is an open-source platform designed to empower students globally by providing free, organized access to a vast array of academic resources. It addresses the critical need for accessible and well-structured study materials, fostering a collaborative community where students can share and improve learning resources.
+**Scholara Collective** (formerly Scholara Collective) is an open-source platform designed to empower students globally by providing free, organized access to a vast array of academic resources. It addresses the critical need for accessible and well-structured study materials, fostering a collaborative community where students can share and improve learning resources.
 
 ### Problem Statement
 
