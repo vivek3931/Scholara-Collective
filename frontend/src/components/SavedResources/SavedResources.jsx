@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faBookmark, 
-  faSearch, 
-  faFilter, 
-  faSort, 
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faBookmark,
+  faSearch,
+  faFilter,
+  faSort,
   faTimes,
   faSpinner,
   faTrash,
@@ -18,12 +18,12 @@ import {
   faChevronUp,
   faCalendarAlt,
   faGraduationCap,
-  faTag
-} from '@fortawesome/free-solid-svg-icons';
+  faTag,
+} from "@fortawesome/free-solid-svg-icons";
 
 // Import your existing components and context
-import { useAuth } from '../../context/AuthContext/AuthContext';
-import ResourceCard from '../ResourceCard/ResourceCard'; // Adjust path as needed
+import { useAuth } from "../../context/AuthContext/AuthContext";
+import ResourceCard from "../ResourceCard/ResourceCard"; // Adjust path as needed
 
 // Modal component for confirmations
 const Modal = ({ isOpen, onClose, config }) => {
@@ -61,11 +61,11 @@ const Modal = ({ isOpen, onClose, config }) => {
               onClose();
             }}
             className={`px-4 py-2 rounded-md ${
-              config.type === 'error' 
-                ? 'bg-red-500 hover:bg-red-600 text-white'
-                : config.type === 'warning'
-                ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-                : 'bg-blue-500 hover:bg-blue-600 text-white'
+              config.type === "error"
+                ? "bg-red-500 hover:bg-red-600 text-white"
+                : config.type === "warning"
+                ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                : "bg-blue-500 hover:bg-blue-600 text-white"
             }`}
           >
             {config.confirmText}
@@ -77,45 +77,45 @@ const Modal = ({ isOpen, onClose, config }) => {
 };
 
 const SavedResourcesPage = () => {
-  const { token, user , isAuthenticated} = useAuth();
+  const { token, user, isAuthenticated } = useAuth();
   const [savedResources, setSavedResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('savedDate');
-  const [filterBy, setFilterBy] = useState('all');
-  const [selectedSubject, setSelectedSubject] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("savedDate");
+  const [filterBy, setFilterBy] = useState("all");
+  const [selectedSubject, setSelectedSubject] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const API_URL = import.meta.env.APP_API_URL || 'http://localhost:5000/api';
-  console.log(user)
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  console.log(user);
 
   // Fetch saved resources from backend
   const fetchSavedResources = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      console.log(token)
-     const requestUrl = `${API_URL}/resources/my-library`;
-console.log("Fetching from URL:", requestUrl);
+      console.log(token);
+      const requestUrl = `${API_URL}/resources/my-library`;
+      console.log("Fetching from URL:", requestUrl);
       const response = await fetch(`${API_URL}/resources/my-library`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.msg || 'Failed to fetch saved resources');
+        throw new Error(errorData.msg || "Failed to fetch saved resources");
       }
 
       const data = await response.json();
       setSavedResources(data);
     } catch (err) {
-      console.error('Error fetching saved resources:', err);
+      console.error("Error fetching saved resources:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -140,78 +140,99 @@ console.log("Fetching from URL:", requestUrl);
   }, []);
 
   // Handle unsaving a resource
-  const handleUnsave = useCallback(async (resourceId) => {
-    try {
-      const response = await fetch(`${API_URL}/resources/${resourceId}/unsave`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+  const handleUnsave = useCallback(
+    async (resourceId) => {
+      try {
+        const response = await fetch(
+          `${API_URL}/resources/${resourceId}/unsave`,
+          {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.msg || 'Failed to unsave resource');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.msg || "Failed to unsave resource");
+        }
+
+        // Remove the resource from local state
+        setSavedResources((prev) =>
+          prev.filter((resource) => resource._id !== resourceId)
+        );
+
+        showModal({
+          type: "success",
+          title: "Resource Removed",
+          message: "The resource has been removed from your saved library.",
+          confirmText: "OK",
+        });
+      } catch (err) {
+        console.error("Error unsaving resource:", err);
+        showModal({
+          type: "error",
+          title: "Error",
+          message: `Failed to remove resource: ${err.message}`,
+          confirmText: "OK",
+        });
       }
-
-      // Remove the resource from local state
-      setSavedResources(prev => prev.filter(resource => resource._id !== resourceId));
-      
-      showModal({
-        type: 'success',
-        title: 'Resource Removed',
-        message: 'The resource has been removed from your saved library.',
-        confirmText: 'OK',
-      });
-    } catch (err) {
-      console.error('Error unsaving resource:', err);
-      showModal({
-        type: 'error',
-        title: 'Error',
-        message: `Failed to remove resource: ${err.message}`,
-        confirmText: 'OK',
-      });
-    }
-  }, [isAuthenticated, showModal]);
+    },
+    [isAuthenticated, showModal]
+  );
 
   // Confirm unsave with modal
-  const confirmUnsave = useCallback((resource) => {
-    showModal({
-      type: 'warning',
-      title: 'Remove from Library?',
-      message: `Are you sure you want to remove "${resource.title}" from your saved resources?`,
-      confirmText: 'Remove',
-      cancelText: 'Cancel',
-      onConfirm: () => handleUnsave(resource._id),
-    });
-  }, [handleUnsave, showModal]);
+  const confirmUnsave = useCallback(
+    (resource) => {
+      showModal({
+        type: "warning",
+        title: "Remove from Library?",
+        message: `Are you sure you want to remove "${resource.title}" from your saved resources?`,
+        confirmText: "Remove",
+        cancelText: "Cancel",
+        onConfirm: () => handleUnsave(resource._id),
+      });
+    },
+    [handleUnsave, showModal]
+  );
 
   // Get unique subjects for filter
   const subjects = useMemo(() => {
-    const subjectSet = new Set(savedResources.map(resource => resource.subject));
+    const subjectSet = new Set(
+      savedResources.map((resource) => resource.subject)
+    );
     return Array.from(subjectSet).sort();
   }, [savedResources]);
 
   // Filter and sort resources
   const filteredAndSortedResources = useMemo(() => {
-    let filtered = savedResources.filter(resource => {
-      const matchesSearch = !searchTerm || 
+    let filtered = savedResources.filter((resource) => {
+      const matchesSearch =
+        !searchTerm ||
         resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        resource.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        resource.description
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
         resource.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        resource.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+        resource.tags?.some((tag) =>
+          tag.toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
-      const matchesSubject = !selectedSubject || resource.subject === selectedSubject;
+      const matchesSubject =
+        !selectedSubject || resource.subject === selectedSubject;
 
-      const matchesFilter = filterBy === 'all' || 
-        (filterBy === 'pdf' && resource.fileType?.toLowerCase().includes('pdf')) ||
-        (filterBy === 'image' && resource.fileType?.toLowerCase().includes('image')) ||
-        (filterBy === 'document' && (
-          resource.fileType?.toLowerCase().includes('doc') ||
-          resource.fileType?.toLowerCase().includes('xls') ||
-          resource.fileType?.toLowerCase().includes('ppt')
-        ));
+      const matchesFilter =
+        filterBy === "all" ||
+        (filterBy === "pdf" &&
+          resource.fileType?.toLowerCase().includes("pdf")) ||
+        (filterBy === "image" &&
+          resource.fileType?.toLowerCase().includes("image")) ||
+        (filterBy === "document" &&
+          (resource.fileType?.toLowerCase().includes("doc") ||
+            resource.fileType?.toLowerCase().includes("xls") ||
+            resource.fileType?.toLowerCase().includes("ppt")));
 
       return matchesSearch && matchesSubject && matchesFilter;
     });
@@ -219,20 +240,23 @@ console.log("Fetching from URL:", requestUrl);
     // Sort resources
     filtered.sort((a, b) => {
       switch (sortBy) {
-        case 'title':
+        case "title":
           return a.title.localeCompare(b.title);
-        case 'subject':
+        case "subject":
           return a.subject.localeCompare(b.subject);
-        case 'rating':
+        case "rating":
           return (b.averageRating || 0) - (a.averageRating || 0);
-        case 'downloads':
+        case "downloads":
           return (b.downloads || 0) - (a.downloads || 0);
-        case 'year':
+        case "year":
           return (b.year || 0) - (a.year || 0);
-        case 'savedDate':
+        case "savedDate":
         default:
           // Sort by creation date if savedAt isn't available
-          return new Date(b.createdAt || b.updatedAt) - new Date(a.createdAt || a.updatedAt);
+          return (
+            new Date(b.createdAt || b.updatedAt) -
+            new Date(a.createdAt || a.updatedAt)
+          );
       }
     });
 
@@ -243,8 +267,15 @@ console.log("Fetching from URL:", requestUrl);
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-onyx flex items-center justify-center">
         <div className="text-center">
-          <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-blue-500 mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading your saved resources...</p>
+          <FontAwesomeIcon
+            icon={faSpinner}
+            spin
+            size="2x"
+            className="text-blue-500 mb-4"
+          />
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading your saved resources...
+          </p>
         </div>
       </div>
     );
@@ -254,7 +285,11 @@ console.log("Fetching from URL:", requestUrl);
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center max-w-md">
-          <FontAwesomeIcon icon={faExclamationTriangle} size="2x" className="text-red-500 mb-4" />
+          <FontAwesomeIcon
+            icon={faExclamationTriangle}
+            size="2x"
+            className="text-red-500 mb-4"
+          />
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             Error Loading Resources
           </h2>
@@ -276,7 +311,10 @@ console.log("Fetching from URL:", requestUrl);
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <FontAwesomeIcon icon={faBookmark} className="text-blue-500 text-2xl" />
+            <FontAwesomeIcon
+              icon={faBookmark}
+              className="text-blue-500 text-2xl"
+            />
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               My Saved Resources
             </h1>
@@ -292,9 +330,9 @@ console.log("Fetching from URL:", requestUrl);
             {/* Search */}
             <div className="flex-1">
               <div className="relative">
-                <FontAwesomeIcon 
-                  icon={faSearch} 
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" 
+                <FontAwesomeIcon
+                  icon={faSearch}
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
                 />
                 <input
                   type="text"
@@ -327,7 +365,9 @@ console.log("Fetching from URL:", requestUrl);
               >
                 <FontAwesomeIcon icon={faFilter} />
                 Filters
-                <FontAwesomeIcon icon={showFilters ? faChevronUp : faChevronDown} />
+                <FontAwesomeIcon
+                  icon={showFilters ? faChevronUp : faChevronDown}
+                />
               </button>
             </div>
           </div>
@@ -346,8 +386,10 @@ console.log("Fetching from URL:", requestUrl);
                     className="px-3 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx dark:text-white"
                   >
                     <option value="">All Subjects</option>
-                    {subjects.map(subject => (
-                      <option key={subject} value={subject}>{subject}</option>
+                    {subjects.map((subject) => (
+                      <option key={subject} value={subject}>
+                        {subject}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -371,10 +413,10 @@ console.log("Fetching from URL:", requestUrl);
                 <div className="flex items-end">
                   <button
                     onClick={() => {
-                      setSearchTerm('');
-                      setSelectedSubject('');
-                      setFilterBy('all');
-                      setSortBy('savedDate');
+                      setSearchTerm("");
+                      setSelectedSubject("");
+                      setFilterBy("all");
+                      setSortBy("savedDate");
                     }}
                     className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                   >
@@ -390,7 +432,10 @@ console.log("Fetching from URL:", requestUrl);
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white dark:bg-onyx rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
             <div className="flex items-center">
-              <FontAwesomeIcon icon={faBookmark} className="text-blue-500 text-2xl mr-3" />
+              <FontAwesomeIcon
+                icon={faBookmark}
+                className="text-blue-500 text-2xl mr-3"
+              />
               <div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {savedResources.length}
@@ -402,7 +447,10 @@ console.log("Fetching from URL:", requestUrl);
 
           <div className="bg-white dark:bg-onyx rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
             <div className="flex items-center">
-              <FontAwesomeIcon icon={faGraduationCap} className="text-green-500 text-2xl mr-3" />
+              <FontAwesomeIcon
+                icon={faGraduationCap}
+                className="text-green-500 text-2xl mr-3"
+              />
               <div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {subjects.length}
@@ -414,7 +462,10 @@ console.log("Fetching from URL:", requestUrl);
 
           <div className="bg-white dark:bg-onyx rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
             <div className="flex items-center">
-              <FontAwesomeIcon icon={faEye} className="text-purple-500 text-2xl mr-3" />
+              <FontAwesomeIcon
+                icon={faEye}
+                className="text-purple-500 text-2xl mr-3"
+              />
               <div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {filteredAndSortedResources.length}
@@ -428,19 +479,24 @@ console.log("Fetching from URL:", requestUrl);
         {/* Resources Grid */}
         {filteredAndSortedResources.length === 0 ? (
           <div className="text-center py-12">
-            <FontAwesomeIcon icon={faBookmark} size="3x" className="text-gray-300 dark:text-gray-600 mb-4" />
+            <FontAwesomeIcon
+              icon={faBookmark}
+              size="3x"
+              className="text-gray-300 dark:text-gray-600 mb-4"
+            />
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              {savedResources.length === 0 ? 'No Saved Resources Yet' : 'No Resources Found'}
+              {savedResources.length === 0
+                ? "No Saved Resources Yet"
+                : "No Resources Found"}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {savedResources.length === 0 
-                ? 'Start building your library by saving resources you find interesting!'
-                : 'Try adjusting your search or filter criteria.'
-              }
+              {savedResources.length === 0
+                ? "Start building your library by saving resources you find interesting!"
+                : "Try adjusting your search or filter criteria."}
             </p>
             {savedResources.length === 0 && (
               <button
-                onClick={() => window.location.href = '/explore'} // Adjust route as needed
+                onClick={() => (window.location.href = "/explore")} // Adjust route as needed
                 className="px-6 py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600"
               >
                 Explore Resources
@@ -457,7 +513,7 @@ console.log("Fetching from URL:", requestUrl);
                   onFlag={() => {}} // Handle flag if needed
                   showModal={showModal}
                 />
-                
+
                 {/* Unsave button overlay */}
                 <button
                   onClick={() => confirmUnsave(resource)}
@@ -472,11 +528,7 @@ console.log("Fetching from URL:", requestUrl);
         )}
       </div>
 
-      <Modal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        config={modalConfig}
-      />
+      <Modal isOpen={isModalOpen} onClose={closeModal} config={modalConfig} />
     </div>
   );
 };

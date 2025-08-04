@@ -1,18 +1,34 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faBookmark, faFlag, faFileAlt, faStar, faEye, faSpinner, faTimes, faExternalLinkAlt, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
-import { ZoomIn, ZoomOut } from 'lucide-react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import { useAuth } from '../../context/AuthContext/AuthContext';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faDownload,
+  faBookmark,
+  faFlag,
+  faFileAlt,
+  faStar,
+  faEye,
+  faSpinner,
+  faTimes,
+  faExternalLinkAlt,
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/free-solid-svg-icons";
+import { ZoomIn, ZoomOut } from "lucide-react";
+import { Document, Page, pdfjs } from "react-pdf";
+import { useAuth } from "../../context/AuthContext/AuthContext";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
-
-  pdfjs.GlobalWorkerOptions.workerSrc = `../../../workers/pdf.worker.min.js`;
-
+pdfjs.GlobalWorkerOptions.workerSrc = `../../../workers/pdf.worker.min.js`;
 
 const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
-  const { token , isAuthenticated } = useAuth();
+  const { token, isAuthenticated } = useAuth();
   const [downloading, setDownloading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [flagging, setFlagging] = useState(false);
@@ -27,10 +43,10 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
   const [loadingTimeout, setLoadingTimeout] = useState(null);
   const previewContainerRef = useRef(null);
   const [previewDataUrl, setPreviewDataUrl] = useState(null);
-  const API_URL = import.meta.env.APP_API_URL || 'http://localhost:5000/api';
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   useEffect(() => {
-    console.log('ResourceCard rendered');
+    console.log("ResourceCard rendered");
   });
 
   useEffect(() => {
@@ -42,10 +58,18 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
 
   const getTypeClasses = (type) => {
     const normalizedType = type?.toLowerCase();
-    if (normalizedType && normalizedType.includes('pdf')) return 'bg-amber-100 text-amber-800 dark:bg-amber-950/90 dark:text-amber-200 font-poppins';
-    if (normalizedType && normalizedType.includes('image')) return 'bg-amber-100 text-amber-800 dark:bg-amber-950/90 dark:text-amber-200 font-poppins';
-    if (normalizedType && (normalizedType.includes('doc') || normalizedType.includes('xls') || normalizedType.includes('ppt'))) return 'bg-amber-100 text-amber-800 dark:bg-amber-950/90 dark:text-amber-200 font-poppins';
-    return 'bg-amber-100 text-amber-800 dark:bg-amber-950/90 dark:text-amber-200 font-poppins';
+    if (normalizedType && normalizedType.includes("pdf"))
+      return "bg-amber-100 text-amber-800 dark:bg-amber-950/90 dark:text-amber-200 font-poppins";
+    if (normalizedType && normalizedType.includes("image"))
+      return "bg-amber-100 text-amber-800 dark:bg-amber-950/90 dark:text-amber-200 font-poppins";
+    if (
+      normalizedType &&
+      (normalizedType.includes("doc") ||
+        normalizedType.includes("xls") ||
+        normalizedType.includes("ppt"))
+    )
+      return "bg-amber-100 text-amber-800 dark:bg-amber-950/90 dark:text-amber-200 font-poppins";
+    return "bg-amber-100 text-amber-800 dark:bg-amber-950/90 dark:text-amber-200 font-poppins";
   };
 
   const genericBgColor = "#F59E0B"; // amber-500 from tailwind.config.js
@@ -58,35 +82,50 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
     return (
       <div className="flex items-center gap-1">
         {[...Array(fullStars)].map((_, i) => (
-          <FontAwesomeIcon key={`full-${i}`} icon={faStar} className="text-yellow-500 dark:text-amber-400 " />
+          <FontAwesomeIcon
+            key={`full-${i}`}
+            icon={faStar}
+            className="text-yellow-500 dark:text-amber-400 "
+          />
         ))}
-        {hasHalfStar && <FontAwesomeIcon icon={faStar} className="text-yellow-500 dark:text-amber-400 opacity-50" />}
+        {hasHalfStar && (
+          <FontAwesomeIcon
+            icon={faStar}
+            className="text-yellow-500 dark:text-amber-400 opacity-50"
+          />
+        )}
         {[...Array(emptyStars)].map((_, i) => (
-          <FontAwesomeIcon key={`empty-${i}`} icon={faStar} className="text-yellow-500 dark:text-amber-400" />
+          <FontAwesomeIcon
+            key={`empty-${i}`}
+            icon={faStar}
+            className="text-yellow-500 dark:text-amber-400"
+          />
         ))}
       </div>
     );
   };
 
   const getFileExtension = (url) => {
-    if (!url) return '';
+    if (!url) return "";
     try {
       const path = new URL(url).pathname;
-      const lastDotIndex = path.lastIndexOf('.');
+      const lastDotIndex = path.lastIndexOf(".");
       if (lastDotIndex > -1) {
         return path.substring(lastDotIndex).split(/[?#]/)[0].toLowerCase();
       }
     } catch (e) {
-      console.error('Error parsing URL:', e);
+      console.error("Error parsing URL:", e);
     }
-    return '';
+    return "";
   };
 
   const startLoadingTimeout = useCallback(() => {
     clearLoadingTimeout();
     const timeout = setTimeout(() => {
       setUseFallback(true);
-      setPreviewError('Preview is taking too long to load. You might want to download the file instead.');
+      setPreviewError(
+        "Preview is taking too long to load. You might want to download the file instead."
+      );
     }, 30000);
     setLoadingTimeout(timeout);
   }, []);
@@ -113,31 +152,40 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
     }
   }, [previewDataUrl, clearLoadingTimeout]);
 
-  const onDocumentLoadSuccess = useCallback(({ numPages }) => {
-    console.log('PDF loaded successfully, pages:', numPages);
-    setNumPages(numPages);
-    setPreviewLoading(false);
-    setPreviewError(null);
-    clearLoadingTimeout();
-  }, [clearLoadingTimeout]);
+  const onDocumentLoadSuccess = useCallback(
+    ({ numPages }) => {
+      console.log("PDF loaded successfully, pages:", numPages);
+      setNumPages(numPages);
+      setPreviewLoading(false);
+      setPreviewError(null);
+      clearLoadingTimeout();
+    },
+    [clearLoadingTimeout]
+  );
 
-  const onDocumentLoadError = useCallback((error) => {
-    console.error('Error loading PDF document:', error);
-    setPreviewError('Failed to load PDF preview. It might be corrupted or incompatible.');
-    setUseFallback(true);
-    setPreviewLoading(false);
-    clearLoadingTimeout();
-  }, [clearLoadingTimeout]);
+  const onDocumentLoadError = useCallback(
+    (error) => {
+      console.error("Error loading PDF document:", error);
+      setPreviewError(
+        "Failed to load PDF preview. It might be corrupted or incompatible."
+      );
+      setUseFallback(true);
+      setPreviewLoading(false);
+      clearLoadingTimeout();
+    },
+    [clearLoadingTimeout]
+  );
 
   const handleDownload = async () => {
     if (!isAuthenticated) {
       showModal({
-        type: 'warning',
-        title: 'Authentication Required',
-        message: 'You need to be logged in to download resources. Please log in or create an account.',
-        confirmText: 'Go to Login',
-        onConfirm: () => console.log('Navigating to login...'),
-        cancelText: 'Cancel',
+        type: "warning",
+        title: "Authentication Required",
+        message:
+          "You need to be logged in to download resources. Please log in or create an account.",
+        confirmText: "Go to Login",
+        onConfirm: () => console.log("Navigating to login..."),
+        cancelText: "Cancel",
         isDismissible: true,
       });
       return;
@@ -145,106 +193,128 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
 
     setDownloading(true);
     try {
-      console.log('Initiating download for:', resource.title);
-      const response = await fetch(`${API_URL}/resources/${resource._id}/download`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': '*/*',
-        },
-      });
+      console.log("Initiating download for:", resource.title);
+      const response = await fetch(
+        `${API_URL}/resources/${resource._id}/download`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "*/*",
+          },
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.msg || 'Unknown error'}`);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${
+            errorData.msg || "Unknown error"
+          }`
+        );
       }
 
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `${resource.title.replace(/[^a-z0-9._-]/gi, '_')}${getFileExtension(resource.cloudinaryUrl)}`;
+      link.download = `${resource.title.replace(
+        /[^a-z0-9._-]/gi,
+        "_"
+      )}${getFileExtension(resource.cloudinaryUrl)}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
 
       showModal({
-        type: 'success',
-        title: 'Download Started',
-        message: 'Your download has started successfully!',
-        confirmText: 'OK',
+        type: "success",
+        title: "Download Started",
+        message: "Your download has started successfully!",
+        confirmText: "OK",
       });
 
       await fetch(`${API_URL}/resources/${resource._id}/increment-download`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
-      console.log('Download count incremented.');
+      console.log("Download count incremented.");
     } catch (error) {
-      console.error('Download failed:', error);
+      console.error("Download failed:", error);
       showModal({
-        type: 'error',
-        title: 'Download Failed',
+        type: "error",
+        title: "Download Failed",
         message: `Could not download the file: ${error.message}. Please try again.`,
-        confirmText: 'Close',
+        confirmText: "Close",
       });
     } finally {
       setDownloading(false);
     }
   };
 
-  const documentProps = useMemo(() => ({
-    file: previewDataUrl,
-    onLoadSuccess: onDocumentLoadSuccess,
-    onLoadError: onDocumentLoadError,
-    className: "w-full h-full overflow-auto",
-    loading: (
-      <div className="flex flex-col items-center text-gray-600 dark:text-platinum font-poppins">
-        <FontAwesomeIcon icon={faSpinner} spin size="2x" className="mb-3 text-amber-600 dark:text-amber-200" />
-        <span>Loading PDF...</span>
-      </div>
-    ),
-    error: (
-      <div className="text-center text-red-600 dark:text-amber-300 font-poppins">
-        <p className="mb-2">Error rendering PDF. Please try downloading.</p>
-        <button
-          onClick={handleDownload}
-          className="mt-4 px-4 py-2 bg-amber-600 text-white dark:bg-onyx/90 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 rounded-md hover:bg-amber-700 dark:hover:bg-amber-950/90 font-poppins shadow-glow-sm"
-        >
-          <FontAwesomeIcon icon={faDownload} className="mr-2" /> Download File
-        </button>
-      </div>
-    ),
-    renderTextLayer: false,
-    renderAnnotationLayer: false,
-  }), [previewDataUrl, onDocumentLoadSuccess, onDocumentLoadError, handleDownload]);
+  const documentProps = useMemo(
+    () => ({
+      file: previewDataUrl,
+      onLoadSuccess: onDocumentLoadSuccess,
+      onLoadError: onDocumentLoadError,
+      className: "w-full h-full overflow-auto",
+      loading: (
+        <div className="flex flex-col items-center text-gray-600 dark:text-platinum font-poppins">
+          <FontAwesomeIcon
+            icon={faSpinner}
+            spin
+            size="2x"
+            className="mb-3 text-amber-600 dark:text-amber-200"
+          />
+          <span>Loading PDF...</span>
+        </div>
+      ),
+      error: (
+        <div className="text-center text-red-600 dark:text-amber-300 font-poppins">
+          <p className="mb-2">Error rendering PDF. Please try downloading.</p>
+          <button
+            onClick={handleDownload}
+            className="mt-4 px-4 py-2 bg-amber-600 text-white dark:bg-onyx/90 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 rounded-md hover:bg-amber-700 dark:hover:bg-amber-950/90 font-poppins shadow-glow-sm"
+          >
+            <FontAwesomeIcon icon={faDownload} className="mr-2" /> Download File
+          </button>
+        </div>
+      ),
+      renderTextLayer: false,
+      renderAnnotationLayer: false,
+    }),
+    [previewDataUrl, onDocumentLoadSuccess, onDocumentLoadError, handleDownload]
+  );
 
-  const pageProps = useMemo(() => ({
-    pageNumber: pageNumber,
-    scale: zoom,
-    renderTextLayer: false,
-    renderAnnotationLayer: false,
-    className: "shadow-lg my-2",
-  }), [pageNumber, zoom]);
+  const pageProps = useMemo(
+    () => ({
+      pageNumber: pageNumber,
+      scale: zoom,
+      renderTextLayer: false,
+      renderAnnotationLayer: false,
+      className: "shadow-lg my-2",
+    }),
+    [pageNumber, zoom]
+  );
 
   const handlePreview = async () => {
     if (!isAuthenticated) {
       showModal({
-        type: 'warning',
-        title: 'Authentication Required',
-        message: 'You need to be logged in to preview resources. Please log in or create an account.',
-        confirmText: 'Go to Login',
-        onConfirm: () => console.log('Navigating to login...'),
-        cancelText: 'Cancel',
+        type: "warning",
+        title: "Authentication Required",
+        message:
+          "You need to be logged in to preview resources. Please log in or create an account.",
+        confirmText: "Go to Login",
+        onConfirm: () => console.log("Navigating to login..."),
+        cancelText: "Cancel",
         isDismissible: true,
       });
       return;
     }
 
-    console.log('Opening preview modal');
+    console.log("Opening preview modal");
     setShowPreviewModal(true);
     setPreviewLoading(true);
     setPreviewError(null);
@@ -254,33 +324,42 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
     startLoadingTimeout();
 
     try {
-      const response = await fetch(`${API_URL}/resources/${resource._id}/preview`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${API_URL}/resources/${resource._id}/preview`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       clearLoadingTimeout();
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.msg || 'Unknown error'}`);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${
+            errorData.msg || "Unknown error"
+          }`
+        );
       }
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setPreviewDataUrl(url);
     } catch (error) {
-      console.error('Preview failed:', error);
-      setPreviewError(`Failed to load preview: ${error.message}. This file might not be directly viewable.`);
+      console.error("Preview failed:", error);
+      setPreviewError(
+        `Failed to load preview: ${error.message}. This file might not be directly viewable.`
+      );
       setUseFallback(true);
       setPreviewLoading(false);
       showModal({
-        type: 'error',
-        title: 'Preview Failed',
+        type: "error",
+        title: "Preview Failed",
         message: `Could not load preview for this file: ${error.message}. It might be corrupted or an unsupported format. Please try downloading it instead.`,
-        confirmText: 'OK',
+        confirmText: "OK",
       });
     } finally {
       setPreviewLoading(false);
@@ -288,65 +367,81 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
   };
 
   const handleClosePreviewModal = useCallback(() => {
-    console.log('Closing preview modal');
+    console.log("Closing preview modal");
     setShowPreviewModal(false);
     resetPreviewState();
   }, [resetPreviewState]);
 
-  const changePage = useCallback((offset) => {
-    setPageNumber(prevPageNumber => Math.max(1, Math.min(prevPageNumber + offset, numPages)));
-  }, [numPages]);
+  const changePage = useCallback(
+    (offset) => {
+      setPageNumber((prevPageNumber) =>
+        Math.max(1, Math.min(prevPageNumber + offset, numPages))
+      );
+    },
+    [numPages]
+  );
 
-  const handleZoomIn = useCallback(() => setZoom(prev => Math.min(prev + 0.1, 3)), []);
-  const handleZoomOut = useCallback(() => setZoom(prev => Math.max(prev - 0.1, 0.5)), []);
+  const handleZoomIn = useCallback(
+    () => setZoom((prev) => Math.min(prev + 0.1, 3)),
+    []
+  );
+  const handleZoomOut = useCallback(
+    () => setZoom((prev) => Math.max(prev - 0.1, 0.5)),
+    []
+  );
 
   const handleSave = async () => {
     if (!isAuthenticated) {
       showModal({
-        type: 'warning',
-        title: 'Authentication Required',
-        message: 'You need to be logged in to save resources to your library. Please log in or create an account.',
-        confirmText: 'Go to Login',
-        onConfirm: () => console.log('Navigating to login...'),
-        cancelText: 'Cancel',
+        type: "warning",
+        title: "Authentication Required",
+        message:
+          "You need to be logged in to save resources to your library. Please log in or create an account.",
+        confirmText: "Go to Login",
+        onConfirm: () => console.log("Navigating to login..."),
+        cancelText: "Cancel",
         isDismissible: true,
       });
       return;
     }
     setSaving(true);
     try {
-      const response = await fetch(`${API_URL}/resources/${resource._id}/save`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${API_URL}/resources/${resource._id}/save`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       const data = await response.json();
       if (response.ok) {
         showModal({
-          type: 'success',
-          title: 'Resource Saved!',
-          message: 'This resource has been successfully added to your library!',
-          confirmText: 'Great!',
+          type: "success",
+          title: "Resource Saved!",
+          message: "This resource has been successfully added to your library!",
+          confirmText: "Great!",
         });
         onSave?.(resource._id);
       } else {
         showModal({
-          type: 'error',
-          title: 'Failed to Save',
-          message: `Could not save resource: ${data.msg || 'Unknown error'}`,
-          confirmText: 'OK',
+          type: "error",
+          title: "Failed to Save",
+          message: `Could not save resource: ${data.msg || "Unknown error"}`,
+          confirmText: "OK",
         });
       }
     } catch (error) {
-      console.error('Save error:', error);
+      console.error("Save error:", error);
       showModal({
-        type: 'error',
-        title: 'Save Error',
-        message: 'An unexpected error occurred while saving the resource. Please try again.',
-        confirmText: 'OK',
+        type: "error",
+        title: "Save Error",
+        message:
+          "An unexpected error occurred while saving the resource. Please try again.",
+        confirmText: "OK",
       });
     } finally {
       setSaving(false);
@@ -356,84 +451,97 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
   const handleFlag = async () => {
     if (!isAuthenticated) {
       showModal({
-        type: 'warning',
-        title: 'Authentication Required',
-        message: 'You need to be logged in to flag resources. Please log in or create an account.',
-        confirmText: 'Go to Login',
-        onConfirm: () => console.log('Navigating to login...'),
-        cancelText: 'Cancel',
+        type: "warning",
+        title: "Authentication Required",
+        message:
+          "You need to be logged in to flag resources. Please log in or create an account.",
+        confirmText: "Go to Login",
+        onConfirm: () => console.log("Navigating to login..."),
+        cancelText: "Cancel",
         isDismissible: true,
       });
       return;
     }
 
-    const reason = prompt('Please provide a reason for flagging this resource:');
+    const reason = prompt(
+      "Please provide a reason for flagging this resource:"
+    );
     if (!reason?.trim()) {
       showModal({
-        type: 'info',
-        title: 'Flagging Cancelled',
-        message: 'Flagging was cancelled because no reason was provided.',
-        confirmText: 'OK',
+        type: "info",
+        title: "Flagging Cancelled",
+        message: "Flagging was cancelled because no reason was provided.",
+        confirmText: "OK",
       });
       return;
     }
 
     setFlagging(true);
     try {
-      const response = await fetch(`${API_URL}/resources/${resource._id}/flag`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ reason: reason.trim() }),
-      });
+      const response = await fetch(
+        `${API_URL}/resources/${resource._id}/flag`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ reason: reason.trim() }),
+        }
+      );
 
       const data = await response.json();
       if (response.ok) {
         showModal({
-          type: 'success',
-          title: 'Resource Flagged',
-          message: 'This resource has been flagged for review. Thank you for helping us maintain content quality!',
-          confirmText: 'Got It',
+          type: "success",
+          title: "Resource Flagged",
+          message:
+            "This resource has been flagged for review. Thank you for helping us maintain content quality!",
+          confirmText: "Got It",
         });
         onFlag?.(resource._id);
       } else {
         showModal({
-          type: 'error',
-          title: 'Failed to Flag',
-          message: `Could not flag resource: ${data.msg || 'Unknown error'}`,
-          confirmText: 'OK',
+          type: "error",
+          title: "Failed to Flag",
+          message: `Could not flag resource: ${data.msg || "Unknown error"}`,
+          confirmText: "OK",
         });
       }
     } catch (error) {
-      console.error('Flag error:', error);
+      console.error("Flag error:", error);
       showModal({
-        type: 'error',
-        title: 'Flagging Error',
-        message: 'An unexpected error occurred while flagging the resource. Please try again.',
-        confirmText: 'OK',
+        type: "error",
+        title: "Flagging Error",
+        message:
+          "An unexpected error occurred while flagging the resource. Please try again.",
+        confirmText: "OK",
       });
     } finally {
       setFlagging(false);
     }
   };
 
-  const isPDF = resource.cloudinaryUrl && getFileExtension(resource.cloudinaryUrl) === '.pdf';
-  const isImage = resource.cloudinaryUrl && (
-    getFileExtension(resource.cloudinaryUrl) === '.jpg' ||
-    getFileExtension(resource.cloudinaryUrl) === '.jpeg' ||
-    getFileExtension(resource.cloudinaryUrl) === '.png' ||
-    getFileExtension(resource.cloudinaryUrl) === '.gif' ||
-    getFileExtension(resource.cloudinaryUrl) === '.svg'
-  );
+  const isPDF =
+    resource.cloudinaryUrl &&
+    getFileExtension(resource.cloudinaryUrl) === ".pdf";
+  const isImage =
+    resource.cloudinaryUrl &&
+    (getFileExtension(resource.cloudinaryUrl) === ".jpg" ||
+      getFileExtension(resource.cloudinaryUrl) === ".jpeg" ||
+      getFileExtension(resource.cloudinaryUrl) === ".png" ||
+      getFileExtension(resource.cloudinaryUrl) === ".gif" ||
+      getFileExtension(resource.cloudinaryUrl) === ".svg");
 
-  const handleModalBackgroundClick = useCallback((e) => {
-    if (e.target === e.currentTarget) {
-      console.log('Background clicked, closing modal');
-      handleClosePreviewModal();
-    }
-  }, [handleClosePreviewModal]);
+  const handleModalBackgroundClick = useCallback(
+    (e) => {
+      if (e.target === e.currentTarget) {
+        console.log("Background clicked, closing modal");
+        handleClosePreviewModal();
+      }
+    },
+    [handleClosePreviewModal]
+  );
 
   const handleModalContentMouseMove = useCallback((e) => {}, []);
 
@@ -451,14 +559,18 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
           <h3 className="text-xl font-semibold text-gray-900 dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:bg-clip-text dark:text-transparent line-clamp-2 font-poppins">
             {resource.title}
           </h3>
-          <span className={`px-2.5 py-1 rounded-full text-xs font-medium uppercase ${getTypeClasses(resource.fileType)}`}>
-            {resource.fileType || 'Document'}
+          <span
+            className={`px-2.5 py-1 rounded-full text-xs font-medium uppercase ${getTypeClasses(
+              resource.fileType
+            )}`}
+          >
+            {resource.fileType || "Document"}
           </span>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-platinum mb-3">
           <span>{resource.subject}</span>
           <span>•</span>
-          <span>{resource.uploadedBy?.username || 'Unknown'}</span>
+          <span>{resource.uploadedBy?.username || "Unknown"}</span>
           {resource.year && (
             <>
               <span>•</span>
@@ -467,13 +579,17 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
           )}
         </div>
         <p className="text-sm text-gray-600 dark:text-platinum mb-4 line-clamp-2">
-          {resource.description || 'No description available'}
+          {resource.description || "No description available"}
         </p>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center  gap-1">
             {renderStars(resource.averageRating || 0)}
             <span className="text-xs text-gray-600 dark:text-platinum ml-1">
-              ({resource.averageRating ? resource.averageRating.toFixed(1) : '0.0'})
+              (
+              {resource.averageRating
+                ? resource.averageRating.toFixed(1)
+                : "0.0"}
+              )
             </span>
           </div>
           <div className="text-xs text-gray-600 dark:text-platinum">
@@ -497,12 +613,23 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
             onClick={handlePreview}
             className="px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-onyx/90 dark:text-gray-300 hover:scale-105 dark:hover:bg-charcoal transition duration-200 rounded-lg flex items-center gap-2 text-sm disabled:opacity-50 shadow-glow-sm font-poppins"
             disabled={previewLoading || (!isPDF && !isImage)}
-            title={(!isPDF && !isImage) ? "Preview not available for this file type" : "Preview Document"}
+            title={
+              !isPDF && !isImage
+                ? "Preview not available for this file type"
+                : "Preview Document"
+            }
           >
             {previewLoading ? (
-              <FontAwesomeIcon icon={faSpinner} spin className="text-amber-600 dark:text-amber-200" />
+              <FontAwesomeIcon
+                icon={faSpinner}
+                spin
+                className="text-amber-600 dark:text-amber-200"
+              />
             ) : (
-              <FontAwesomeIcon icon={faEye} className="text-gray-600 dark:text-amber-200" />
+              <FontAwesomeIcon
+                icon={faEye}
+                className="text-gray-600 dark:text-amber-200"
+              />
             )}
             Preview
           </button>
@@ -514,9 +641,16 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
               title="Download"
             >
               {downloading ? (
-                <FontAwesomeIcon icon={faSpinner} spin className="text-amber-600 dark:text-amber-200" />
+                <FontAwesomeIcon
+                  icon={faSpinner}
+                  spin
+                  className="text-amber-600 dark:text-amber-200"
+                />
               ) : (
-                <FontAwesomeIcon icon={faDownload} className="text-amber-600 dark:text-amber-200" />
+                <FontAwesomeIcon
+                  icon={faDownload}
+                  className="text-amber-600 dark:text-amber-200"
+                />
               )}
             </button>
             <button
@@ -526,9 +660,16 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
               title="Save to Library"
             >
               {saving ? (
-                <FontAwesomeIcon icon={faSpinner} spin className="text-amber-600 dark:text-amber-200" />
+                <FontAwesomeIcon
+                  icon={faSpinner}
+                  spin
+                  className="text-amber-600 dark:text-amber-200"
+                />
               ) : (
-                <FontAwesomeIcon icon={faBookmark} className="text-amber-600 dark:text-amber-200" />
+                <FontAwesomeIcon
+                  icon={faBookmark}
+                  className="text-amber-600 dark:text-amber-200"
+                />
               )}
             </button>
             <button
@@ -538,9 +679,16 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
               title="Flag Content"
             >
               {flagging ? (
-                <FontAwesomeIcon icon={faSpinner} spin className="text-amber-600 dark:text-amber-200" />
+                <FontAwesomeIcon
+                  icon={faSpinner}
+                  spin
+                  className="text-amber-600 dark:text-amber-200"
+                />
               ) : (
-                <FontAwesomeIcon icon={faFlag} className="text-amber-600 dark:text-amber-200" />
+                <FontAwesomeIcon
+                  icon={faFlag}
+                  className="text-amber-600 dark:text-amber-200"
+                />
               )}
             </button>
           </div>
@@ -562,7 +710,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
                 Preview: {resource.title}
               </h2>
               <div className="flex items-center gap-2">
-                {(isPDF && !previewError) && (
+                {isPDF && !previewError && (
                   <>
                     <button
                       onClick={handleZoomOut}
@@ -604,12 +752,17 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
             <div
               ref={previewContainerRef}
               className="flex-1 overflow-auto p-4 flex items-center justify-center"
-              style={{ minHeight: 0, scrollbarWidth: 'none' }}
+              style={{ minHeight: 0, scrollbarWidth: "none" }}
               onClick={(e) => e.stopPropagation()}
             >
               {previewLoading && !previewError && (
                 <div className="flex flex-col items-center justify-center text-gray-600 dark:text-platinum font-poppins">
-                  <FontAwesomeIcon icon={faSpinner} spin size="2x" className="mb-3 text-amber-600 dark:text-amber-200" />
+                  <FontAwesomeIcon
+                    icon={faSpinner}
+                    spin
+                    size="2x"
+                    className="mb-3 text-amber-600 dark:text-amber-200"
+                  />
                   <span>Loading preview...</span>
                 </div>
               )}
@@ -622,7 +775,15 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
                       className="mt-4 px-4 py-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-onyx/90 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:hover:bg-amber-950/90 rounded-md shadow-glow-sm font-poppins"
                       disabled={downloading}
                     >
-                      {downloading ? <FontAwesomeIcon icon={faSpinner} spin className="mr-2" /> : <FontAwesomeIcon icon={faDownload} className="mr-2" />}
+                      {downloading ? (
+                        <FontAwesomeIcon
+                          icon={faSpinner}
+                          spin
+                          className="mr-2"
+                        />
+                      ) : (
+                        <FontAwesomeIcon icon={faDownload} className="mr-2" />
+                      )}
                       Download File
                     </button>
                   )}
@@ -633,7 +794,11 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
                       rel="noopener noreferrer"
                       className="mt-2 ml-2 inline-flex items-center px-4 py-2 border border-gray-300 dark:border-onyx rounded-md shadow-sm text-sm text-gray-700 dark:text-platinum bg-white dark:bg-onyx/90 hover:bg-gray-50 dark:hover:bg-amber-50/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-200 font-poppins"
                     >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-2 text-amber-600 dark:text-amber-200" /> Open in New Tab
+                      <FontAwesomeIcon
+                        icon={faExternalLinkAlt}
+                        className="mr-2 text-amber-600 dark:text-amber-200"
+                      />{" "}
+                      Open in New Tab
                     </a>
                   )}
                 </div>
@@ -643,10 +808,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
                   {isPDF ? (
                     <div className="flex flex-col items-center w-full h-full">
                       <Document {...documentProps}>
-                        <Page
-                          key={`page_${pageNumber}`}
-                          {...pageProps}
-                        />
+                        <Page key={`page_${pageNumber}`} {...pageProps} />
                       </Document>
                       {numPages > 1 && (
                         <div className="flex justify-center items-center mt-4 gap-4 bg-gray-100 dark:bg-amber-950/90 p-2 rounded-lg flex-shrink-0">
@@ -677,27 +839,41 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
                       className="max-w-full max-h-full object-contain"
                       onLoad={() => setPreviewLoading(false)}
                       onError={() => {
-                        setPreviewError('Failed to load image preview.');
+                        setPreviewError("Failed to load image preview.");
                         setUseFallback(true);
                         setPreviewLoading(false);
                         showModal({
-                          type: 'error',
-                          title: 'Image Preview Failed',
-                          message: 'Could not load image preview. The file might be corrupted or in an unsupported format.',
-                          confirmText: 'OK',
+                          type: "error",
+                          title: "Image Preview Failed",
+                          message:
+                            "Could not load image preview. The file might be corrupted or in an unsupported format.",
+                          confirmText: "OK",
                         });
                       }}
                     />
                   ) : (
                     <div className="text-center text-gray-600 dark:text-platinum font-poppins">
-                      <p className="mb-2">This file type is not directly previewable in the browser.</p>
-                      <p className="mb-4">Please download the file to view it.</p>
+                      <p className="mb-2">
+                        This file type is not directly previewable in the
+                        browser.
+                      </p>
+                      <p className="mb-4">
+                        Please download the file to view it.
+                      </p>
                       <button
                         onClick={handleDownload}
                         className="px-4 py-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-onyx/90 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:hover:bg-amber-950/90 rounded-md shadow-glow-sm font-poppins"
                         disabled={downloading}
                       >
-                        {downloading ? <FontAwesomeIcon icon={faSpinner} spin className="mr-2" /> : <FontAwesomeIcon icon={faDownload} className="mr-2" />}
+                        {downloading ? (
+                          <FontAwesomeIcon
+                            icon={faSpinner}
+                            spin
+                            className="mr-2"
+                          />
+                        ) : (
+                          <FontAwesomeIcon icon={faDownload} className="mr-2" />
+                        )}
                         Download File
                       </button>
                       {resource.cloudinaryUrl && (
@@ -707,7 +883,11 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
                           rel="noopener noreferrer"
                           className="mt-2 ml-2 inline-flex items-center px-4 py-2 border border-gray-300 dark:border-onyx rounded-md shadow-sm text-sm text-gray-700 dark:text-platinum bg-white dark:bg-onyx/90 hover:bg-gray-50 dark:hover:bg-amber-50/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-200 font-poppins"
                         >
-                          <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-2 text-amber-600 dark:text-amber-200" /> Open in New Tab
+                          <FontAwesomeIcon
+                            icon={faExternalLinkAlt}
+                            className="mr-2 text-amber-600 dark:text-amber-200"
+                          />{" "}
+                          Open in New Tab
                         </a>
                       )}
                     </div>
