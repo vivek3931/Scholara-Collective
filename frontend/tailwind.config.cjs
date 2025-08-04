@@ -86,4 +86,4 @@ module.exports = {
   // Add any Tailwind CSS plugins here (e.g., for forms, typography)
   // Example: require('@tailwindcss/forms') if you are using form styling
   plugins: [],
-};
+}; 
