@@ -1,122 +1,181 @@
+// backend/routes/analyticsRoutes.js
 const express = require('express');
 const router = express.Router();
 const Resource = require('../models/Resource');
 const User = require('../models/User');
-const auth = require('../middleware/auth'); // For protecting admin routes
-const moment = require('moment'); // For date-based queries (npm install moment)
+const { protect, authorize } = require('../middleware/authMiddleware');
 
-// @route   GET /api/analytics/admin/summary
-// @desc    Get overall platform summary for admin dashboard
-// @access  Private (Admin Only) - Requires role check
-router.get('/admin/summary', auth, async (req, res) => {
+// @route   GET /api/analytics/summary
+// @desc    Get a summary of platform analytics for the admin dashboard.
+// @access  Private (Admin/Superadmin only)
+router.get('/public-stats', async (req, res) => {
     try {
-        // Basic role check (you might want a more robust middleware for this)
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({ msg: 'Access denied. Admin only.' });
-        }
+        const totalResources = await Resource.countDocuments({ visibility: 'public' });
+        const totalStudents = await User.countDocuments(); // Adjust if you track active students differently
+        const totalCourses = await Resource.distinct('course').length; // Unique courses
+        const totalUniversities = await Resource.distinct('institution').length; // Unique institutions
 
+        res.json({
+            resources: totalResources,
+            students: totalStudents,
+            courses: totalCourses,
+            universities: totalUniversities
+        });
+    } catch (err) {
+        console.error('Public stats route error:', err.message);
+        res.status(500).json({ msg: 'Server error' });
+    }
+});
+
+
+
+router.get('/summary', protect, authorize('admin', 'superadmin'), async (req, res) => {
+    try {
         const totalUsers = await User.countDocuments();
         const totalResources = await Resource.countDocuments();
-        const totalDownloads = (await Resource.aggregate([
-            { $group: { _id: null, total: { $sum: '$downloads' } } }
-        ]))[0]?.total || 0;
-
-        // You could also add:
-        // - Resources uploaded in last 7 days
-        // - New users in last 7 days
-        // - Most flagged resources
-        // - Average rating across all resources
+        const totalDownloads = await Resource.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: '$downloads' }
+                }
+            }
+        ]);
+        const totalFlags = await Resource.countDocuments({ 'flags.0': { '$exists': true } });
 
         res.json({
             totalUsers,
             totalResources,
-            totalDownloads
+            totalDownloads: totalDownloads[0]?.total || 0,
+            totalFlaggedResources: totalFlags
         });
-
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error('Analytics summary route error:', err.message);
+        res.status(500).json({ msg: 'Server error' });
     }
 });
 
-// @route   GET /api/analytics/admin/popular-resources
-// @desc    Get top N most downloaded resources for admin
-// @access  Private (Admin Only)
-router.get('/admin/popular-resources', auth, async (req, res) => {
+
+// @route   GET /api/analytics/top-resources
+// @desc    Get top resources by downloads or ratings for admin view.
+// @access  Private (Admin/Superadmin only)
+router.get('/top-resources', protect, authorize('admin', 'superadmin'), async (req, res) => {
+    const { sortBy = 'downloads', limit = 10 } = req.query;
+
+    // Validate sortBy parameter
+    const validSorts = ['downloads', 'averageRating'];
+    if (!validSorts.includes(sortBy)) {
+      return res.status(400).json({ msg: 'Invalid sort parameter. Use "downloads" or "averageRating".' });
+    }
+
+    const sortOptions = {};
+    sortOptions[sortBy] = -1; // Sort descending
+
     try {
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({ msg: 'Access denied. Admin only.' });
-        }
+        const resources = await Resource.find({})
+            .sort(sortOptions)
+            .limit(parseInt(limit))
+            .populate('uploadedBy', 'username');
 
-        const limit = parseInt(req.query.limit) || 10; // Default to top 10
-
-        const popularResources = await Resource.find({})
-            .sort({ downloads: -1 }) // Sort by downloads in descending order
-            .limit(limit)
-            .select('title downloads averageRating'); // Select specific fields
-
-        res.json(popularResources);
-
+        res.json(resources);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error('Top resources route error:', err.message);
+        res.status(500).json({ msg: 'Server error' });
     }
 });
 
-// @route   GET /api/analytics/admin/flagged-resources
-// @desc    Get all resources that have been flagged for admin review
-// @access  Private (Admin Only)
-router.get('/admin/flagged-resources', auth, async (req, res) => {
-    try {
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({ msg: 'Access denied. Admin only.' });
-        }
 
-        const flaggedResources = await Resource.find({ 'flags.0': { '$exists': true } }) // Check if flags array is not empty
-            .populate('uploadedBy', 'username email')
-            .populate('flags.user', 'username email') // Populate user who flagged
-            .sort({ 'flags.createdAt': -1 }); // Sort by latest flag
+router.get('/users/top-contributors', protect, authorize('admin', 'superadmin'), async (req, res) => {
+    const { limit = 10 } = req.query;
+
+    try {
+        const contributors = await Resource.aggregate([
+            {
+                $group: {
+                    _id: '$uploadedBy',
+                    count: { $sum: 1 }
+                }
+            },
+            {
+                $sort: { count: -1 }
+            },
+            {
+                $limit: parseInt(limit)
+            },
+            {
+                $lookup: {
+                    from: 'users', // The name of the collection for the User model
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            {
+                $unwind: '$user'
+            },
+            {
+                $project: {
+                    _id: '$user._id',
+                    username: '$user.username',
+                    email: '$user.email',
+                    uploadCount: '$count'
+                }
+            }
+        ]);
+
+        res.json(contributors);
+    } catch (err) {
+        console.error('Top contributors route error:', err.message);
+        res.status(500).json({ msg: 'Server error' });
+    }
+});
+
+
+// @route   GET /api/analytics/resources/flags
+// @desc    Get a list of all flagged resources for admin review.
+// @access  Private (Admin/Superadmin only)
+router.get('/resources/flags', protect, authorize('admin', 'superadmin'), async (req, res) => {
+    try {
+        const flaggedResources = await Resource.find({ 'flags.0': { '$exists': true } })
+            .sort({ 'flags.createdAt': -1 }) // Sort by newest flag
+            .populate('uploadedBy', 'username')
+            .populate('flags.postedBy', 'username'); // Correctly populating the user who posted the flag
 
         res.json(flaggedResources);
-
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error('Flagged resources route error:', err.message);
+        res.status(500).json({ msg: 'Server error' });
     }
 });
 
-
 // @route   GET /api/analytics/user/my-activity
-// @desc    Get user's upload/download history for their dashboard
-// @access  Private (User specific)
-router.get('/user/my-activity', auth, async (req, res) => {
+// @desc    Get a summary of the current user's activity (uploads, saved resources).
+// @access  Private (Authenticated User only)
+router.get('/user/my-activity', protect, async (req, res) => {
     try {
-        // For user view of upload/download history 
         const userId = req.user.id;
 
         const uploadedResources = await Resource.find({ uploadedBy: userId })
-            .select('title downloads createdAt')
+            .select('title downloads createdAt averageRating')
             .sort({ createdAt: -1 });
 
-        // Note: Tracking downloads by a specific user is complex without
-        // adding a specific 'downloadedBy' array to resources or a dedicated
-        // download history in the User model. For now, we'll show uploaded.
-        // If you need per-user download history, you'd need to modify the
-        // Resource model or User model to store that data.
+        const savedResourcesCount = await User.findById(userId)
+            .select('savedResources')
+            .then(user => user?.savedResources.length || 0);
 
-        const savedResourcesCount = (await User.findById(userId).select('savedResources')).savedResources.length;
+        // NOTE: Per-user download tracking is not implemented in the base models.
+        // This is a placeholder for future functionality.
 
         res.json({
             uploadedResources,
-            savedResourcesCount, // Count of resources saved to personal library
-            // downloadsByMe: [...] // Placeholder if you implement specific user download tracking
+            savedResourcesCount,
+            // downloadsByMe: [...] // Placeholder for future implementation
         });
 
     } catch (err) {
-        console.error(err.message);
+        console.error('User activity route error:', err.message);
         res.status(500).send('Server Error');
     }
 });
-
 
 module.exports = router;
