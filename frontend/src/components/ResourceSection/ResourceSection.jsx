@@ -16,7 +16,7 @@ const ResourcesSection = ({ searchQuery, filterType, filterCourse, sortBy, setSo
 
       try {
         const queryParams = new URLSearchParams();
-        if (searchQuery) queryParams.append('keyword', searchQuery);
+        if (searchQuery) queryParams.append('search', searchQuery);
         if (filterType && filterType !== 'All') queryParams.append('type', filterType);
         if (filterCourse && filterCourse !== 'All') queryParams.append('course', filterCourse);
         if (sortBy === 'popular') queryParams.append('sortBy', 'downloads');

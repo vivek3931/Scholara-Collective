@@ -77,7 +77,7 @@ const Modal = ({ isOpen, onClose, config }) => {
 };
 
 const SavedResourcesPage = () => {
-  const { token, user } = useAuth();
+  const { token, user , isAuthenticated} = useAuth();
   const [savedResources, setSavedResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -89,13 +89,16 @@ const SavedResourcesPage = () => {
   const [modalConfig, setModalConfig] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const API_URL = import.meta.env.APP_API_URL || 'http://localhost:5000/api';
+  console.log(user)
 
   // Fetch saved resources from backend
   const fetchSavedResources = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
+      console.log(token)
+     const requestUrl = `${API_URL}/resources/my-library`;
+console.log("Fetching from URL:", requestUrl);
       const response = await fetch(`${API_URL}/resources/my-library`, {
         method: 'GET',
         headers: {
@@ -117,13 +120,13 @@ const SavedResourcesPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    if (token) {
+    if (isAuthenticated) {
       fetchSavedResources();
     }
-  }, [token, fetchSavedResources]);
+  }, [isAuthenticated, fetchSavedResources]);
 
   // Modal handler
   const showModal = useCallback((config) => {
@@ -170,7 +173,7 @@ const SavedResourcesPage = () => {
         confirmText: 'OK',
       });
     }
-  }, [token, showModal]);
+  }, [isAuthenticated, showModal]);
 
   // Confirm unsave with modal
   const confirmUnsave = useCallback((resource) => {

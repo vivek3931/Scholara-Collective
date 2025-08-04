@@ -20,6 +20,7 @@ const UploadPage = () => {
     const [success, setSuccess] = useState('');
     const API_URL = import.meta.env.APP_API_URL || 'http://localhost:5000/api';
 
+    // Expanded subjects including exam categories
     const subjects = [
         { value: '', label: 'Select Subject' },
         { value: 'Mathematics', label: 'Mathematics' },
@@ -40,15 +41,25 @@ const UploadPage = () => {
         { value: 'Law', label: 'Law' },
         { value: 'Arts and Culture', label: 'Arts and Culture' },
         { value: 'Physical Education', label: 'Physical Education' },
+        { value: 'UPSC', label: 'UPSC' },
+        { value: 'JEE', label: 'JEE' },
+        { value: 'NEET', label: 'NEET' },
+        { value: 'CAT', label: 'CAT' },
+        { value: 'IAS', label: 'IAS' },
+        { value: 'Other', label: 'Other' },
     ];
 
+    // Expanded courses for all note types
     const courses = [
-        { value: '', label: 'Select Course (Optional)' },
+        { value: '', label: 'Select Course Type (Optional)' },
         { value: 'Notes', label: 'Notes' },
         { value: 'Question Paper', label: 'Question Paper' },
         { value: 'Book', label: 'Book' },
         { value: 'Presentation', label: 'Presentation' },
         { value: 'Syllabus', label: 'Syllabus' },
+        { value: 'Mock Test', label: 'Mock Test' },
+        { value: 'Previous Year Paper', label: 'Previous Year Paper' },
+        { value: 'Study Guide', label: 'Study Guide' },
         { value: 'Other', label: 'Other' },
     ];
 
@@ -70,8 +81,8 @@ const UploadPage = () => {
             return;
         }
 
-        if (!title.trim() || !subject || !year || !institution.trim()) {
-            setError('Please fill in all required fields (Title, Subject, Year, Institution).');
+        if (!title.trim() || !subject || !year) { // Made institution optional
+            setError('Please fill in all required fields (Title, Subject, Year).');
             setUploading(false);
             return;
         }
@@ -82,7 +93,7 @@ const UploadPage = () => {
         formData.append('subject', subject);
         formData.append('course', course || '');
         formData.append('year', year);
-        formData.append('institution', institution.trim());
+        formData.append('institution', institution.trim() || 'N/A'); // Default to N/A if empty
         formData.append('tags', JSON.stringify(tags.split(',').map(tag => tag.trim()).filter(tag => tag)));
         formData.append('file', file);
 
@@ -107,7 +118,7 @@ const UploadPage = () => {
                 setInstitution('');
                 setTags('');
                 setFile(null);
-                
+
                 setTimeout(() => {
                     navigate('/resources');
                 }, 1500);
@@ -143,11 +154,12 @@ const UploadPage = () => {
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-onyx text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans">
-            <div className="container mx-auto  p-3 lg:p-6">
+            <Navbar />
+            <div className="container mx-auto p-3 lg:p-6">
                 <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-yellow-500 text-center mb-12">Upload New Resource</h1>
 
                 <div className="bg-white dark:bg-onyx p-4 lg:p-8 rounded-xl shadow-lg max-w-2xl mx-auto border border-gray-200 dark:border-charcoal transition-colors duration-300">
-                    {error && <p className="bg-red-100  text-red-600 dark:text-red-300 p-4 rounded-lg mb-6 text-center">{error}</p>}
+                    {error && <p className="bg-red-100 text-red-600 dark:text-red-300 p-4 rounded-lg mb-6 text-center">{error}</p>}
                     {success && <p className="bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-300 p-4 rounded-lg mb-6 text-center">{success}</p>}
 
                     <form onSubmit={handleSubmit} className="space-y-6">
@@ -175,7 +187,7 @@ const UploadPage = () => {
                                 type="text"
                                 id="title"
                                 className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-colors duration-200 placeholder:text-charcoal"
-                                placeholder="e.g., Quantum Physics Lecture Notes"
+                                placeholder="e.g., UPSC 2023 General Studies Notes"
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 required
@@ -285,16 +297,15 @@ const UploadPage = () => {
 
                         <div>
                             <label htmlFor="institution" className="block text-lg font-medium mb-2">
-                                Institution <span className="text-orange-500">*</span>
+                                Institution (Optional)
                             </label>
                             <input
                                 type="text"
                                 id="institution"
                                 className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-colors duration-200 placeholder:text-charcoal"
-                                placeholder="e.g., MIT, Harvard University, IIT Delhi"
+                                placeholder="e.g., MIT, N/A for exams like UPSC/JEE"
                                 value={institution}
                                 onChange={(e) => setInstitution(e.target.value)}
-                                required
                             />
                         </div>
 
@@ -306,7 +317,7 @@ const UploadPage = () => {
                                 type="text"
                                 id="tags"
                                 className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-colors duration-200 placeholder:text-charcoal"
-                                placeholder="e.g., physics, quantum, notes, university"
+                                placeholder="e.g., UPSC, GS1, JEE Physics, NEET Biology"
                                 value={tags}
                                 onChange={(e) => setTags(e.target.value)}
                             />

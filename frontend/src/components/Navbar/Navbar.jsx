@@ -1,8 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, NavLink } from 'react-router-dom';
-import { Menu, X, Moon, Sun, Upload, Home, BookOpen, Info, ChevronDown, User, Settings, LogOut, Bookmark } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from "react";
+import { Link, NavLink } from "react-router-dom";
+import {
+  Menu,
+  X,
+  Moon,
+  Sun,
+  Upload,
+  Home,
+  BookOpen,
+  Info,
+  ChevronDown,
+  User,
+  Settings,
+  LogOut,
+  Bookmark,
+  LayoutDashboard,
+} from "lucide-react";
+import { useAuth } from "../../context/AuthContext/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 // Desktop NavLink component
 const DesktopNavLink = ({ to, text }) => (
@@ -35,7 +50,8 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
   const navigate = useNavigate();
   const profileDropdownRef = useRef(null);
   const mobileMenuRef = useRef(null);
-  console.log(user)
+  // Check if the user is an admin or superadmin
+const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
 
   // --- Body Scroll Lock Logic ---
   useEffect(() => {
@@ -43,15 +59,15 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
 
     if (isMobileMenuOpen) {
       // Prevent scrolling
-      body.style.overflow = 'hidden';
+      body.style.overflow = "hidden";
     } else {
       // Restore scrolling
-      body.style.overflow = '';
+      body.style.overflow = "";
     }
 
     // Cleanup
     return () => {
-      body.style.overflow = '';
+      body.style.overflow = "";
     };
   }, [isMobileMenuOpen]);
 
@@ -72,13 +88,13 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
 
   // --- Profile Dropdown Toggle ---
   const toggleProfileDropdown = () => {
-    setIsProfileDropdownOpen(prev => !prev);
+    setIsProfileDropdownOpen((prev) => !prev);
   };
 
   // --- Handle Logout ---
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate("/");
     setIsProfileDropdownOpen(false);
     if (isMobileMenuOpen) toggleMobileMenu();
   };
@@ -94,32 +110,38 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
   // --- Close handlers for clicking outside dropdowns/menus ---
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+      if (
+        profileDropdownRef.current &&
+        !profileDropdownRef.current.contains(event.target)
+      ) {
         setIsProfileDropdownOpen(false);
       }
-      if (isMobileMenuOpen && mobileMenuRef.current &&
-          !mobileMenuRef.current.contains(event.target) &&
-          !event.target.closest('[aria-label="Toggle mobile menu"]')) {
+      if (
+        isMobileMenuOpen &&
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target) &&
+        !event.target.closest('[aria-label="Toggle mobile menu"]')
+      ) {
         toggleMobileMenu();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isMobileMenuOpen]);
 
   // --- Handle Escape Key ---
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         if (isMobileMenuOpen) toggleMobileMenu();
         if (isProfileDropdownOpen) setIsProfileDropdownOpen(false);
       }
     };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
   }, [isMobileMenuOpen, isProfileDropdownOpen]);
 
   return (
@@ -140,6 +162,7 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
             <>
               <DesktopNavLink to="/saved" text="My Library" />
               <DesktopNavLink to="/upload" text="Upload" />
+              {isAdmin && <DesktopNavLink to="/admin" text="Admin" />}
             </>
           )}
           <DesktopNavLink to="/about" text="About" />
@@ -153,7 +176,11 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
             className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
             aria-label="Toggle dark mode"
           >
-            {isDarkMode ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
+            {isDarkMode ? (
+              <Sun className="w-6 h-6" />
+            ) : (
+              <Moon className="w-6 h-6" />
+            )}
           </button>
 
           {/* User Profile / Auth Buttons (Desktop) */}
@@ -165,14 +192,16 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
                 aria-label="Profile menu"
               >
                 <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
-                  {user?.username?.charAt(0).toUpperCase() || 'U'}
+                  {user?.username?.charAt(0).toUpperCase() || "U"}
                 </div>
                 <span className="hidden md:block text-gray-700 dark:text-gray-200 font-medium text-sm">
-                  {user?.username || 'User'}
+                  {user?.username || "User"}
                 </span>
                 <ChevronDown
                   size={16}
-                  className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 ${isProfileDropdownOpen ? 'rotate-180' : ''}`}
+                  className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 ${
+                    isProfileDropdownOpen ? "rotate-180" : ""
+                  }`}
                 />
               </button>
               {isProfileDropdownOpen && (
@@ -180,10 +209,10 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
                   {user && (
                     <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {user.username || 'User'}
+                        {user.username || "User"}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {user.email || 'user@example.com'}
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">
+                        {user.roles || "Member"}
                       </p>
                     </div>
                   )}
@@ -194,6 +223,16 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
                   >
                     <Bookmark size={16} className="mr-3" /> My Library
                   </Link>
+                  {isAdmin && (
+                    <Link
+                      to="/admin"
+                      onClick={handleNavLinkClick}
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      <LayoutDashboard size={16} className="mr-3" /> Admin
+                      Dashboard
+                    </Link>
+                  )}
                   <Link
                     to="/profile"
                     onClick={handleNavLinkClick}
@@ -242,7 +281,11 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
               className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
               aria-label="Toggle mobile menu"
             >
-              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
             </button>
           </div>
         </div>
@@ -253,8 +296,10 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
         <>
           {/* Backdrop - Fixed positioning to cover entire viewport */}
           <div
-            className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-md transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0'}`}
-            style={{ minHeight: '100vh', width: '100vw' }}
+            className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-md transition-opacity duration-300 ${
+              isAnimating ? "opacity-100" : "opacity-0"
+            }`}
+            style={{ minHeight: "100vh", width: "100vw" }}
             onClick={toggleMobileMenu}
           />
 
@@ -262,13 +307,15 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
           <div
             ref={mobileMenuRef}
             className={`fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] bg-white/95 dark:bg-onyx/95 backdrop-blur-lg shadow-2xl transition-transform duration-300 ease-in-out ${
-              isAnimating ? 'translate-x-0' : 'translate-x-full'
+              isAnimating ? "translate-x-0" : "translate-x-full"
             }`}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-charcoal bg-gray-50/80 dark:bg-onyx backdrop-blur-sm">
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-gray-900 dark:text-white">Scholara Collective</span>
+                <span className="text-lg font-bold text-gray-900 dark:text-white">
+                  Scholara Collective
+                </span>
               </div>
               <button
                 onClick={toggleMobileMenu}
@@ -310,6 +357,14 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
                         text="Upload"
                         onClick={handleNavLinkClick}
                       />
+                      {isAdmin && (
+                        <MobileNavLink
+                          to="/admin"
+                          icon={<LayoutDashboard size={18} />}
+                          text="Admin Dashboard"
+                          onClick={handleNavLinkClick}
+                        />
+                      )}
                     </>
                   )}
                   <MobileNavLink
@@ -327,21 +382,21 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 p-3 bg-white/90 dark:bg-onyx/80 backdrop-blur-sm rounded-lg shadow-sm">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                        {user?.username?.charAt(0).toUpperCase() || 'U'}
+                        {user?.username?.charAt(0).toUpperCase() || "U"}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                          {user?.username || 'User'}
+                          {user?.username || "User"}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {user?.email || 'Member'}
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">
+                          {user?.role || "Member"}
                         </p>
                       </div>
                     </div>
                     <div className="space-y-1">
                       <Link
                         to="/profile"
-                        className="flex items-center gap-2 w-full p-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-white/90 dark:hover:bg-gray-800/90 rounded-lg transition-colors duration-200"
+                        className="flex items-center gap-2 w-full p-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-white/90 dark:hover:bg-charcoal/20 rounded-lg transition-colors duration-200"
                         onClick={handleNavLinkClick}
                       >
                         <User size={16} />

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import CountUp from 'react-countup';
 import axios from 'axios';
+import { io } from 'socket.io-client'; // Ensure this is installed
 
 const StatsSection = () => {
   const [stats, setStats] = useState({
@@ -9,64 +10,65 @@ const StatsSection = () => {
     courses: 0,
     universities: 0
   });
-  
   const [loading, setLoading] = useState(true);
   const sectionRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
   const API_URL = import.meta.env.APP_API_URL || 'http://localhost:5000/api';
+  const socket = useRef(null);
 
-  // Fetch real data from your API
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await axios.get(`${API_URL}/analytics/stats`);
-        setStats({
-          resources: response.data.resources || 5000,
-          students: response.data.students || 10000,
-          courses: response.data.courses || 200,
-          universities: response.data.universities || 50
-        });
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-        // Fallback to default values if API fails
-        setStats({
-          resources: 5000,
-          students: 10000,
-          courses: 200,
-          universities: 50
-        });
-        setLoading(false);
-      }
-    };
+useEffect(() => {
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/analytics/public-stats`);
+      console.log(response)
+      setStats({
+        resources: response.data.resources || 5000,
+        students: response.data.students || 10000,
+        courses: response.data.courses || 200,
+        universities: response.data.universities || 50
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      setStats({
+        resources: 5000,
+        students: 10000,
+        courses: 200,
+        universities: 50
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchStats();
-  }, []);
+  fetchStats();
 
-  // Intersection Observer for animation trigger
+  socket.current = io(API_URL.replace('/api', '')); // Connect to base URL
+  socket.current.on('statsUpdated', (data) => {
+    console.log('Stats updated:', data); // Debug log
+    setStats((prev) => ({
+      ...prev,
+      resources: data.resources || prev.resources,
+      students: data.students || prev.students,
+      courses: data.courses || prev.courses,
+      universities: data.universities || prev.universities
+    }));
+  });
+
+  return () => {
+    if (socket.current) socket.current.disconnect();
+  };
+}, []);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
+        if (entry.isIntersecting) setIsVisible(true);
       },
-      {
-        root: null,
-        rootMargin: '0px',
-        threshold: 0.1
-      }
+      { root: null, rootMargin: '0px', threshold: 0.1 }
     );
 
-    if (sectionRef.current) {
-      observer.observe(sectionRef.current);
-    }
-
-    return () => {
-      if (sectionRef.current) {
-        observer.unobserve(sectionRef.current);
-      }
-    };
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
   }, []);
 
   return (
@@ -76,8 +78,8 @@ const StatsSection = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="text-center p-6 bg-white dark:bg-onyx/90 rounded-xl shadow-glow-sm">
-                <div className="h-12 bg-gray-200  rounded animate-pulse mb-2"></div>
-                <div className="h-6 bg-gray-200  rounded animate-pulse"></div>
+                <div className="h-12 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse"></div>
               </div>
             ))}
           </div>
@@ -94,7 +96,6 @@ const StatsSection = () => {
               )}
               <div className="text-base text-gray-600 dark:text-platinum">Resources Shared</div>
             </div>
-            
             <div className="text-center p-6 bg-white dark:bg-onyx/90 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
               {isVisible && (
                 <CountUp
@@ -106,7 +107,6 @@ const StatsSection = () => {
               )}
               <div className="text-base text-gray-600 dark:text-platinum">Students Helped</div>
             </div>
-            
             <div className="text-center p-6 bg-white dark:bg-onyx/90 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
               {isVisible && (
                 <CountUp
@@ -118,7 +118,6 @@ const StatsSection = () => {
               )}
               <div className="text-base text-gray-600 dark:text-platinum">Courses Covered</div>
             </div>
-            
             <div className="text-center p-6 bg-white dark:bg-onyx/90 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
               {isVisible && (
                 <CountUp

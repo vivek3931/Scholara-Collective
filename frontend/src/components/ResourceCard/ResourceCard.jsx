@@ -8,11 +8,11 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
 
-  pdfjs.GlobalWorkerOptions.workerSrc = `/workers/pdf.worker.min.js`;
+  pdfjs.GlobalWorkerOptions.workerSrc = `../../../workers/pdf.worker.min.js`;
 
 
 const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
-  const { token } = useAuth();
+  const { token , isAuthenticated } = useAuth();
   const [downloading, setDownloading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [flagging, setFlagging] = useState(false);
@@ -130,7 +130,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
   }, [clearLoadingTimeout]);
 
   const handleDownload = async () => {
-    if (!token) {
+    if (!isAuthenticated) {
       showModal({
         type: 'warning',
         title: 'Authentication Required',
@@ -231,7 +231,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
   }), [pageNumber, zoom]);
 
   const handlePreview = async () => {
-    if (!token) {
+    if (!isAuthenticated) {
       showModal({
         type: 'warning',
         title: 'Authentication Required',
@@ -301,7 +301,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
   const handleZoomOut = useCallback(() => setZoom(prev => Math.max(prev - 0.1, 0.5)), []);
 
   const handleSave = async () => {
-    if (!token) {
+    if (!isAuthenticated) {
       showModal({
         type: 'warning',
         title: 'Authentication Required',
@@ -354,7 +354,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
   };
 
   const handleFlag = async () => {
-    if (!token) {
+    if (!isAuthenticated) {
       showModal({
         type: 'warning',
         title: 'Authentication Required',
@@ -495,7 +495,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
         <div className="flex justify-between items-center pt-3 border-t border-gray-200 dark:border-onyx">
           <button
             onClick={handlePreview}
-            className="px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-onyx/90 dark:text-gray-300 dark:hover:bg-amber-100/90 dark:hover:text-black rounded-lg flex items-center gap-2 text-sm disabled:opacity-50 shadow-glow-sm font-poppins"
+            className="px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-onyx/90 dark:text-gray-300 hover:scale-105 dark:hover:bg-charcoal transition duration-200 rounded-lg flex items-center gap-2 text-sm disabled:opacity-50 shadow-glow-sm font-poppins"
             disabled={previewLoading || (!isPDF && !isImage)}
             title={(!isPDF && !isImage) ? "Preview not available for this file type" : "Preview Document"}
           >
@@ -510,7 +510,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
             <button
               onClick={handleDownload}
               disabled={downloading}
-              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:hover:bg-amber-50/90 disabled:opacity-50 shadow-glow-sm font-poppins"
+              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm font-poppins"
               title="Download"
             >
               {downloading ? (
@@ -522,7 +522,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:hover:bg-amber-50/90 disabled:opacity-50 shadow-glow-sm font-poppins"
+              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm font-poppins"
               title="Save to Library"
             >
               {saving ? (
@@ -534,7 +534,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
             <button
               onClick={handleFlag}
               disabled={flagging}
-              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:hover:bg-amber-50/90 disabled:opacity-50 shadow-glow-sm font-poppins"
+              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm font-poppins"
               title="Flag Content"
             >
               {flagging ? (
@@ -567,14 +567,14 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
                     <button
                       onClick={handleZoomOut}
                       disabled={zoom <= 0.5}
-                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-black text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                      className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
                     >
                       <ZoomOut size={20} />
                     </button>
                     <button
                       onClick={handleZoomIn}
                       disabled={zoom >= 3}
-                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-amber-50/90 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                      className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
                     >
                       <ZoomIn size={20} />
                     </button>
@@ -583,7 +583,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
                 <button
                   onClick={handleDownload}
                   disabled={downloading}
-                  className="p-2 rounded-full bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:text-amber-200 dark:hover:bg-amber-50/90 disabled:opacity-50 shadow-glow-sm"
+                  className="p-2 rounded-full bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:text-amber-200 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm"
                   title="Download File"
                 >
                   {downloading ? (
@@ -594,7 +594,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
                 </button>
                 <button
                   onClick={handleClosePreviewModal}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-amber-50/90 text-gray-600 dark:text-amber-200 shadow-glow-sm"
+                  className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 shadow-glow-sm"
                   title="Close Preview"
                 >
                   <FontAwesomeIcon icon={faTimes} size="lg" />

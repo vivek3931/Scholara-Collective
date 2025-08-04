@@ -1,0 +1,10 @@
+<svg class="max-w-xs mb-6" viewBox="-1 0 257 50" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <linearGradient id="scholaraGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fb923c" />
+      <stop offset="50%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#eab308" />
+    </linearGradient>
+  </defs>
+  <text x="10" y="40" font-family="Montserrat, sans-serif" font-weight="700" font-size="36" fill="url(#scholaraGradient)">Scholara</text>
+</svg>
