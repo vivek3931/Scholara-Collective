@@ -18,34 +18,39 @@ import {
   MessageSquare,
   HelpCircle,
   BarChart2,
-  ChevronRight
+  ChevronRight,
+  Bot,
+  User
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 
-// Updated color scheme
+// Updated color scheme for dark and light themes
 const colors = {
   primary: {
-    light: "bg-amber-500",
-    dark: "bg-amber-600",
-    text: "text-amber-500",
-    border: "border-amber-500",
-    hover: "hover:bg-charcaol/20",
+    light: "bg-gradient-to-r from-amber-500 to-amber-600",
+    dark: "bg-gradient-to-r from-amber-600 to-amber-700",
+    text: "text-amber-600 dark:text-amber-400",
+    border: "border-amber-500 dark:border-amber-600",
+    hover: "hover:bg-amber-50 dark:hover:bg-charcoal/50",
   },
   secondary: {
-    light: "bg-blue-500",
-    dark: "bg-onyx",
-    text: "text-blue-500",
-    border: "border-blue-500",
-    hover: "hover:bg-charcoal",
+    light: "bg-gradient-to-r from-blue-500 to-blue-600",
+    dark: "bg-gradient-to-r from-blue-600 to-blue-700",
+    text: "text-blue-600 dark:text-blue-400",
+    border: "border-blue-500 dark:border-blue-600",
   },
   background: {
     light: "bg-gray-50",
     dark: "bg-onyx",
   },
   card: {
-    light: "bg-white",
-    dark: "bg-charcoal/20",
+    light: "bg-white shadow-sm",
+    dark: "bg-charcoal",
+  },
+  border: {
+    light: "border-gray-200",
+    dark: "border-charcoal",
   },
   text: {
     primary: {
@@ -57,48 +62,49 @@ const colors = {
       dark: "text-gray-300",
     },
   },
-  border: {
-    light: "border-gray-200",
-    dark: "border-charcoal",
-  },
 };
 
+// Modern animated typing indicator
 const TypingIndicator = memo(() => (
-  <div className="flex space-x-1.5">
+  <div className="flex space-x-1.5 px-1 py-1.5">
     {[...Array(3)].map((_, i) => (
       <div
         key={i}
-        className="w-2 h-2 bg-amber-500 rounded-full animate-bounce"
-        style={{ animationDelay: `${i * 0.2}s` }}
+        className="w-2 h-2 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full animate-bounce"
+        style={{ 
+          animationDelay: `${i * 0.2}s`,
+          animationDuration: "1s"
+        }}
       />
     ))}
   </div>
 ));
 
+// Enhanced ResourceCard with better styling
 const ResourceCard = ({ resource }) => {
   const getSubjectColor = (subject) => {
     const colors = {
-      Physics: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800",
-      Chemistry: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-800",
-      Mathematics: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-800",
-      Biology: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800",
-      English: "bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-200 dark:border-pink-800",
-      "Computer Science": "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-200 dark:border-indigo-800",
-      Engineering: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-200 dark:border-orange-800",
+      Physics: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/50 dark:text-blue-100 dark:border-blue-800/50",
+      Chemistry: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-100 dark:border-green-800/50",
+      Mathematics: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/50 dark:text-purple-100 dark:border-purple-800/50",
+      Biology: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-100 dark:border-emerald-800/50",
+      English: "bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/50 dark:text-pink-100 dark:border-pink-800/50",
+      "Computer Science": "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/50 dark:text-indigo-100 dark:border-indigo-800/50",
+      Engineering: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/50 dark:text-orange-100 dark:border-orange-800/50",
     };
-    return colors[subject] || "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700/30 dark:text-gray-200 dark:border-gray-600";
+    return colors[subject] || "bg-gray-100 text-gray-800 border-gray-200 dark:bg-charcoal/50 dark:text-gray-200 dark:border-charcoal/50";
   };
 
   if (!resource || Object.keys(resource).length === 0) {
     return (
-      <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-3 shadow-sm animate-fade-in`}>
+      <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-3 animate-fade-in`}>
         <p className={`${colors.text.secondary.light} dark:${colors.text.secondary.dark} text-sm font-poppins`}>Resource details not available</p>
       </div>
     );
   }
 
   return (
-    <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-3 shadow-sm hover:shadow-md transition-all duration-200 font-poppins animate-fade-in group`}>
+    <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-3 hover:shadow-md transition-all duration-200 font-poppins animate-fade-in group hover:scale-[1.01]`}>
       <div className="flex items-start justify-between mb-2">
         <h4 className={`font-semibold ${colors.text.primary.light} dark:${colors.text.primary.dark} flex items-center gap-2`}>
           <FileText className="w-4 h-4 text-amber-500 group-hover:text-amber-600 dark:text-amber-400" />
@@ -147,86 +153,111 @@ const ResourceCard = ({ resource }) => {
   );
 };
 
+// Modern AnalyticsCard with gradient
 const AnalyticsCard = ({ title, value, icon: Icon }) => (
-  <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-2 shadow-sm hover:shadow-md transition-all duration-200 font-poppins animate-fade-in`}>
+  <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-2 hover:shadow-md transition-all duration-200 font-poppins animate-fade-in hover:scale-[1.02]`}>
     <div className="flex items-center justify-between">
       <div>
         <p className={`text-sm ${colors.text.secondary.light} dark:${colors.text.secondary.dark}`}>{title}</p>
-        <p className={`text-2xl font-bold ${colors.text.primary.light} dark:${colors.text.primary.dark}`}>{value}</p>
+        <p className={`text-2xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 dark:from-amber-400 dark:to-amber-500 bg-clip-text text-transparent`}>
+          {value}
+        </p>
       </div>
-      <Icon className="w-8 h-8 text-amber-500 dark:text-amber-400" />
+      <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/10 dark:from-amber-400/10 dark:to-amber-500/10">
+        <Icon className="w-6 h-6 text-amber-500 dark:text-amber-400" />
+      </div>
     </div>
   </div>
 );
 
+// Enhanced ChatBubble with avatar and better styling
 const ChatBubble = memo(({ message, isUser }) => {
   return (
-    <div
-      className={`max-w-[90%] sm:max-w-lg p-4 rounded-2xl transition-all duration-200 font-poppins ${
-        isUser
-          ? `${colors.primary.light} text-white rounded-br-sm hover:shadow-md`
-          : `${colors.card.light} dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} rounded-bl-sm border ${colors.border.light} dark:${colors.border.dark} hover:shadow-md`
-      }`}
-    >
-      <div className="text-sm leading-relaxed prose prose-sm max-w-none">
-        {message.sender === "bot" && message.text.includes("**") ? (
-          <div
-            dangerouslySetInnerHTML={{
-              __html: message.text
-                .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-                .replace(/\n/g, "<br/>")
-                .replace(/\* /g, "• "),
-            }}
-          />
-        ) : (
-          message.text
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"} items-start gap-3 max-w-full`}>
+      {!isUser && (
+        <div className="flex-shrink-0 mt-1.5">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center">
+            <Bot className="w-4 h-4 text-white" />
+          </div>
+        </div>
+      )}
+      
+      <div
+        className={`max-w-[90%] sm:max-w-lg p-4 rounded-2xl transition-all duration-200 font-poppins ${
+          isUser
+            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-sm hover:shadow-md"
+            : `${colors.card.light} dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} rounded-bl-sm border ${colors.border.light} dark:${colors.border.dark} hover:shadow-md`
+        } ${isUser ? "order-2" : "order-1"}`}
+      >
+        <div className="text-sm leading-relaxed prose prose-sm max-w-none">
+          {message.sender === "bot" && message.text.includes("**") ? (
+            <div
+              dangerouslySetInnerHTML={{
+                __html: message.text
+                  .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                  .replace(/\n/g, "<br/>")
+                  .replace(/\* /g, "• "),
+              }}
+            />
+          ) : (
+            message.text
+          )}
+        </div>
+        {message.resources && message.resources.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {message.resources.map((resource, index) => (
+              <ResourceCard key={index} resource={resource} />
+            ))}
+          </div>
         )}
-      </div>
-      {message.resources && message.resources.length > 0 && (
-        <div className="mt-3 space-y-2">
-          {message.resources.map((resource, index) => (
-            <ResourceCard key={index} resource={resource} />
-          ))}
-        </div>
-      )}
-      {message.analytics && (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <AnalyticsCard title="Total Resources" value={message.analytics.resources || 0} icon={FileText} />
-          <AnalyticsCard title="Active Users" value={message.analytics.students || 0} icon={Users} />
-          <AnalyticsCard title="Courses" value={message.analytics.courses || 0} icon={BookOpen} />
-          <AnalyticsCard title="Universities" value={message.analytics.universities || 0} icon={School} />
-        </div>
-      )}
-      {message.sender === "bot" && (
-        <div className={`flex items-center justify-between mt-2 pt-2 border-t ${colors.border.light} dark:${colors.border.dark}`}>
-          <div className="flex items-center space-x-1">
-            <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-subtle-pulse"></div>
-            <span className={`text-xs ${colors.text.secondary.light} dark:${colors.text.secondary.dark} font-medium`}>
-              Scholara Assistant
+        {message.analytics && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <AnalyticsCard title="Total Resources" value={message.analytics.resources || 0} icon={FileText} />
+            <AnalyticsCard title="Active Users" value={message.analytics.students || 0} icon={Users} />
+            <AnalyticsCard title="Courses" value={message.analytics.courses || 0} icon={BookOpen} />
+            <AnalyticsCard title="Universities" value={message.analytics.universities || 0} icon={School} />
+          </div>
+        )}
+        {message.sender === "bot" && (
+          <div className={`flex items-center justify-between mt-2 pt-2 border-t ${colors.border.light} dark:${colors.border.dark}`}>
+            <div className="flex items-center space-x-1">
+              <div className="w-1.5 h-1.5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full animate-subtle-pulse"></div>
+              <span className={`text-xs ${colors.text.secondary.light} dark:${colors.text.secondary.dark} font-medium`}>
+                Scholara Assistant
+              </span>
+            </div>
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
           </div>
-          <span className="text-xs text-gray-400 dark:text-gray-500">
-            {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </span>
+        )}
+      </div>
+      
+      {isUser && (
+        <div className="flex-shrink-0 mt-1.5">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+            <User className="w-4 h-4 text-white" />
+          </div>
         </div>
       )}
     </div>
   );
 });
 
+// Enhanced QuickActionButton with better hover effects
 const QuickActionButton = ({ label, query, icon: Icon, onClick, disabled }) => (
   <button
     onClick={onClick}
     disabled={disabled}
     className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
       disabled
-        ? "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-        : "bg-gray-100 dark:bg-gray-700 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 border border-transparent hover:border-amber-300 dark:hover:border-amber-700"
-    }`}
+        ? "bg-gray-100 dark:bg-charcoal text-gray-400 dark:text-gray-500 cursor-not-allowed"
+        : "bg-gray-100 dark:bg-charcoal text-amber-600 dark:text-amber-400 hover:bg-gradient-to-r hover:from-amber-50 hover:to-amber-100 dark:hover:from-charcoal dark:hover:to-charcoal border border-transparent hover:border-amber-300 dark:hover:border-charcoal hover:shadow-sm"
+    } group`}
   >
-    <Icon className="w-4 h-4" />
+    <Icon className="w-4 h-4 group-hover:text-amber-600 dark:group-hover:text-amber-400" />
     {label}
-    <ChevronRight className="w-3 h-3 opacity-70" />
+    <ChevronRight className="w-3 h-3 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform" />
   </button>
 );
 
@@ -234,7 +265,7 @@ const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false }) => 
   const [messages, setMessages] = useState([]);
   const [userInput, setUserInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [resources, setResources] = useState([]); // This state isn't strictly needed for the chatbot's core logic now but is kept for context
+  const [resources, setResources] = useState([]);
   const [isResourcesLoaded, setIsResourcesLoaded] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
@@ -256,13 +287,12 @@ const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false }) => 
     setRecentSearches(savedSearches);
   }, []);
 
-  // API_CONFIG definition moved outside for better scope and to ensure it's available for all functions
   const API_CONFIG = {
-    baseUrl: import.meta.env.VITE_API_URL || "http://localhost:5000",
+    baseUrl: import.meta.env.VITE_API_URL || "http://localhost:5000a/api",
     endpoints: {
-      resources: "/api/resources",
-      analytics: "/api/resources/analytics/stats",
-      auth: "/api/auth",
+      resources: "/resources",
+      analytics: "/public-stats",
+      auth: "/auth",
     },
     geminiApi: {
       url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
@@ -290,7 +320,7 @@ const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false }) => 
       }
     };
     fetchSuggestions();
-  }, [userInput, API_CONFIG.baseUrl, API_CONFIG.endpoints.resources]); // Added API_CONFIG dependencies
+  }, [userInput, API_CONFIG.baseUrl, API_CONFIG.endpoints.resources]);
 
   const KNOWLEDGE_BASE = {
     howToUpload: `**How to Upload Resources on Scholara Collective:**
@@ -392,7 +422,7 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
       if (!response.ok) throw new Error("Failed to fetch resources");
       const result = await response.json();
       const fetchedResources = Array.isArray(result.resources) ? result.resources : [];
-      setResources(fetchedResources); // Still setting this, though its direct use in chatbot response is reduced
+      setResources(fetchedResources);
       return fetchedResources;
     } catch (error) {
       console.error("Error fetching resources:", error);
@@ -412,20 +442,18 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
     }
   };
 
-  // Modified searchResources to accept an object of parameters
   const searchResources = async (params) => {
     const queryParams = new URLSearchParams();
     if (params.subject) queryParams.append('subject', params.subject);
     if (params.course) queryParams.append('course', params.course);
     if (params.institution) queryParams.append('institution', params.institution);
-    if (params.resource_type) queryParams.append('type', params.resource_type); // Assuming your backend uses 'type'
-    if (params.keywords) queryParams.append('search', params.keywords); // General keyword search
+    if (params.resource_type) queryParams.append('type', params.resource_type);
+    if (params.keywords) queryParams.append('search', params.keywords);
 
-    // If no specific search parameters are provided, fetch popular resources
     const hasSpecificParams = Object.values(params).some(value => value !== null && value !== undefined && value !== '');
     if (!hasSpecificParams) {
-        queryParams.append('limit', 5); // Default to showing top 5
-        queryParams.append('sort', 'downloads'); // Sort by downloads or ratings to show popular
+        queryParams.append('limit', 5);
+        queryParams.append('sort', 'downloads');
     }
 
     try {
@@ -468,7 +496,6 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
     }
   };
 
-  // NEW: Dedicated function for Gemini Intent and Entity Extraction
   const getChatbotIntent = async (message) => {
     const prompt = `You are an intelligent intent and entity extraction system for a platform called Scholara Collective. Your task is to analyze user queries and determine their primary intent and any relevant parameters (entities).
 
@@ -582,41 +609,34 @@ Output:
       if (!response.ok) throw new Error("Gemini intent API request failed");
       const result = await response.json();
       const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-      // Clean and parse the JSON string, removing triple backticks and 'json' if present
       const cleanedText = rawText.replace(/```json\n|\n```/g, '').trim();
       return JSON.parse(cleanedText);
     } catch (error) {
       console.error("Gemini Intent/Entity extraction error:", error);
-      // Fallback to general chat if intent detection fails
       return { intent: "GENERAL_CHAT", entities: null };
     }
   };
 
-
-  // Refactored processUserQuery to use intent and entity extraction
   const processUserQuery = useCallback(async (message) => {
     let parsedIntent;
     try {
-        // Step 1: Use Gemini for Intent & Entity Extraction
         parsedIntent = await getChatbotIntent(message);
     } catch (error) {
         console.error("Error getting chatbot intent:", error);
-        parsedIntent = { intent: "GENERAL_CHAT", entities: null }; // Fallback
+        parsedIntent = { intent: "GENERAL_CHAT", entities: null };
     }
 
     const { intent, entities } = parsedIntent;
 
     switch (intent) {
         case "SEARCH_RESOURCE":
-            // Construct a more precise search query based on extracted entities
             const searchParams = {
                 subject: entities?.subject,
                 course: entities?.course,
                 institution: entities?.institution,
                 resource_type: entities?.resource_type,
-                keywords: entities?.keywords // Use specific keywords found by Gemini
+                keywords: entities?.keywords
             };
-            // If no specific keywords are found by Gemini, use the original message as a broad keyword search fallback
             if (!searchParams.keywords && !searchParams.subject && !searchParams.course && !searchParams.institution && !searchParams.resource_type) {
                 searchParams.keywords = message;
             }
@@ -629,7 +649,6 @@ Output:
                     resources: searchResults.slice(0, 5),
                 };
             } else {
-                // If no specific results, provide helpful suggestions AND offer popular resources
                 return {
                     text: `No resources directly matching your specific request were found. However, I can still help you!\n\nTry these tips for better results:\n• Use more precise subjects (e.g., "Quantum Physics" instead of "Physics")\n• Specify the course or year (e.g., "B.Sc. Chemistry" or "Class 12")\n• Check for typos\n\nWould you like me to show you some **popular ${entities?.resource_type || 'academic'} resources** instead?`,
                 };
@@ -664,52 +683,50 @@ Output:
 
         case "GENERAL_CHAT":
         default:
-            // For general queries, use Gemini to generate a conversational response.
             const geminiResponse = await callGeminiAPI(message);
             return { text: geminiResponse };
     }
   }, [getChatbotIntent, searchResources, fetchAnalyticsData, callGeminiAPI, KNOWLEDGE_BASE]);
 
-
   useEffect(() => {
-  let isMounted = true; // Add mounted check to prevent state updates after unmount
+    let isMounted = true;
 
-  const initializeChatbot = async () => {
-    setIsLoading(true);
-    try {
-      await fetchResourcesData();
-      if (isMounted) {
-        setIsResourcesLoaded(true);
-        setMessages([
-          {
-            text: "🎓 **Welcome to Scholara Collective!**\n\nI'm Scholara, your personal academic assistant. I'm here to help you:\n\n• 🔍 **Find Study Resources** - Search for notes, papers, and materials\n• 📊 **Platform Insights** - View analytics and statistics  \n• 📤 **Upload Resources** - Learn how to contribute and share\n• ❓ **Get Support** - FAQs and community guidelines\n\nWhat would you like to explore today?",
-            sender: "bot",
-          },
-        ]);
+    const initializeChatbot = async () => {
+      setIsLoading(true);
+      try {
+        await fetchResourcesData();
+        if (isMounted) {
+          setIsResourcesLoaded(true);
+          setMessages([
+            {
+              text: "🎓 **Welcome to Scholara Collective!**\n\nI'm Scholara, your personal academic assistant. I'm here to help you:\n\n• 🔍 **Find Study Resources** - Search for notes, papers, and materials\n• 📊 **Platform Insights** - View analytics and statistics  \n• 📤 **Upload Resources** - Learn how to contribute and share\n• ❓ **Get Support** - FAQs and community guidelines\n\nWhat would you like to explore today?",
+              sender: "bot",
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error("Initialization error:", error);
+        if (isMounted) {
+          setMessages([
+            {
+              text: "⚠️ Having trouble connecting to our servers. Please try again later or contact support.",
+              sender: "bot",
+            },
+          ]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      console.error("Initialization error:", error);
-      if (isMounted) {
-        setMessages([
-          {
-            text: "⚠️ Having trouble connecting to our servers. Please try again later or contact support.",
-            sender: "bot",
-          },
-        ]);
-      }
-    } finally {
-      if (isMounted) {
-        setIsLoading(false);
-      }
-    }
-  };
+    };
 
-  initializeChatbot();
+    initializeChatbot();
 
-  return () => {
-    isMounted = false; // Cleanup function
-  };
-}, []); // Empty dependency array since we only want this to run once on mount
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const sendMessage = useCallback(async () => {
     const message = userInput.trim();
@@ -751,7 +768,6 @@ Output:
     }
   };
 
-
   const quickActions = [
     { label: "Find Resources", query: "Find physics notes", icon: Search },
     { label: "Platform Stats", query: "Show platform analytics", icon: BarChart2 },
@@ -760,24 +776,23 @@ Output:
   ];
 
   return (
-    <div className={`flex h-screen flex-col custom-scrollbar overflow-hidden ${colors.background.light} dark:${colors.background.dark} font-poppins`}>
+    <div className={`flex h-screen flex-col custom-scrollbar overflow-hidden ${colors.background.light} dark:${colors.background.dark} font-poppins transition-colors duration-300`}>
       {!isInToggle && (
-        <div className={`${colors.primary.light} dark:${colors.primary.dark}  p-4 sm:p-5 border-b ${colors.border.light} dark:border-amber-700 shadow-md`}>
+        <div className={`${colors.primary.light} dark:${colors.primary.dark} p-4 sm:p-5 border-b ${colors.border.light} dark:${colors.border.dark} shadow-lg`}>
           <div className="relative flex items-center justify-center space-x-3">
             <div className="relative">
-              {isLoading && (
+              {isLoading ? (
                 <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-400 rounded-full animate-subtle-pulse"></div>
-              )}
-              {!isLoading && (
-                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-400 rounded-full animate-subtle-pulse"></div>
+              ) : (
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-400 rounded-full animate-subtle-pulse"></div>
               )}
             </div>
             <div className="text-center">
               <h1 className="text-2xl font-bold text-white mb-1 flex items-center gap-2 justify-center">
-                Scholara Collective <Sparkles className="w-5 h-5 text-blue-300 animate-subtle-pulse" />
+                Scholara Collective <Sparkles className="w-5 h-5 text-amber-200 animate-pulse" />
               </h1>
               <p className="text-amber-100 text-sm font-medium flex items-center gap-1 justify-center">
-                <MessageSquare className="w-3.5 h-3.5 text-blue-300" /> Academic Resource Assistant
+                <MessageSquare className="w-3.5 h-3.5 text-amber-200" /> Academic Resource Assistant
               </p>
             </div>
           </div>
@@ -786,11 +801,11 @@ Output:
 
       <div
         ref={chatMessagesRef}
-        className={`flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar border dark:border-charcoal space-y-4 ${colors.background.light} dark:${colors.background.dark}`}
+        className={`flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar ${colors.background.light} dark:${colors.background.dark} space-y-4`}
       >
         {!isResourcesLoaded && (
           <div className="flex justify-start animate-fade-in">
-            <div className={`${colors.card.light} dark:${colors.card.dark} p-4 rounded-2xl rounded-bl-md shadow-sm border ${colors.border.light} dark:${colors.border.dark} flex items-center space-x-3`}>
+            <div className={`${colors.card.light} dark:${colors.card.dark} p-4 rounded-2xl rounded-bl-md border ${colors.border.light} dark:${colors.border.dark} flex items-center space-x-3`}>
               <FontAwesomeIcon icon={faSpinner} spin className="text-amber-500" />
               <span className={`text-sm font-medium ${colors.text.primary.light} dark:${colors.text.primary.dark}`}>
                 Loading academic resources...
@@ -800,21 +815,24 @@ Output:
         )}
 
         {messages.map((message, index) => (
-          <div key={index} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
-            <ChatBubble message={message} isUser={message.sender === "user"} />
-          </div>
+          <ChatBubble key={index} message={message} isUser={message.sender === "user"} />
         ))}
 
         {isLoading && (
-          <div className="flex justify-start">
-            <div className={`${colors.card.light} dark:${colors.card.dark} p-4 rounded-2xl rounded-bl-md shadow-sm border ${colors.border.light} dark:${colors.border.dark}`}>
+          <div className="flex justify-start items-start gap-3">
+            <div className="flex-shrink-0 mt-1.5">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center">
+                <Bot className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <div className={`${colors.card.light} dark:${colors.card.dark} p-4 rounded-2xl rounded-bl-md border ${colors.border.light} dark:${colors.border.dark}`}>
               <TypingIndicator />
             </div>
           </div>
         )}
       </div>
 
-      <div className={`p-4 ${colors.card.light} dark:bg-onyx border custom-scrollbar border-charcoal border-t ${colors.border.light} dark:${colors.border.dark} shadow-md`}>
+      <div className={`p-4 ${colors.card.light} dark:${colors.card.dark} border-t ${colors.border.light} dark:${colors.border.dark} shadow-lg`}>
         <div className="relative max-w-[1150px] mx-auto">
           <div className="flex items-center space-x-3 mb-3">
             <div className="absolute inset-y-0 left-2 pl-3 flex items-center pointer-events-none">
@@ -829,7 +847,7 @@ Output:
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               placeholder="Ask about resources, platform features, or upload help..."
-              className={`flex-1 pl-10 pr-10 py-3 rounded-lg ${colors.card.light} dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} border border-charcoal dark:${colors.border.dark} focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 placeholder:${colors.text.secondary.light} dark:placeholder:${colors.text.secondary.dark}`}
+              className={`flex-1 pl-10 pr-10 py-3 rounded-lg ${colors.card.light} dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} border ${colors.border.light} dark:${colors.border.dark} focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 placeholder:${colors.text.secondary.light} dark:placeholder:${colors.text.secondary.dark} shadow-inner`}
               disabled={isLoading}
             />
             {userInput && (
@@ -838,7 +856,7 @@ Output:
                 onClick={() => setUserInput("")}
                 className="absolute inset-y-0 right-12 pr-3 flex items-center"
               >
-                <X className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" size={20} />
+                <X className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" size={20} />
               </button>
             )}
             <button
@@ -846,7 +864,7 @@ Output:
               className={`p-3 rounded-lg transition-all duration-200 ${
                 isLoading || userInput.trim() === ""
                   ? "bg-gray-100 dark:bg-charcoal text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                  : `${colors.primary.light} dark:${colors.primary.dark} text-white hover:bg-amber-600 dark:hover:bg-amber-700 active:scale-95 shadow-sm`
+                  : `${colors.primary.light} dark:${colors.primary.dark} text-white hover:shadow-md active:scale-95 shadow-sm`
               }`}
               disabled={isLoading || userInput.trim() === ""}
             >
@@ -859,22 +877,22 @@ Output:
           </div>
 
           {(showSuggestions && (suggestions.length > 0 || recentSearches.length > 0)) && (
-            <div className={`absolute z-50 mt-1 w-full max-w-[calc(100%-4rem)] ${colors.card.light} dark:bg-charcoal/90 rounded-lg shadow-lg border ${colors.border.light} dark:${colors.border.dark} max-h-60 overflow-auto`}>
+            <div className={`absolute z-50 mt-1 w-full max-w-[calc(100%-4rem)] ${colors.card.light} dark:${colors.card.dark} rounded-lg border ${colors.border.light} dark:${colors.border.dark} max-h-60 overflow-auto`}>
               {suggestions.length > 0 && (
                 <>
-                  <div className={`px-3 py-2 text-xs font-medium ${colors.text.secondary.light} dark:${colors.text.secondary.dark} border-b ${colors.border.light} dark:${colors.border.dark}`}>
+                  <div className={`px-3 py-2 text-xs font-medium ${colors.text.secondary.light} dark:${colors.text.secondary.dark} border-b ${colors.border.light} dark:${colors.border.dark} sticky top-0 ${colors.card.light} dark:${colors.card.dark}`}>
                     Suggested Resources
                   </div>
                   {suggestions.map((item) => (
                     <div
                       key={item._id}
-                      className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-charcoal cursor-pointer flex items-center gap-2 ${colors.text.primary.light} dark:${colors.text.primary.dark}`}
+                      className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-charcoal cursor-pointer flex items-center gap-2 ${colors.text.primary.light} dark:${colors.text.primary.dark} transition-colors`}
                       onMouseDown={() => {
                         setUserInput(item.title);
                         inputRef.current.focus();
                       }}
                     >
-                      <FileText size={16} className="text-amber-500" />
+                      <FileText size={16} className="text-amber-500 flex-shrink-0" />
                       <span className="truncate">{item.title}</span>
                     </div>
                   ))}
@@ -882,19 +900,19 @@ Output:
               )}
               {recentSearches.length > 0 && (
                 <>
-                  <div className={`px-3 py-2 text-xs font-medium ${colors.text.secondary.light} dark:${colors.text.secondary.dark} border-b ${colors.border.light} dark:${colors.border.dark}`}>
+                  <div className={`px-3 py-2 text-xs font-medium ${colors.text.secondary.light} dark:${colors.text.secondary.dark} border-b ${colors.border.light} dark:${colors.border.dark} sticky top-0 ${colors.card.light} dark:${colors.card.dark}`}>
                     Recent Searches
                   </div>
                   {recentSearches.map((search, index) => (
                     <div
                       key={index}
-                      className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-onyx cursor-pointer flex items-center gap-2 ${colors.text.primary.light} dark:${colors.text.primary.dark}`}
+                      className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-charcoal cursor-pointer flex items-center gap-2 ${colors.text.primary.light} dark:${colors.text.primary.dark} transition-colors`}
                       onMouseDown={() => {
                         setUserInput(search);
                         inputRef.current.focus();
                       }}
                     >
-                      <Clock size={16} className="text-amber-500" />
+                      <Clock size={16} className="text-amber-500 flex-shrink-0" />
                       <span className="truncate">{search}</span>
                     </div>
                   ))}
