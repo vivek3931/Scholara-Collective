@@ -7,9 +7,11 @@ const ResourcesSection = ({
   searchQuery,
   filterType,
   filterCourse,
+  filterSubject, // Added to match App.jsx context
   sortBy,
   setSortBy,
   showModal,
+  isFullPage = false, // <-- New prop with a default value of false
 }) => {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +30,8 @@ const ResourcesSection = ({
           queryParams.append("type", filterType);
         if (filterCourse && filterCourse !== "All")
           queryParams.append("course", filterCourse);
+        if (filterSubject && filterSubject !== "All")
+          queryParams.append("subject", filterSubject);
         if (sortBy === "popular") queryParams.append("sortBy", "downloads");
         if (sortBy === "rating") queryParams.append("sortBy", "averageRating");
         if (sortBy === "recent") queryParams.append("sortBy", "createdAt");
@@ -59,14 +63,20 @@ const ResourcesSection = ({
     };
 
     fetchResources();
-  }, [searchQuery, filterType, filterCourse, sortBy]);
+  }, [searchQuery, filterType, filterCourse, filterSubject, sortBy]); // Added filterSubject dependency
 
   const displayedResources = resources;
 
   return (
-    <section className="px-4 py-8 max-w-full  mx-auto bg-gray-50 dark:bg-onyx min-h-screen  shadow-glow-sm border border-gray-200 dark:border-onyx transition-all duration-300 animate-fade-in hover:bg-gray-100 ">
+    <section
+      className={`px-4 py-8 max-w-full mx-auto min-h-screen transition-all duration-300 animate-fade-in ${
+        isFullPage
+          ? "bg-gray-100 dark:bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx"
+          : "bg-gray-50 dark:bg-transparent"
+      } hover:${isFullPage ? "bg-gray-100 dark:bg-zinc-900" : "bg-gray-100"}`}
+    >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 max-w-6xl mx-auto">
-        <h2 className="text-2xl font-semibold dark:text-white  font-poppins">
+        <h2 className="text-2xl font-semibold dark:text-white font-poppins">
           Popular Resources
         </h2>
         <div className="flex items-center gap-2">
@@ -139,7 +149,7 @@ const ResourcesSection = ({
         </div>
       )}
 
-      <div className="max-w-6xl  grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mx-auto gap-8 ">
+      <div className="max-w-6xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mx-auto gap-8 ">
         {displayedResources.map((resource) => (
           <ResourceCard
             key={resource._id}

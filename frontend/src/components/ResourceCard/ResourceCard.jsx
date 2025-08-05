@@ -546,7 +546,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
   const handleModalContentMouseMove = useCallback((e) => {}, []);
 
   return (
-    <div className="bg-white dark:bg-onyx rounded-2xl overflow-hidden shadow-lg border border-gray-200 dark:border-onyx animate-fade-in font-poppins">
+    <div className="bg-white dark:bg-onyx/50 rounded-2xl overflow-hidden shadow-lg border border-gray-200 dark:border-onyx animate-fade-in font-poppins">
       <div
         className="h-36 flex items-center justify-center text-white relative"
         style={{ backgroundColor: genericBgColor }}

@@ -14,7 +14,7 @@ import RegisterPage from "./pages/Register/RegisterPage.jsx";
 import ResourcesSection from "./components/ResourceSection/ResourceSection.jsx";
 import AboutPage from "./components/About/About.jsx";
 import { AuthProvider } from "./context/AuthContext/AuthContext.jsx";
-import { ThemeProvider } from "./ThemeProvider/ThemeProvider.jsx";
+import { ThemeProvider } from "./context/ThemeProvider/ThemeProvider.jsx";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoutes.jsx";
 import UploadPage from "./pages/UploadPage/UploadPage.jsx";
 import SavedResourcesPage from "./components/SavedResources/SavedResources.jsx";
@@ -32,11 +32,14 @@ const router = createBrowserRouter(
        <Route path="/login" element={<LoginPage />} />
        <Route path="/register" element={<RegisterPage />} />
        <Route path="/about" element={<AboutPage />} />
-       <Route path="/setup/admin" element={<AdminSetup />} />     {" "}
+       <Route path="/setup/admin" element={<AdminSetup />} />
       <Route element={<ProtectedRoute />}>
-         <Route path="/resources" element={<ResourcesSection />} />
+         <Route path="/resources" element={<ResourcesSection 
+            isFullPage={true} 
+            showSearchControls={true} 
+          />} />
          <Route path="/upload" element={<UploadPage />} />
-        <Route path="/saved" element={<SavedResourcesPage />} />     {" "}
+        <Route path="/saved" element={<SavedResourcesPage />} />
       </Route>
       <Route element={<ProtectedRoute requiredRole="admin" />}>
         <Route path="/admin" element={<AdminLayout />}>

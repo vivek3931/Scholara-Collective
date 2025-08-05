@@ -4,80 +4,57 @@ import {
   faBookmark,
   faSearch,
   faFilter,
-  faSort,
-  faTimes,
   faSpinner,
   faTrash,
-  faDownload,
-  faEye,
-  faFileAlt,
-  faStar,
   faExclamationTriangle,
-  faHeart,
   faChevronDown,
   faChevronUp,
-  faCalendarAlt,
   faGraduationCap,
-  faTag,
+  faEye,
+  faArrowLeft,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Import your existing components and context
 import { useAuth } from "../../context/AuthContext/AuthContext";
 import ResourceCard from "../ResourceCard/ResourceCard"; // Adjust path as needed
+import CustomWarningModal from "../CustomWarningModal/CustomWarningModal";
 
-// Modal component for confirmations
-const Modal = ({ isOpen, onClose, config }) => {
-  if (!isOpen) return null;
+// Enhanced ResourceCard wrapper with delete button
+const SavedResourceCard = ({ resource, onUnsave, showModal }) => {
+  const confirmUnsave = useCallback(() => {
+    showModal({
+      type: "warning",
+      title: "Remove from Library?",
+      message: `Are you sure you want to remove "${resource.title}" from your saved resources?`,
+      confirmText: "Remove",
+      onConfirm: () => onUnsave(resource._id),
+      onCancel: null, // CustomWarningModal can use null to hide the cancel button
+    });
+  }, [resource, onUnsave, showModal]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {config.title}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          >
-            <FontAwesomeIcon icon={faTimes} />
-          </button>
-        </div>
-        <p className="text-gray-600 dark:text-gray-300 mb-6">
-          {config.message}
-        </p>
-        <div className="flex justify-end gap-3">
-          {config.cancelText && (
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-            >
-              {config.cancelText}
-            </button>
-          )}
-          <button
-            onClick={() => {
-              if (config.onConfirm) config.onConfirm();
-              onClose();
-            }}
-            className={`px-4 py-2 rounded-md ${
-              config.type === "error"
-                ? "bg-red-500 hover:bg-red-600 text-white"
-                : config.type === "warning"
-                ? "bg-yellow-500 hover:bg-yellow-600 text-white"
-                : "bg-blue-500 hover:bg-blue-600 text-white"
-            }`}
-          >
-            {config.confirmText}
-          </button>
-        </div>
-      </div>
+    <div className="relative group">
+      <ResourceCard
+        resource={resource}
+        onSave={() => {}} // Already saved, no action needed
+        onFlag={() => {}} // Handle flag if needed
+        showModal={showModal}
+      />
+      
+      {/* Delete button positioned within the card */}
+      <button
+        onClick={confirmUnsave}
+        className="absolute top-3 right-3 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-100 z-10"
+        title="Remove from saved resources"
+      >
+        <FontAwesomeIcon icon={faTrash} size="sm" />
+      </button>
     </div>
   );
 };
 
 const SavedResourcesPage = () => {
-  const { token, user, isAuthenticated } = useAuth();
+  const { token, isAuthenticated } = useAuth();
   const [savedResources, setSavedResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -87,18 +64,18 @@ const SavedResourcesPage = () => {
   const [selectedSubject, setSelectedSubject] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-  console.log(user);
+
+  // Back navigation handler
+  const handleGoBack = useCallback(() => {
+    window.history.back();
+  }, []);
 
   // Fetch saved resources from backend
   const fetchSavedResources = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      console.log(token);
-      const requestUrl = `${API_URL}/resources/my-library`;
-      console.log("Fetching from URL:", requestUrl);
       const response = await fetch(`${API_URL}/resources/my-library`, {
         method: "GET",
         headers: {
@@ -120,7 +97,7 @@ const SavedResourcesPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [token]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -131,11 +108,9 @@ const SavedResourcesPage = () => {
   // Modal handler
   const showModal = useCallback((config) => {
     setModalConfig(config);
-    setIsModalOpen(true);
   }, []);
 
   const closeModal = useCallback(() => {
-    setIsModalOpen(false);
     setModalConfig(null);
   }, []);
 
@@ -169,6 +144,8 @@ const SavedResourcesPage = () => {
           title: "Resource Removed",
           message: "The resource has been removed from your saved library.",
           confirmText: "OK",
+          onConfirm: () => closeModal(), // Close modal on 'OK'
+          onCancel: null, // Hide cancel button
         });
       } catch (err) {
         console.error("Error unsaving resource:", err);
@@ -177,25 +154,12 @@ const SavedResourcesPage = () => {
           title: "Error",
           message: `Failed to remove resource: ${err.message}`,
           confirmText: "OK",
+          onConfirm: () => closeModal(),
+          onCancel: null,
         });
       }
     },
-    [isAuthenticated, showModal]
-  );
-
-  // Confirm unsave with modal
-  const confirmUnsave = useCallback(
-    (resource) => {
-      showModal({
-        type: "warning",
-        title: "Remove from Library?",
-        message: `Are you sure you want to remove "${resource.title}" from your saved resources?`,
-        confirmText: "Remove",
-        cancelText: "Cancel",
-        onConfirm: () => handleUnsave(resource._id),
-      });
-    },
-    [handleUnsave, showModal]
+    [token, showModal, closeModal]
   );
 
   // Get unique subjects for filter
@@ -252,7 +216,6 @@ const SavedResourcesPage = () => {
           return (b.year || 0) - (a.year || 0);
         case "savedDate":
         default:
-          // Sort by creation date if savedAt isn't available
           return (
             new Date(b.createdAt || b.updatedAt) -
             new Date(a.createdAt || a.updatedAt)
@@ -306,11 +269,18 @@ const SavedResourcesPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-onyx">
+    <div className="min-h-screen bg-gray-50 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
+        {/* Header with Back Button */}
+        <div className="flex justify-between items-center mb-10">
+          <button
+            onClick={handleGoBack}
+            className="flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-400 dark:bg-onyx shadow-glow-sm hover:text-gray-800 bg-white  hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition duration-200 rounded-md "
+          >
+            <FontAwesomeIcon icon={faArrowLeft}/>
+            <span>Back</span>
+          </button>
+          <div className="flex items-center gap-3">
             <FontAwesomeIcon
               icon={faBookmark}
               className="text-blue-500 text-2xl"
@@ -319,13 +289,13 @@ const SavedResourcesPage = () => {
               My Saved Resources
             </h1>
           </div>
-          <p className="text-gray-600 dark:text-gray-400">
-            Your personal library of saved academic resources
-          </p>
         </div>
+        <p className="text-gray-600 dark:text-gray-400 -mt-6 mb-8">
+            Your personal library of saved academic resources
+        </p>
 
         {/* Search and Filters */}
-        <div className="bg-white dark:bg-onyx rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
+        <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search */}
             <div className="flex-1">
@@ -349,7 +319,7 @@ const SavedResourcesPage = () => {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx dark:text-white"
+                className="px-4 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx/60 dark:text-white"
               >
                 <option value="savedDate">Recently Saved</option>
                 <option value="title">Title A-Z</option>
@@ -361,7 +331,7 @@ const SavedResourcesPage = () => {
 
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="px-4 py-2 bg-gray-100 dark:bg-onyx text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-2"
+                className="px-4 py-2 bg-gray-100 dark:bg-onyx/60 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-2"
               >
                 <FontAwesomeIcon icon={faFilter} />
                 Filters
@@ -401,7 +371,7 @@ const SavedResourcesPage = () => {
                   <select
                     value={filterBy}
                     onChange={(e) => setFilterBy(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx dark:text-white"
+                    className="px-3 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx/60 dark:text-white"
                   >
                     <option value="all">All Types</option>
                     <option value="pdf">PDF Documents</option>
@@ -430,7 +400,7 @@ const SavedResourcesPage = () => {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white dark:bg-onyx rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
+          <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
             <div className="flex items-center">
               <FontAwesomeIcon
                 icon={faBookmark}
@@ -445,7 +415,7 @@ const SavedResourcesPage = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-onyx rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
+          <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
             <div className="flex items-center">
               <FontAwesomeIcon
                 icon={faGraduationCap}
@@ -460,7 +430,7 @@ const SavedResourcesPage = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-onyx rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
+          <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
             <div className="flex items-center">
               <FontAwesomeIcon
                 icon={faEye}
@@ -506,29 +476,30 @@ const SavedResourcesPage = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredAndSortedResources.map((resource) => (
-              <div key={resource._id} className="relative">
-                <ResourceCard
-                  resource={resource}
-                  onSave={() => {}} // Already saved, no action needed
-                  onFlag={() => {}} // Handle flag if needed
-                  showModal={showModal}
-                />
-
-                {/* Unsave button overlay */}
-                <button
-                  onClick={() => confirmUnsave(resource)}
-                  className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg transition-all duration-200 opacity-90 hover:opacity-100"
-                  title="Remove from saved resources"
-                >
-                  <FontAwesomeIcon icon={faTrash} size="sm" />
-                </button>
-              </div>
+              <SavedResourceCard
+                key={resource._id}
+                resource={resource}
+                onUnsave={handleUnsave}
+                showModal={showModal}
+              />
             ))}
           </div>
         )}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={closeModal} config={modalConfig} />
+      {modalConfig && (
+        <CustomWarningModal
+          isOpen={!!modalConfig}
+          onClose={closeModal}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          confirmText={modalConfig.confirmText}
+          onConfirm={modalConfig.onConfirm}
+          cancelText={modalConfig.cancelText}
+          onCancel={modalConfig.onCancel}
+        />
+      )}
     </div>
   );
 };

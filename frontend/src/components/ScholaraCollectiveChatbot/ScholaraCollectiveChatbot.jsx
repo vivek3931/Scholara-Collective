@@ -83,6 +83,14 @@ const TypingIndicator = memo(() => (
   </div>
 ));
 
+const handleEscKey = (event, setIsOpen) => {
+  if (event.key === "Escape" || event.key === "Esc") {
+    setIsOpen(false);
+  }
+};
+
+
+
 // Enhanced ResourceCard with better styling and hover effects
 const ResourceCard = ({ resource }) => {
   const getSubjectColor = (subject) => {
@@ -264,7 +272,7 @@ const QuickActionButton = ({ label, query, icon: Icon, onClick, disabled }) => (
   </button>
 );
 
-const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false }) => {
+const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false , setIsOpen }) => {
   const [messages, setMessages] = useState([]);
   const [userInput, setUserInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -793,7 +801,7 @@ Output:
   ];
 
   return (
-    <div className={`flex h-screen flex-col custom-scrollbar overflow-hidden ${colors.background.light} dark:${colors.background.dark} font-poppins transition-colors duration-300`}>
+    <div className={`flex h-screen flex-col custom-scrollbar overflow-hidden ${colors.background.light} dark:${colors.background.dark} font-poppins transition-colors duration-300`} onKeyDown={(e) => handleEscKey(e, setIsOpen)}>
       {!isInToggle && (
         <div className={`${colors.primary.light} dark:${colors.primary.dark} p-4 sm:p-5 border-b ${colors.border.light} dark:${colors.border.dark} shadow-lg`}>
           <div className="relative flex items-center justify-center space-x-3">
@@ -805,6 +813,7 @@ Output:
               )}
             </div>
             <div className="text-center">
+              <X className="lg:hidden absolute -top-1 -right-1 w-5 h-5  text-charcoal bg-white rounded-full p-1" onClick={() =>setIsOpen(false)} />
               <h1 className="text-2xl font-bold text-white mb-1 flex items-center gap-2 justify-center">
                 Scholara Collective <Sparkles className="w-5 h-5 text-amber-200 animate-pulse" />
               </h1>

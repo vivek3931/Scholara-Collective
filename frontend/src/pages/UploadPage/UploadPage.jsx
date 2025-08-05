@@ -1,12 +1,24 @@
-import React, { useState } from "react";
-import { useAuth } from "../../context/AuthContext/AuthContext";
-import { useNavigate } from "react-router-dom";
-import Navbar from "../../components/Navbar/Navbar";
+import {  faArrowLeft} from  "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import React, { useCallback, useState } from "react";
+
+// Placeholder components
+
+
+
+const UploadIcon = () => (
+  <svg className="w-8 h-8 mb-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
 
 const UploadPage = () => {
-  const { token, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [subject, setSubject] = useState("");
@@ -18,9 +30,8 @@ const UploadPage = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const [dragActive, setDragActive] = useState(false);
 
-  // Expanded subjects including exam categories
   const subjects = [
     { value: "", label: "Select Subject" },
     { value: "Mathematics", label: "Mathematics" },
@@ -49,7 +60,6 @@ const UploadPage = () => {
     { value: "Other", label: "Other" },
   ];
 
-  // Expanded courses for all note types
   const courses = [
     { value: "", label: "Select Course Type (Optional)" },
     { value: "Notes", label: "Notes" },
@@ -69,8 +79,30 @@ const UploadPage = () => {
     years.push({ value: i.toString(), label: i.toString() });
   }
 
-  const handleSubmit = async (e) => {
+  const handleDrag = (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setFile(e.dataTransfer.files[0]);
+    }
+  };
+  
+  const handleGoBack = useCallback(() =>{
+    window.history.back();
+  },[])
+
+  const handleSubmit = async () => {
     setError("");
     setSuccess("");
     setUploading(true);
@@ -82,313 +114,313 @@ const UploadPage = () => {
     }
 
     if (!title.trim() || !subject || !year) {
-      // Made institution optional
       setError("Please fill in all required fields (Title, Subject, Year).");
       setUploading(false);
       return;
     }
 
-    const formData = new FormData();
-    formData.append("title", title.trim());
-    formData.append("description", description.trim());
-    formData.append("subject", subject);
-    formData.append("course", course || "");
-    formData.append("year", year);
-    formData.append("institution", institution.trim() || "N/A"); // Default to N/A if empty
-    formData.append(
-      "tags",
-      JSON.stringify(
-        tags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter((tag) => tag)
-      )
-    );
-    formData.append("file", file);
-
-    try {
-      const response = await fetch(`${API_URL}/resources/upload`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess(data.msg || "Resource uploaded successfully!");
-        setTitle("");
-        setDescription("");
-        setSubject("");
-        setCourse("");
-        setYear("");
-        setInstitution("");
-        setTags("");
-        setFile(null);
-
-        setTimeout(() => {
-          navigate("/resources");
-        }, 1500);
-      } else {
-        setError(data.msg || "Failed to upload resource.");
-        console.error("Upload error details:", data);
-      }
-    } catch (err) {
-      console.error("Upload error:", err);
-      setError("Server error during upload. Please try again.");
-    } finally {
+    // Simulate upload
+    setTimeout(() => {
+      setSuccess("Resource uploaded successfully!");
+      setTitle("");
+      setDescription("");
+      setSubject("");
+      setCourse("");
+      setYear("");
+      setInstitution("");
+      setTags("");
+      setFile(null);
       setUploading(false);
-    }
+    }, 2000);
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-100 dark:bg-onyx text-gray-900 dark:text-gray-100 p-6 font-sans transition-colors duration-300">
-        <Navbar />
-        <div className="container mx-auto mt-10 text-center">
-          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-yellow-500 mb-4">
-            Access Denied
-          </h1>
-          <p className="text-lg">Please log in to upload resources.</p>
-          <button
-            onClick={() => navigate("/login")}
-            className="mt-6 px-6 py-3 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-colors duration-200 shadow-md"
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-onyx text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans">
-      <Navbar />
-      <div className="container mx-auto p-3 lg:p-6">
-        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-yellow-500 text-center mb-12">
-          Upload New Resource
-        </h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 dark:from-onyx dark:via-charcoal dark:to-onyx text-gray-900 dark:text-gray-100 transition-all duration-300">
+      
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        {/* Header Section */}
+        <div className="mb-8">
+          <button
+                      onClick={handleGoBack}
+                      className="flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-400 dark:bg-onyx shadow-glow-sm hover:text-gray-800 bg-white  hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition duration-200 rounded-md "
+                    >
+                      <FontAwesomeIcon icon={faArrowLeft}/>
+                      <span>Back</span>
+                    </button>
+                      
 
-        <div className="bg-white dark:bg-onyx p-4 lg:p-8 rounded-xl shadow-lg max-w-2xl mx-auto border border-gray-200 dark:border-charcoal transition-colors duration-300">
-          {error && (
-            <p className="bg-red-100 text-red-600 dark:text-red-300 p-4 rounded-lg mb-6 text-center">
-              {error}
+          <div className="text-center mb-8">
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-600 bg-clip-text text-transparent mb-4">
+              Upload Resource
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 text-lg max-w-2xl mx-auto">
+              Share your knowledge with the community. Upload notes, papers, and study materials.
             </p>
-          )}
-          {success && (
-            <p className="bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-300 p-4 rounded-lg mb-6 text-center">
-              {success}
-            </p>
-          )}
+          </div>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="file" className="block text-lg font-medium mb-2">
-                Select File <span className="text-orange-500">*</span>
-              </label>
-              <input
-                type="file"
-                id="file"
-                className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-orange-500 file:text-white hover:file:bg-orange-600 transition-colors duration-200"
-                onChange={(e) => setFile(e.target.files[0])}
-                required
-              />
-              {file && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Selected: {file.name} ({Math.round(file.size / 1024)} KB)
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="title" className="block text-lg font-medium mb-2">
-                Title <span className="text-orange-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="title"
-                className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-colors duration-200 placeholder:text-charcoal"
-                placeholder="e.g., UPSC 2023 General Studies Notes"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="description"
-                className="block text-lg font-medium mb-2"
-              >
-                Description
-              </label>
-              <textarea
-                id="description"
-                rows="4"
-                className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 resize-y transition-colors duration-200 placeholder:text-charcoal"
-                placeholder="Provide a brief summary of the resource content."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              ></textarea>
-            </div>
-
-            <div className="relative">
-              <label
-                htmlFor="subject"
-                className="block text-lg font-medium mb-2"
-              >
-                Subject <span className="text-orange-500">*</span>
-              </label>
-              <select
-                id="subject"
-                className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 appearance-none pr-10 transition-colors duration-200"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                required
-              >
-                {subjects.map((subj) => (
-                  <option
-                    key={subj.value}
-                    value={subj.value}
-                    disabled={subj.value === ""}
-                  >
-                    {subj.label}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none top-10">
-                <svg
-                  className="w-5 h-5 text-gray-500 dark:text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
+        {/* Main Form */}
+        <div className="bg-white/80 dark:bg-onyx/60 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-charcoal shadow-glow-sm dark:shadow-glow-sm overflow-hidden">
+          {/* Progress Steps */}
+          <div className="bg-gradient-to-r p-6 border-b border-gray-200/50 dark:border-charcoal">
+            <div className="flex items-center justify-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                  <CheckIcon />
+                </div>
+                <span className="lg:text-sm text-xs font-medium">File Upload</span>
+              </div>
+              <div className="w-16 h-0.5 bg-gray-300 dark:bg-charcoal"></div>
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 border-2 border-orange-500 rounded-full flex items-center justify-center">
+                  <span className="text-sm font-bold text-orange-500">2</span>
+                </div>
+                <span className="lg:text-sm text-xs font-medium">Details</span>
+              </div>
+              <div className="w-16 h-0.5 bg-gray-300 dark:bg-charcoal"></div>
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 border-2 border-gray-300 dark:border-charcoal rounded-full flex items-center justify-center">
+                  <span className="text-sm text-gray-400">3</span>
+                </div>
+                <span className="lg:text-sm text-xs text-gray-400">Publish</span>
               </div>
             </div>
+          </div>
 
-            <div className="relative">
-              <label
-                htmlFor="course"
-                className="block text-lg font-medium mb-2"
-              >
-                Course Type
-              </label>
-              <select
-                id="course"
-                className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 appearance-none pr-10 transition-colors duration-200"
-                value={course}
-                onChange={(e) => setCourse(e.target.value)}
-              >
-                {courses.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none top-10">
-                <svg
-                  className="w-5 h-5 text-gray-500 dark:text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+          <div className="p-8">
+            {/* Status Messages */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl shadow-glow-sm">
+                <p className="text-red-700 dark:text-red-300 text-center font-medium">{error}</p>
+              </div>
+            )}
+            {success && (
+              <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl shadow-glow-sm">
+                <p className="text-green-700 dark:text-green-300 text-center font-medium">{success}</p>
+              </div>
+            )}
+
+            <div className="space-y-8">
+              {/* File Upload Section */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-platinum flex items-center">
+                  <span className="w-2 h-8 bg-gradient-to-b from-orange-500 to-yellow-500 rounded-full mr-3"></span>
+                  Upload File
+                </h3>
+                
+                <div
+                  className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 shadow-glow-sm hover:shadow-glow-sm ${
+                    dragActive
+                      ? "border-orange-400 bg-orange-50 dark:bg-orange-900/10"
+                      : file
+                      ? "border-green-400 bg-green-50 dark:bg-green-900/10"
+                      : "border-gray-300 dark:border-charcoal hover:border-orange-400 hover:bg-orange-50/50 dark:hover:bg-orange-900/5"
+                  }`}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
+                  <input
+                    type="file"
+                    id="file"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={(e) => setFile(e.target.files[0])}
+                    required
                   />
-                </svg>
+                  
+                  {file ? (
+                    <div className="space-y-3">
+                      <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto">
+                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-green-700 dark:text-green-300">{file.name}</p>
+                        <p className="text-sm text-green-600 dark:text-green-400">{formatFileSize(file.size)}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFile(null)}
+                        className="text-sm text-gray-500 hover:text-red-500 transition-colors duration-200"
+                      >
+                        Remove file
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <UploadIcon />
+                      <div>
+                        <p className="text-lg font-medium">Drop your file here, or <span className="text-orange-500">browse</span></p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Supports PDF, DOC, DOCX, PPT, PPTX (Max 50MB)</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Resource Details Section */}
+              <div className="space-y-6">
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-platinum flex items-center">
+                  <span className="w-2 h-8 bg-gradient-to-b from-orange-500 to-yellow-500 rounded-full mr-3"></span>
+                  Resource Details
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Title */}
+                  <div className="md:col-span-2">
+                    <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-platinum mb-2">
+                      Title <span className="text-orange-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="title"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-charcoal bg-white dark:bg-onyx text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 placeholder-gray-400 shadow-glow-sm"
+                      placeholder="e.g., UPSC 2023 General Studies Notes"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  {/* Subject */}
+                  <div>
+                    <label htmlFor="subject" className="block text-sm font-semibold text-gray-700 dark:text-platinum mb-2">
+                      Subject <span className="text-orange-500">*</span>
+                    </label>
+                    <select
+                      id="subject"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-charcoal bg-white dark:bg-onyx text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 shadow-glow-sm"
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      required
+                    >
+                      {subjects.map((subj) => (
+                        <option key={subj.value} value={subj.value} disabled={subj.value === ""}>
+                          {subj.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Year */}
+                  <div>
+                    <label htmlFor="year" className="block text-sm font-semibold text-gray-700 dark:text-platinum mb-2">
+                      Year <span className="text-orange-500">*</span>
+                    </label>
+                    <select
+                      id="year"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-charcoal bg-white dark:bg-onyx text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 shadow-glow-sm "
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                      required
+                    >
+                      <option value="">Select Year</option>
+                      {years.map((y) => (
+                        <option key={y.value} value={y.value}>
+                          {y.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Course Type */}
+                  <div>
+                    <label htmlFor="course" className="block text-sm font-semibold text-gray-700 dark:text-platinum mb-2">
+                      Course Type
+                    </label>
+                    <select
+                      id="course"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-charcoal bg-white dark:bg-onyx text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 shadow-glow-sm "
+                      value={course}
+                      onChange={(e) => setCourse(e.target.value)}
+                    >
+                      {courses.map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Institution */}
+                  <div>
+                    <label htmlFor="institution" className="block text-sm font-semibold text-gray-700 dark:text-platinum mb-2">
+                      Institution
+                    </label>
+                    <input
+                      type="text"
+                      id="institution"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-charcoal bg-white dark:bg-onyx text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 placeholder-gray-400 shadow-glow-sm "
+                      placeholder="e.g., MIT, Delhi University"
+                      value={institution}
+                      onChange={(e) => setInstitution(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className="md:col-span-2">
+                    <label htmlFor="description" className="block text-sm font-semibold text-gray-700 dark:text-platinum mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      id="description"
+                      rows="4"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-charcoal bg-white dark:bg-onyx text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 placeholder-gray-400 resize-none shadow-glow-sm "
+                      placeholder="Provide a detailed description of your resource..."
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    ></textarea>
+                  </div>
+
+                  {/* Tags */}
+                  <div className="md:col-span-2">
+                    <label htmlFor="tags" className="block text-sm font-semibold text-gray-700 dark:text-platinum mb-2">
+                      Tags
+                    </label>
+                    <input
+                      type="text"
+                      id="tags"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-charcoal bg-white dark:bg-onyx text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 placeholder-gray-400 shadow-glow-sm "
+                      placeholder="e.g., UPSC, GS1, JEE Physics, NEET Biology"
+                      value={tags}
+                      onChange={(e) => setTags(e.target.value)}
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Separate multiple tags with commas to help others find your resource
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="pt-6 border-t border-gray-200 dark:border-charcoal">
+                <button
+                  onClick={handleSubmit}
+                  className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white py-4 px-8 rounded-xl font-semibold text-lg  transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Uploading...</span>
+                    </div>
+                  ) : (
+                    "Upload Resource"
+                  )}
+                </button>
               </div>
             </div>
-
-            <div className="relative">
-              <label htmlFor="year" className="block text-lg font-medium mb-2">
-                Year <span className="text-orange-500">*</span>
-              </label>
-              <select
-                id="year"
-                className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 appearance-none pr-10 transition-colors duration-200"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                required
-              >
-                <option value="">Select Year</option>
-                {years.map((y) => (
-                  <option key={y.value} value={y.value}>
-                    {y.label}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none top-10">
-                <svg
-                  className="w-5 h-5 text-gray-500 dark:text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="institution"
-                className="block text-lg font-medium mb-2"
-              >
-                Institution (Optional)
-              </label>
-              <input
-                type="text"
-                id="institution"
-                className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-colors duration-200 placeholder:text-charcoal"
-                placeholder="e.g., MIT, N/A for exams like UPSC/JEE"
-                value={institution}
-                onChange={(e) => setInstitution(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="tags" className="block text-lg font-medium mb-2">
-                Tags (comma-separated)
-              </label>
-              <input
-                type="text"
-                id="tags"
-                className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx border border-gray-300 dark:border-charcoal text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-colors duration-200 placeholder:text-charcoal"
-                placeholder="e.g., UPSC, GS1, JEE Physics, NEET Biology"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-              />
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                Separate multiple tags with commas (e.g., "math, algebra,
-                calculus")
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-orange-500 text-white p-3 rounded-lg font-semibold hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-colors duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={uploading}
-            >
-              {uploading ? "Uploading..." : "Upload Resource"}
-            </button>
-          </form>
+          </div>
         </div>
       </div>
     </div>

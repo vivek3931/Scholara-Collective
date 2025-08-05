@@ -62,7 +62,7 @@ const Hero = () => {
     <section
       ref={heroRef}
       className="relative py-20 px-4 text-center min-h-screen flex items-center justify-center
-                 bg-gray-50 dark:bg-onyx transition-colors duration-500 overflow-hidden"
+                 bg-gray-50 dark:bg-transparent  rounded-2xl transition-colors duration-500 overflow-hidden"
     >
       {/* Radial Gradient Glow */}
       <div

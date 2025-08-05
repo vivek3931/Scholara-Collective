@@ -7,7 +7,7 @@ import StatsSection from "./components/StatsSection/StatsSection";
 import Footer from "./components/Footer/Footer";
 import CustomWarningModal from "./components/CustomWarningModal/CustomWarningModal";
 import ChatbotToggle from "./components/ChatbotToggle/ChatbotToggle";
-import { useTheme } from "./ThemeProvider/ThemeProvider.jsx";
+import { useTheme } from "./context/ThemeProvider/ThemeProvider.jsx";
 import "./index.css";
 
 function App() {
@@ -21,6 +21,7 @@ function App() {
   const [filterCourse, setFilterCourse] = useState("All");
   const [filterSubject, setFilterSubject] = useState("All");
   const [sortBy, setSortBy] = useState("recent"); // Modal state
+  const [isOpen , setIsOpen] = useState(false);
 
   const [modalState, setModalState] = useState({
     isOpen: false,
@@ -90,7 +91,7 @@ function App() {
 
   return (
     <div
-      className={`App min-h-screen bg-platinum/95 custom-scrollbar dark:bg-onyx text-gray-800 dark:text-gray-200 font-poppins transition-colors duration-300`}
+      className={`App min-h-screen bg-platinum/95 custom-scrollbar bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx text-gray-800 dark:text-gray-200 font-poppins transition-colors duration-300`}
     >
       <Navbar isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
 
@@ -136,7 +137,7 @@ function App() {
         isDismissible={modalState.isDismissible}
       />
 
-      <ChatbotToggle />
+      <ChatbotToggle isOpen={isOpen} setIsOpen={setIsOpen} />
     </div>
   );
 }

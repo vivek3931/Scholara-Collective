@@ -165,8 +165,8 @@ const SearchSection = ({ searchQuery, setSearchQuery, filterType, setFilterType,
   };
 
   return (
-    <section className="px-4 py-8 w-full bg-gray-50 dark:bg-onyx flex justify-center">
-      <div className="bg-white dark:bg-onyx/90 rounded-2xl shadow-lg p-6 md:p-8 border border-gray-200 dark:border-onyx w-full max-w-[1150px]">
+    <section className="px-4 py-8 w-full bg-gray-50 dark:bg-transparent flex  justify-center">
+      <div className="bg-white dark:bg-onyx/60 rounded-2xl shadow-lg p-6 md:p-8 border border-gray-200 dark:border-onyx w-full max-w-[1150px]">
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 font-poppins">
           <Search size={24} className="text-amber-600 dark:text-amber-200" />
           <span>Find Academic Resources</span>

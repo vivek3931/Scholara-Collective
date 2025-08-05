@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext/AuthContext.jsx';
 import { LogIn } from 'lucide-react';
-import { useTheme } from '../../ThemeProvider/ThemeProvider.jsx';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');

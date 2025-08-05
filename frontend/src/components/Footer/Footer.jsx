@@ -4,7 +4,7 @@ import { faTwitter, faFacebookF, faInstagram, faLinkedinIn } from '@fortawesome/
 
 const Footer = () => {
   return (
-    <footer className="bg-gray-100 dark:bg-onyx pt-12 pb-6 border-t border-gray-200 dark:border-onyx font-poppins animate-fade-in">
+    <footer className="bg-gray-100 dark:bg-transparent pt-12 pb-6 border-t border-gray-200 dark:border-t-charcoal font-poppins animate-fade-in">
       <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         <div className="footer-col">
           <div className="flex items-center gap-3 mb-4">

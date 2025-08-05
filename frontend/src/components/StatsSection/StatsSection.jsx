@@ -74,7 +74,7 @@ const StatsSection = () => {
   return (
     <section
       ref={sectionRef}
-      className="py-16 px-4 bg-gray-50 dark:bg-onyx font-poppins animate-fade-in"
+      className="py-16 px-4 bg-gray-50 dark:bg-transparent  font-poppins animate-fade-in"
     >
       <div className="max-w-6xl mx-auto">
         {loading ? (
@@ -82,7 +82,7 @@ const StatsSection = () => {
             {[...Array(4)].map((_, i) => (
               <div
                 key={i}
-                className="text-center p-6 bg-white dark:bg-onyx/90 rounded-xl shadow-glow-sm"
+                className="text-center p-6 bg-white dark:bg-onyx/60 rounded-xl shadow-glow-sm"
               >
                 <div className="h-12 bg-gray-200 rounded animate-pulse mb-2"></div>
                 <div className="h-6 bg-gray-200 rounded animate-pulse"></div>
@@ -91,7 +91,7 @@ const StatsSection = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="text-center p-6 bg-white dark:bg-onyx/90 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
+            <div className="text-center p-6 bg-white dark:bg-onyx/60 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
               {isVisible && (
                 <CountUp
                   end={stats.resources}
@@ -104,7 +104,7 @@ const StatsSection = () => {
                 Resources Shared
               </div>
             </div>
-            <div className="text-center p-6 bg-white dark:bg-onyx/90 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
+            <div className="text-center p-6 bg-white dark:bg-onyx/60 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
               {isVisible && (
                 <CountUp
                   end={stats.students}
@@ -117,7 +117,7 @@ const StatsSection = () => {
                 Students Helped
               </div>
             </div>
-            <div className="text-center p-6 bg-white dark:bg-onyx/90 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
+            <div className="text-center p-6 bg-white dark:bg-onyx/60 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
               {isVisible && (
                 <CountUp
                   end={stats.courses}
@@ -130,7 +130,7 @@ const StatsSection = () => {
                 Courses Covered
               </div>
             </div>
-            <div className="text-center p-6 bg-white dark:bg-onyx/90 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
+            <div className="text-center p-6 bg-white dark:bg-onyx/60 rounded-xl shadow-glow-sm transition-all hover:scale-105 hover:bg-amber-50 dark:hover:bg-onyx/90">
               {isVisible && (
                 <CountUp
                   end={stats.universities}

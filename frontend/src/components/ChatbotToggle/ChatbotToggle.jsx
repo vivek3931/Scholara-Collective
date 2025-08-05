@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import ChatbotContent from "../ScholaraCollectiveChatbot/ScholaraCollectiveChatbot";
 import { MessageSquareText, X, Sparkles } from "lucide-react";
 
-const ChatbotToggle = () => {
-  const [isOpen, setIsOpen] = useState(false);
+const ChatbotToggle = ({ isOpen, setIsOpen }) => {
   const [showChatbot, setShowChatbot] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isInitialRender, setIsInitialRender] = useState(true);
@@ -86,7 +85,7 @@ const ChatbotToggle = () => {
             }),
           }}
         >
-          <ChatbotContent />
+          <ChatbotContent isOpen={isOpen} setIsOpen={setIsOpen} />
         </div>
       )}
 
