@@ -60,7 +60,7 @@ body {
   scroll-behavior: smooth;
 
   /* --- Firefox-specific styles (standard properties) --- */
-  scrollbar-width: thin; /* Can be 'auto', 'thin', or 'none' */
+  scrollbar-width: none; /* Can be 'auto', 'thin', or 'none' */
   scrollbar-color: var(--color-amber-400) transparent; /* thumb color track color */
 
   /* --- Webkit-specific styles (pseudo-elements) --- */
