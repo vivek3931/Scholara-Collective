@@ -4,7 +4,7 @@ import axios from 'axios';
 // Configure the base URL for your backend API
 // IMPORTANT: This should be your backend server URL, e.g., 'http://localhost:5000'
 // We've added a fallback to `http://localhost:5000` to help with debugging
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -57,7 +57,7 @@ api.interceptors.response.use(
 // --- AUTHENTICATION API CALLS ---
 export const login = async (credentials) => {
   // Use the full path, including /api, to match the backend router configuration
-  const response = await api.post(`/api/auth/login`, credentials);
+  const response = await api.post(`/auth/login`, credentials);
   const { token, user } = response.data;
   localStorage.setItem('token', token); // Store JWT token
   localStorage.setItem('user', JSON.stringify(user)); // Store user info
@@ -65,7 +65,7 @@ export const login = async (credentials) => {
 };
 
 export const register = async (userData) => {
-  const response = await api.post('/api/auth/register', userData);
+  const response = await api.post('/auth/register', userData);
   // Optionally log in user immediately after registration
   // const { token, user } = response.data;
   // localStorage.setItem('token', token);
@@ -88,7 +88,7 @@ export const logout = async () => {
 
 // --- USER-RELATED API CALLS (Example) ---
 export const getUserProfile = async () => {
-  const response = await api.get('/api/users/profile');
+  const response = await api.get('/users/profile');
   return response.data;
 };
 
@@ -96,50 +96,50 @@ export const getUserProfile = async () => {
 
 // Dashboard
 export const getAdminDashboard = async () => {
-  const response = await api.get('/api/admin/dashboard'); // Backend route for admin dashboard stats
+  const response = await api.get('/admin/dashboard'); // Backend route for admin dashboard stats
   return response.data;
 };
 
 // User Management
 export const getUsers = async (searchQuery = '', statusFilter = 'all', page = 1, limit = 20) => {
-  const response = await api.get(`/api/admin/users?search=${searchQuery}&status=${statusFilter}&page=${page}&limit=${limit}`);
+  const response = await api.get(`/admin/users?search=${searchQuery}&status=${statusFilter}&page=${page}&limit=${limit}`);
   return response.data;
 };
 
 export const toggleUserStatus = async (userId) => {
-  const response = await api.patch(`/api/admin/users/${userId}/toggle-status`); // Patch for partial update
+  const response = await api.patch(`/admin/users/${userId}/toggle-status`); // Patch for partial update
   return response.data;
 };
 
 export const deleteUser = async (userId) => {
-  const response = await api.delete(`/api/admin/users/${userId}`);
+  const response = await api.delete(`/admin/users/${userId}`);
   return response.data;
 };
 
 export const promoteUserToAdmin = async (userId) => {
-  const response = await api.patch(`/api/admin/users/${userId}/promote-admin`); // Promote to admin role
+  const response = await api.patch(`/admin/users/${userId}/promote-admin`); // Promote to admin role
   return response.data;
 };
 
 
 // Resource Management
 export const getResources = async (searchQuery = '', subjectFilter = 'all', statusFilter = 'all', page = 1, limit = 20) => {
-  const response = await api.get(`/api/admin/resources?search=${searchQuery}&subject=${subjectFilter}&status=${statusFilter}&page=${page}&limit=${limit}`);
+  const response = await api.get(`/admin/resources?search=${searchQuery}&subject=${subjectFilter}&status=${statusFilter}&page=${page}&limit=${limit}`);
   return response.data;
 };
 
 export const toggleResourceVisibility = async (resourceId) => {
-  const response = await api.patch(`/api/admin/resources/${resourceId}/toggle-visibility`);
+  const response = await api.patch(`/admin/resources/${resourceId}/toggle-visibility`);
   return response.data;
 };
 
 export const deleteResource = async (resourceId) => {
-  const response = await api.delete(`/api/admin/resources/${resourceId}`);
+  const response = await api.delete(`/admin/resources/${resourceId}`);
   return response.data;
 };
 
 export const resolveFlags = async (resourceId, actionType) => { // actionType can be 'approve' or 'remove'
-  const response = await api.patch(`/api/admin/resources/${resourceId}/resolve-flags`, { action: actionType });
+  const response = await api.patch(`/admin/resources/${resourceId}/resolve-flags`, { action: actionType });
   return response.data;
 };
 
