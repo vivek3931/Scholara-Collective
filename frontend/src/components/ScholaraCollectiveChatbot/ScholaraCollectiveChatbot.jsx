@@ -20,19 +20,21 @@ import {
   BarChart2,
   ChevronRight,
   Bot,
-  User
+  User,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 
-// Updated color scheme for dark and light themes
+// Enhanced color scheme with better contrast and modern tones
 const colors = {
   primary: {
     light: "bg-gradient-to-r from-amber-500 to-amber-600",
     dark: "bg-gradient-to-r from-amber-600 to-amber-700",
     text: "text-amber-600 dark:text-amber-400",
     border: "border-amber-500 dark:border-amber-600",
-    hover: "hover:bg-amber-50 dark:hover:bg-charcoal/50",
+    hover: "hover:bg-amber-50 dark:hover:bg-gray-800/50",
   },
   secondary: {
     light: "bg-gradient-to-r from-blue-500 to-blue-600",
@@ -42,7 +44,7 @@ const colors = {
   },
   background: {
     light: "bg-gray-50",
-    dark: "bg-onyx",
+    dark: "bg-onyx shadow-glow-sm",
   },
   card: {
     light: "bg-white shadow-sm",
@@ -50,7 +52,7 @@ const colors = {
   },
   border: {
     light: "border-gray-200",
-    dark: "border-charcoal",
+    dark: "border-gray-700",
   },
   text: {
     primary: {
@@ -64,7 +66,7 @@ const colors = {
   },
 };
 
-// Modern animated typing indicator
+// Modern animated typing indicator with smooth transitions
 const TypingIndicator = memo(() => (
   <div className="flex space-x-1.5 px-1 py-1.5">
     {[...Array(3)].map((_, i) => (
@@ -73,26 +75,27 @@ const TypingIndicator = memo(() => (
         className="w-2 h-2 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full animate-bounce"
         style={{ 
           animationDelay: `${i * 0.2}s`,
-          animationDuration: "1s"
+          animationDuration: "1s",
+          transformOrigin: "bottom"
         }}
       />
     ))}
   </div>
 ));
 
-// Enhanced ResourceCard with better styling
+// Enhanced ResourceCard with better styling and hover effects
 const ResourceCard = ({ resource }) => {
   const getSubjectColor = (subject) => {
     const colors = {
-      Physics: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/50 dark:text-blue-100 dark:border-blue-800/50",
-      Chemistry: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-100 dark:border-green-800/50",
-      Mathematics: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/50 dark:text-purple-100 dark:border-purple-800/50",
-      Biology: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-100 dark:border-emerald-800/50",
-      English: "bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/50 dark:text-pink-100 dark:border-pink-800/50",
-      "Computer Science": "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/50 dark:text-indigo-100 dark:border-indigo-800/50",
-      Engineering: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/50 dark:text-orange-100 dark:border-orange-800/50",
+      Physics: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-100 dark:border-blue-800/30",
+      Chemistry: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-100 dark:border-green-800/30",
+      Mathematics: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-100 dark:border-purple-800/30",
+      Biology: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-100 dark:border-emerald-800/30",
+      English: "bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-100 dark:border-pink-800/30",
+      "Computer Science": "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-100 dark:border-indigo-800/30",
+      Engineering: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-100 dark:border-orange-800/30",
     };
-    return colors[subject] || "bg-gray-100 text-gray-800 border-gray-200 dark:bg-charcoal/50 dark:text-gray-200 dark:border-charcoal/50";
+    return colors[subject] || "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700/50 dark:text-gray-200 dark:border-gray-600/50";
   };
 
   if (!resource || Object.keys(resource).length === 0) {
@@ -104,43 +107,43 @@ const ResourceCard = ({ resource }) => {
   }
 
   return (
-    <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-3 hover:shadow-md transition-all duration-200 font-poppins animate-fade-in group hover:scale-[1.01]`}>
+    <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-3 hover:shadow-md transition-all duration-300 font-poppins animate-fade-in group hover:scale-[1.01] hover:border-amber-400/30 dark:hover:border-amber-500/30`}>
       <div className="flex items-start justify-between mb-2">
         <h4 className={`font-semibold ${colors.text.primary.light} dark:${colors.text.primary.dark} flex items-center gap-2`}>
-          <FileText className="w-4 h-4 text-amber-500 group-hover:text-amber-600 dark:text-amber-400" />
+          <FileText className="w-4 h-4 text-amber-500 group-hover:text-amber-600 dark:text-amber-400 dark:group-hover:text-amber-300 transition-colors" />
           {resource.title || resource.name || "Untitled Resource"}
         </h4>
-        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getSubjectColor(resource.subject)}`}>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getSubjectColor(resource.subject)} transition-colors`}>
           {resource.subject || "General"}
         </span>
       </div>
       <div className={`space-y-2 text-sm ${colors.text.secondary.light} dark:${colors.text.secondary.dark}`}>
         {resource.course && (
           <div className="flex items-center gap-2">
-            <BookOpen className="w-3 h-3 text-amber-500" />
+            <BookOpen className="w-3 h-3 text-amber-500 flex-shrink-0" />
             <span>Course: {resource.course}</span>
           </div>
         )}
         {resource.year && (
           <div className="flex items-center gap-2">
-            <Calendar className="w-3 h-3 text-amber-500" />
+            <Calendar className="w-3 h-3 text-amber-500 flex-shrink-0" />
             <span>Year: {resource.year}</span>
           </div>
         )}
         {resource.institution && (
           <div className="flex items-center gap-2">
-            <School className="w-3 h-3 text-amber-500" />
+            <School className="w-3 h-3 text-amber-500 flex-shrink-0" />
             <span>{resource.institution}</span>
           </div>
         )}
         <div className="flex items-center justify-between pt-2 border-t ${colors.border.light} dark:${colors.border.dark}">
           <div className="flex items-center gap-3 text-xs">
             <span className="flex items-center gap-1">
-              <Download className="w-3 h-3 text-amber-500" />
+              <Download className="w-3 h-3 text-amber-500 flex-shrink-0" />
               {resource.downloads || 0}
             </span>
             <span className="flex items-center gap-1">
-              <Award className="w-3 h-3 text-amber-500" />
+              <Award className="w-3 h-3 text-amber-500 flex-shrink-0" />
               {resource.averageRating || 0}/5
             </span>
           </div>
@@ -153,9 +156,9 @@ const ResourceCard = ({ resource }) => {
   );
 };
 
-// Modern AnalyticsCard with gradient
+// Modern AnalyticsCard with gradient and subtle animation
 const AnalyticsCard = ({ title, value, icon: Icon }) => (
-  <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-2 hover:shadow-md transition-all duration-200 font-poppins animate-fade-in hover:scale-[1.02]`}>
+  <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-2 hover:shadow-md transition-all duration-300 font-poppins animate-fade-in hover:scale-[1.02] group`}>
     <div className="flex items-center justify-between">
       <div>
         <p className={`text-sm ${colors.text.secondary.light} dark:${colors.text.secondary.dark}`}>{title}</p>
@@ -163,30 +166,30 @@ const AnalyticsCard = ({ title, value, icon: Icon }) => (
           {value}
         </p>
       </div>
-      <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/10 dark:from-amber-400/10 dark:to-amber-500/10">
-        <Icon className="w-6 h-6 text-amber-500 dark:text-amber-400" />
+      <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/10 dark:from-amber-400/10 dark:to-amber-500/10 group-hover:from-amber-500/20 group-hover:to-amber-600/20 dark:group-hover:from-amber-400/20 dark:group-hover:to-amber-500/20 transition-all">
+        <Icon className="w-6 h-6 text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors" />
       </div>
     </div>
   </div>
 );
 
-// Enhanced ChatBubble with avatar and better styling
+// Enhanced ChatBubble with better animations and styling
 const ChatBubble = memo(({ message, isUser }) => {
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} items-start gap-3 max-w-full`}>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"} items-start gap-3 max-w-full animate-fade-in-up`}>
       {!isUser && (
         <div className="flex-shrink-0 mt-1.5">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-sm">
             <Bot className="w-4 h-4 text-white" />
           </div>
         </div>
       )}
       
       <div
-        className={`max-w-[90%] sm:max-w-lg p-4 rounded-2xl transition-all duration-200 font-poppins ${
+        className={`max-w-[90%] sm:max-w-lg p-4 rounded-2xl transition-all duration-300 font-poppins ${
           isUser
-            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-sm hover:shadow-md"
-            : `${colors.card.light} dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} rounded-bl-sm border ${colors.border.light} dark:${colors.border.dark} hover:shadow-md`
+            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-sm hover:shadow-md hover:from-blue-600 hover:to-blue-700"
+            : `${colors.card.light} dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} rounded-bl-sm border ${colors.border.light} dark:${colors.border.dark} hover:shadow-md hover:border-amber-400/30 dark:hover:border-amber-500/30`
         } ${isUser ? "order-2" : "order-1"}`}
       >
         <div className="text-sm leading-relaxed prose prose-sm max-w-none">
@@ -235,7 +238,7 @@ const ChatBubble = memo(({ message, isUser }) => {
       
       {isUser && (
         <div className="flex-shrink-0 mt-1.5">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
             <User className="w-4 h-4 text-white" />
           </div>
         </div>
@@ -249,13 +252,13 @@ const QuickActionButton = ({ label, query, icon: Icon, onClick, disabled }) => (
   <button
     onClick={onClick}
     disabled={disabled}
-    className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
+    className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-300 flex items-center gap-1.5 ${
       disabled
-        ? "bg-gray-100 dark:bg-charcoal text-gray-400 dark:text-gray-500 cursor-not-allowed"
-        : "bg-gray-100 dark:bg-charcoal text-amber-600 dark:text-amber-400 hover:bg-gradient-to-r hover:from-amber-50 hover:to-amber-100 dark:hover:from-charcoal dark:hover:to-charcoal border border-transparent hover:border-amber-300 dark:hover:border-charcoal hover:shadow-sm"
+        ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+        : "bg-gray-100 dark:bg-charcoal text-amber-600 dark:text-amber-400 hover:bg-gradient-to-r hover:from-amber-50 hover:to-amber-100 dark:hover:from-gray-700 dark:hover:to-gray-800 border border-transparent hover:border-amber-300 dark:hover:border-gray-600 hover:shadow-sm lg:h-auto "
     } group`}
   >
-    <Icon className="w-4 h-4 group-hover:text-amber-600 dark:group-hover:text-amber-400" />
+    <Icon className="w-4 h-4 text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors" />
     {label}
     <ChevronRight className="w-3 h-3 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform" />
   </button>
@@ -270,6 +273,7 @@ const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false }) => 
   const [recentSearches, setRecentSearches] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [expandedInput, setExpandedInput] = useState(false);
   const chatMessagesRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -288,7 +292,7 @@ const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false }) => 
   }, []);
 
   const API_CONFIG = {
-    baseUrl: import.meta.env.VITE_API_URL || "http://localhost:5000a/api",
+    baseUrl: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
     endpoints: {
       resources: "/resources",
       analytics: "/public-stats",
@@ -489,10 +493,10 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
       });
       if (!response.ok) throw new Error("Gemini API request failed");
       const result = await response.json();
-      return result.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn’t process that request. Please try again.";
+      return result.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't process that request. Please try again.";
     } catch (error) {
       console.error("Gemini API error:", error);
-      return "⚠️ Sorry, I couldn’t process your request right now. Please try again or ask something else!";
+      return "⚠️ Sorry, I couldn't process your request right now. Please try again or ask something else!";
     }
   };
 
@@ -736,6 +740,7 @@ Output:
     setMessages((prev) => [...prev, userMessage]);
     setUserInput("");
     setIsLoading(true);
+    setExpandedInput(false);
 
     const updatedSearches = [message, ...recentSearches.filter((item) => item !== message).slice(0, 4)];
     setRecentSearches(updatedSearches);
@@ -766,6 +771,18 @@ Output:
       setUserInput("");
       inputRef.current.blur();
     }
+  };
+
+  const toggleInputExpansion = () => {
+    setExpandedInput(!expandedInput);
+    setTimeout(() => {
+      if (chatMessagesRef.current) {
+        chatMessagesRef.current.scrollTo({
+          top: chatMessagesRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    }, 100);
   };
 
   const quickActions = [
@@ -832,24 +849,30 @@ Output:
         )}
       </div>
 
-      <div className={`p-4 ${colors.card.light} dark:${colors.card.dark} border-t ${colors.border.light} dark:${colors.border.dark} shadow-lg`}>
+      <div className={`p-4 ${colors.card.light} dark:bg-onyx border-t ${colors.border.light} dark:${colors.border.dark} shadow-lg`}>
         <div className="relative max-w-[1150px] mx-auto">
           <div className="flex items-center space-x-3 mb-3">
             <div className="absolute inset-y-0 left-2 pl-3 flex items-center pointer-events-none">
               <Search className="text-amber-500 dark:text-amber-400" size={20} />
             </div>
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               onKeyDown={handleKeyDown}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               placeholder="Ask about resources, platform features, or upload help..."
-              className={`flex-1 pl-10 pr-10 py-3 rounded-lg ${colors.card.light} dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} border ${colors.border.light} dark:${colors.border.dark} focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 placeholder:${colors.text.secondary.light} dark:placeholder:${colors.text.secondary.dark} shadow-inner`}
+              className={`flex-1 pl-10 pr-10 py-3 rounded-lg ${colors.card.light} placeholder:text-xs custom-scrollbar dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} border ${colors.border.light} dark:${colors.border.dark} focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 placeholder:${colors.text.secondary.light} dark:placeholder:${colors.text.secondary.dark} shadow-inner resize-none ${expandedInput ? 'min-h-[100px]' : 'min-h-[48px] max-h-[200px]'}`}
               disabled={isLoading}
+              rows={1}
             />
+            <button
+              onClick={toggleInputExpansion}
+              className={`absolute right-14 top-1/2 transform -translate-y-1/2 p-1 rounded-md transition-colors ${colors.hover} ${expandedInput ? 'text-amber-500' : 'text-gray-400'}`}
+            >
+              {expandedInput ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </button>
             {userInput && (
               <button
                 type="button"
@@ -863,7 +886,7 @@ Output:
               onClick={sendMessage}
               className={`p-3 rounded-lg transition-all duration-200 ${
                 isLoading || userInput.trim() === ""
-                  ? "bg-gray-100 dark:bg-charcoal text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                  ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed"
                   : `${colors.primary.light} dark:${colors.primary.dark} text-white hover:shadow-md active:scale-95 shadow-sm`
               }`}
               disabled={isLoading || userInput.trim() === ""}
@@ -877,7 +900,7 @@ Output:
           </div>
 
           {(showSuggestions && (suggestions.length > 0 || recentSearches.length > 0)) && (
-            <div className={`absolute z-50 mt-1 w-full max-w-[calc(100%-4rem)] ${colors.card.light} dark:${colors.card.dark} rounded-lg border ${colors.border.light} dark:${colors.border.dark} max-h-60 overflow-auto`}>
+            <div className={`absolute z-50 mt-1 w-full max-w-[calc(100%-4rem)] ${colors.card.light} dark:${colors.card.dark} rounded-lg border custom-scrollbar ${colors.border.light} dark:${colors.border.dark} max-h-60 overflow-auto shadow-xl`}>
               {suggestions.length > 0 && (
                 <>
                   <div className={`px-3 py-2 text-xs font-medium ${colors.text.secondary.light} dark:${colors.text.secondary.dark} border-b ${colors.border.light} dark:${colors.border.dark} sticky top-0 ${colors.card.light} dark:${colors.card.dark}`}>
@@ -886,7 +909,7 @@ Output:
                   {suggestions.map((item) => (
                     <div
                       key={item._id}
-                      className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-charcoal cursor-pointer flex items-center gap-2 ${colors.text.primary.light} dark:${colors.text.primary.dark} transition-colors`}
+                      className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-2 ${colors.text.primary.light} dark:${colors.text.primary.dark} transition-colors`}
                       onMouseDown={() => {
                         setUserInput(item.title);
                         inputRef.current.focus();
@@ -906,7 +929,7 @@ Output:
                   {recentSearches.map((search, index) => (
                     <div
                       key={index}
-                      className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-charcoal cursor-pointer flex items-center gap-2 ${colors.text.primary.light} dark:${colors.text.primary.dark} transition-colors`}
+                      className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-2 ${colors.text.primary.light} dark:${colors.text.primary.dark} transition-colors`}
                       onMouseDown={() => {
                         setUserInput(search);
                         inputRef.current.focus();
@@ -922,14 +945,17 @@ Output:
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-3">
+<div className="flex flex-nowrap lg:flex-wrap h-9 lg:h-auto overflow-x-auto lg:overflow-hidden custom-scrollbar w-full gap-2 mt-3">
           {quickActions.map((action, index) => (
             <QuickActionButton
               key={index}
               label={action.label}
               query={action.query}
               icon={action.icon}
-              onClick={() => setUserInput(action.query)}
+              onClick={() => {
+                setUserInput(action.query);
+                inputRef.current.focus();
+              }}
               disabled={isLoading}
             />
           ))}
