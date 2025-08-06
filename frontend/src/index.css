@@ -71,6 +71,23 @@ body {
     height: 8px; /* Height for horizontal scrollbar */
     background: transparent; /* A transparent background for the overall scrollbar area */
   }
+  
+   @font-face {
+        font-family: 'Playfair Display';
+        font-style: normal;
+        font-weight: 700;
+        src: url(data:font/woff2;base64,d09GMgABAAAA...) format('woff2');
+      }
+      @font-face {
+        font-family: 'Montserrat';
+        font-style: normal;
+        font-weight: 600;
+        src: url(data:font/woff2;base64,d09GMgABAAAA...) format('woff2');
+      }
+      text {
+        font-family: 'Playfair Display', Georgia, serif;
+      }
+
 
   &::-webkit-scrollbar-track {
     background: transparent; /* Transparent track for a clean look */

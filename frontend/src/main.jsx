@@ -23,6 +23,7 @@ import AdminUsers from "./components/AdminUsers/AdminUsers.jsx";
 import AdminResources from "./components/AdminResources/AdminResources.jsx";
 import AdminSetup from "./components/AdminSetup/AdminSetup.jsx";
 import AdminLayout from "./AdminLayout.jsx";
+import Profile from "./components/UserProfile/UserProfile.jsx";
 
 // Define your routes
 const router = createBrowserRouter(
@@ -39,6 +40,7 @@ const router = createBrowserRouter(
             showSearchControls={true} 
           />} />
          <Route path="/upload" element={<UploadPage />} />
+         <Route path="/profile" element={<Profile/>}/>
         <Route path="/saved" element={<SavedResourcesPage />} />
       </Route>
       <Route element={<ProtectedRoute requiredRole="admin" />}>
