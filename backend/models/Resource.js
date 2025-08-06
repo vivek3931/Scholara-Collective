@@ -1,3 +1,4 @@
+
 const mongoose = require('mongoose');
 
 const resourceSchema = new mongoose.Schema({
@@ -27,10 +28,10 @@ const resourceSchema = new mongoose.Schema({
         {
             postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
             text: String,
+            upvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: [] }], // Upvotes are on the comment, not the resource
             createdAt: { type: Date, default: Date.now }
         }
     ],
-    upvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: [] }],
     flags: [
         {
             postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -44,8 +45,29 @@ const resourceSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-resourceSchema.index({ title: 'text', description: 'text', subject: 'text', course: 'text', institution: 'text', tags: 'text' });
-resourceSchema.index({ uploadedBy: 1, createdAt: -1, visibility: 1 }); // Enhanced index
+// Create a weighted text index for smarter search functionality
+// You must drop your old index and restart your app to build this new one
+resourceSchema.index({
+    title: 'text',
+    description: 'text',
+    subject: 'text',
+    course: 'text',
+    institution: 'text',
+    tags: 'text'
+}, {
+    weights: {
+        title: 10,
+        tags: 8,
+        subject: 5,
+        course: 5,
+        institution: 3,
+        description: 1
+    },
+    name: 'resource_text_index'
+});
+
+// A standard index for filtering by user and sorting by date
+resourceSchema.index({ uploadedBy: 1, createdAt: -1, visibility: 1 });
 
 resourceSchema.pre('save', function(next) {
     if (this.ratings.length > 0) {
@@ -57,6 +79,7 @@ resourceSchema.pre('save', function(next) {
     next();
 });
 
+// Virtual property to calculate rating on the fly (for readability/non-persisted checks)
 resourceSchema.virtual('calculatedAverageRating').get(function() {
     return this.ratings.length > 0 ? this.ratings.reduce((acc, curr) => acc + curr.value, 0) / this.ratings.length : 0;
 });
