@@ -15,6 +15,7 @@ import {
   Bell
 } from 'lucide-react';
 import { useAuth } from './context/AuthContext/AuthContext';
+import logo from '../src/assets/logo.svg'
 
 const AdminLayout = () => {
   const navigate = useNavigate();
@@ -127,28 +128,31 @@ const AdminLayout = () => {
 
       {/* Sidebar */}
       <div
-        className={`fixed left-0 flex flex-col  top-0 h-full w-64 bg-white/95 dark:bg-onyx/95 backdrop-blur-lg shadow-xl border-r border-gray-200/50 dark:border-charcoal/50 z-50
+        className={`fixed left-0 flex flex-col  top-0 h-full w-64 bg-white/95 dark:bg-onyx/95 backdrop-blur-lg shadow-xl border-r border-gray-200/50 dark:border-charcoal/50 z-50
           transition-transform duration-300 ease-in-out
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{
           willChange: 'transform',
         }}
       >
-        <div className="flex items-center justify-between p-6 border-b border-gray-200/50 dark:border-charcoal/50">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 rounded-lg flex items-center justify-center">
-              <Shield className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-charcoal/50">
+            
+            <div className="flex flex-col ">
+              {/* Adjusted logo container and image styling */}
+              <div className="h-10 w-full"> 
+                <img 
+                  src={logo} 
+                  alt="Company Logo" 
+                  className="h-full object-contain max-w-full" // Added max-w to prevent excessive width
+                  style={{ width: 'auto' }} // Ensure natural width
+                />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Admin Panel</p>
             </div>
-            <div>
-              <h1 className="text-lg font-bold bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 bg-clip-text text-transparent">
-                Scholara Collective
-              </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Admin Panel</p>
-            </div>
-          </div>
           <button
             onClick={toggleSidebar}
             className="p-1 rounded-md hover:bg-gray-100/80 dark:hover:bg-gray-700/50 transition-colors duration-200"
+            aria-label="Close sidebar"
           >
             <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
           </button>
@@ -268,7 +272,7 @@ const AdminLayout = () => {
         </header>
 
         {/* Page Content */}
-        <main className="p-2 lg:p-5 bg-gray-50 dark:bg-onyx/95 min-h-screen transition-colors duration-300">
+        <main className="p-2 lg:p-5 bg-gray-50 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx min-h-screen transition-colors duration-300">
           <div className="max-w-full mx-auto">
             <Outlet />
           </div>
