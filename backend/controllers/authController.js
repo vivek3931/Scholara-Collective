@@ -1,4 +1,3 @@
-// server/controllers/authController.js
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -58,7 +57,7 @@ exports.register = async (req, res) => {
                 username: user.username,
                 email: user.email,
                 roles: [user.role],
-                bio: user.bio, // Include bio in the response
+                bio: user.bio,
             },
             message: 'Registration successful!',
         });
@@ -98,7 +97,7 @@ exports.login = async (req, res) => {
                 username: user.username,
                 email: user.email,
                 roles: [user.role],
-                bio: user.bio, // Include bio in the response
+                bio: user.bio,
             },
             message: 'Login successful!',
         });
@@ -110,14 +109,18 @@ exports.login = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
     try {
-        const { username, bio } = req.body;
+        const { username, email, notifications, bio } = req.body; // Added email and notifications
         const user = await User.findByIdAndUpdate(
             req.user.id,
-            { username, bio },
+            { username, email, notifications, bio },
             { new: true, runValidators: true }
         ).select('-password');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
         res.status(200).json({ user });
     } catch (error) {
+        console.error('Update Profile Error:', error.message);
         res.status(400).json({ message: 'Failed to update profile' });
     }
 };
@@ -134,7 +137,8 @@ exports.getMe = async (req, res) => {
             username: user.username,
             email: user.email,
             roles: [user.role],
-            bio: user.bio, // Include bio in the response
+            notifications: user.notifications, // Added notifications
+            bio: user.bio,
         });
     } catch (err) {
         console.error('Get user data error:', err.message);
@@ -175,7 +179,7 @@ exports.setupAdmin = async (req, res) => {
             email,
             password,
             role: 'admin',
-            bio: '', // Default bio for admin
+            bio: '',
         });
 
         await newAdmin.save();
@@ -183,5 +187,34 @@ exports.setupAdmin = async (req, res) => {
     } catch (error) {
         console.error('Error in /setup-admin:', error);
         res.status(500).json({ message: 'Server error during admin setup.' });
+    }
+};
+
+exports.changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Current password is incorrect' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: 'New password must be at least 6 characters' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+
+        res.status(200).json({ message: 'Password changed successfully' });
+    } catch (error) {
+        console.error('Change Password Error:', error.message);
+        res.status(500).json({ message: 'Server error during password change' });
     }
 };
