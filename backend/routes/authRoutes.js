@@ -23,6 +23,8 @@ router.post('/login', authController.login);
 router.get('/me', protect, authController.getMe); // 'protect' middleware comes before the controller
 router.patch('/users/profile', protect, authController.updateProfile);
 
+router.post('/change-password', protect, authController.changePassword);
+
 // @route   POST /api/auth/logout
 // @desc    Logout user
 // @access  Public

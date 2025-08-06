@@ -254,6 +254,48 @@ router.get('/my-uploaded', protect, async (req, res) => {
         }
     });
 
+    router.delete('/:id/delete-my-resource', protect, async (req, res) => {
+    try {
+        const resource = await Resource.findById(req.params.id);
+        if (!resource) {
+            return res.status(404).json({ msg: 'Resource not found' });
+        }
+
+        if (resource.uploadedBy.toString() !== req.user.id) {
+            return res.status(403).json({ msg: 'Not authorized to delete this resource' });
+        }
+
+        console.log("Attempting to delete Cloudinary file:", {
+            publicId: resource.cloudinaryPublicId,
+            resourceType: getCloudinaryResourceType(resource.fileType)
+        });
+
+        try {
+            const cloudinaryResult = await cloudinary.uploader.destroy(resource.cloudinaryPublicId, {
+                resource_type: getCloudinaryResourceType(resource.fileType)
+            });
+            if (!cloudinaryResult || cloudinaryResult.result !== 'ok') {
+                throw new Error(`Cloudinary deletion failed: ${cloudinaryResult?.error?.message || 'Unknown error'}`);
+            }
+            console.log("Cloudinary deletion successful:", cloudinaryResult);
+        } catch (cloudinaryErr) {
+            console.error(`Failed to delete Cloudinary file for resource ${resource._id}:`, cloudinaryErr);
+            return res.status(500).json({
+                msg: `Failed to delete file from Cloudinary: ${cloudinaryErr.message}`,
+                details: cloudinaryErr
+            });
+        }
+
+        await resource.deleteOne();
+        res.json({ msg: 'Resource deleted successfully' });
+    } catch (err) {
+        console.error('Delete resource route error:', err.message);
+        if (err.kind === 'ObjectId') {
+            return res.status(404).json({ msg: 'Resource not found' });
+        }
+        res.status(500).json({ msg: 'Server error during resource deletion.' });
+    }
+});
     router.get('/:id/preview', async (req, res) => {
         try {
             const resource = await Resource.findById(req.params.id);
