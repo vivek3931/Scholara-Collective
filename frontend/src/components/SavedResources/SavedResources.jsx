@@ -271,31 +271,32 @@ const SavedResourcesPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header with Back Button */}
-        <div className="flex justify-between items-center mb-10">
-          <button
-            onClick={handleGoBack}
-            className="flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-400 dark:bg-onyx shadow-glow-sm hover:text-gray-800 bg-white  hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition duration-200 rounded-md "
-          >
-            <FontAwesomeIcon icon={faArrowLeft}/>
-            <span>Back</span>
-          </button>
-          <div className="flex items-center gap-3">
-            <FontAwesomeIcon
-              icon={faBookmark}
-              className="text-blue-500 text-2xl"
-            />
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              My Saved Resources
-            </h1>
-          </div>
+        {/* Fixed Back Button */}
+        <button
+          onClick={handleGoBack}
+          className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal"
+        >
+          <FontAwesomeIcon icon={faArrowLeft} className="text-sm"/>
+          <span>Back</span>
+        </button>
+
+        {/* Header */}
+        <div className="flex items-center justify-center gap-3 mb-6 sm:mb-10 pt-16 sm:pt-8">
+          <FontAwesomeIcon
+            icon={faBookmark}
+            className="text-blue-500 text-xl sm:text-2xl"
+          />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+            My Saved Resources
+          </h1>
         </div>
-        <p className="text-gray-600 dark:text-gray-400 -mt-6 mb-8">
-            Your personal library of saved academic resources
+        
+        <p className="text-gray-600 dark:text-gray-400 mb-8 text-center sm:text-left">
+          Your personal library of saved academic resources
         </p>
 
         {/* Search and Filters */}
-        <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
+        <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-8 overflow-hidden">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search */}
             <div className="flex-1">
@@ -314,27 +315,29 @@ const SavedResourcesPage = () => {
               </div>
             </div>
 
-            {/* Sort */}
-            <div className="flex gap-4">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx/60 dark:text-white"
-              >
-                <option value="savedDate">Recently Saved</option>
-                <option value="title">Title A-Z</option>
-                <option value="subject">Subject</option>
-                <option value="rating">Highest Rated</option>
-                <option value="downloads">Most Downloaded</option>
-                <option value="year">Newest Year</option>
-              </select>
+            {/* Sort and Filter Controls */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx/60 dark:text-white appearance-none pr-8"
+                >
+                  <option value="savedDate">Recently Saved</option>
+                  <option value="title">Title A-Z</option>
+                  <option value="subject">Subject</option>
+                  <option value="rating">Highest Rated</option>
+                  <option value="downloads">Most Downloaded</option>
+                  <option value="year">Newest Year</option>
+                </select>
+              </div>
 
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="px-4 py-2 bg-gray-100 dark:bg-onyx/60 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-2"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-100 dark:bg-onyx/60 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 <FontAwesomeIcon icon={faFilter} />
-                Filters
+                <span>Filters</span>
                 <FontAwesomeIcon
                   icon={showFilters ? faChevronUp : faChevronDown}
                 />
@@ -345,42 +348,46 @@ const SavedResourcesPage = () => {
           {/* Advanced Filters */}
           {showFilters && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex flex-wrap gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Subject
                   </label>
-                  <select
-                    value={selectedSubject}
-                    onChange={(e) => setSelectedSubject(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx dark:text-white"
-                  >
-                    <option value="">All Subjects</option>
-                    {subjects.map((subject) => (
-                      <option key={subject} value={subject}>
-                        {subject}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={selectedSubject}
+                      onChange={(e) => setSelectedSubject(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx dark:text-white appearance-none pr-8"
+                    >
+                      <option value="">All Subjects</option>
+                      {subjects.map((subject) => (
+                        <option key={subject} value={subject}>
+                          {subject}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     File Type
                   </label>
-                  <select
-                    value={filterBy}
-                    onChange={(e) => setFilterBy(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx/60 dark:text-white"
-                  >
-                    <option value="all">All Types</option>
-                    <option value="pdf">PDF Documents</option>
-                    <option value="image">Images</option>
-                    <option value="document">Office Documents</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={filterBy}
+                      onChange={(e) => setFilterBy(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx/60 dark:text-white appearance-none pr-8"
+                    >
+                      <option value="all">All Types</option>
+                      <option value="pdf">PDF Documents</option>
+                      <option value="image">Images</option>
+                      <option value="document">Office Documents</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div className="flex items-end">
+                <div className="flex items-end sm:col-span-2 lg:col-span-1">
                   <button
                     onClick={() => {
                       setSearchTerm("");
@@ -388,7 +395,7 @@ const SavedResourcesPage = () => {
                       setFilterBy("all");
                       setSortBy("savedDate");
                     }}
-                    className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                    className="w-full sm:w-auto px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-charcoal rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     Clear Filters
                   </button>

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext/AuthContext";
 import { useNavigate } from "react-router-dom";
+import logo from '../../assets/logo.svg'
 
 // Desktop NavLink component
 const DesktopNavLink = ({ to, text }) => (
@@ -51,7 +52,7 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
   const profileDropdownRef = useRef(null);
   const mobileMenuRef = useRef(null);
   // Check if the user is an admin or superadmin
-const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
+  const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
 
   // --- Body Scroll Lock Logic ---
   useEffect(() => {
@@ -145,13 +146,10 @@ const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superad
   }, [isMobileMenuOpen, isProfileDropdownOpen]);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/95 backdrop-blur-lg shadow-lg border-b border-gray-200/50 dark:border-charcoal/50 transition-colors duration-300">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg shadow-lg border-b border-gray-200/50 dark:border-charcoal/50 transition-colors duration-300">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-        {/* Logo */}
         <Link to="/" className="flex items-center space-x-2 group">
-          <span className="text-xl font-bold bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 bg-clip-text text-transparent transition-all duration-300 group-hover:scale-105">
-            Scholara Collective
-          </span>
+          <img src={logo} alt="Scholara Collective Logo" className="h-full w-full" />
         </Link>
 
         {/* Desktop Navigation Links */}
@@ -313,9 +311,7 @@ const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superad
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-charcoal bg-gray-50/80 dark:bg-onyx backdrop-blur-sm">
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-gray-900 dark:text-white">
-                  Scholara Collective
-                </span>
+                <img src={logo} alt="Scholara Collective Logo" className="h-8 w-auto" />
               </div>
               <button
                 onClick={toggleMobileMenu}
@@ -389,7 +385,7 @@ const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superad
                           {user?.username || "User"}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">
-                          {user?.role || "Member"}
+                          {user?.roles || "Member"}
                         </p>
                       </div>
                     </div>
@@ -446,4 +442,4 @@ const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superad
   );
 };
 
-export default Navbar;
+export default Navbar; 

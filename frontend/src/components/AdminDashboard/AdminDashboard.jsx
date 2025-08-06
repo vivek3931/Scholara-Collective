@@ -169,18 +169,18 @@ const AdminDashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-onyx p-6 transition-all duration-300 animate-fade-in hover:bg-gray-100">
+    <div className="min-h-screen bg-gray-50 dark:bg-onyx lg:p-6 p-2 transition-all duration-300 animate-fade-in hover:bg-gray-100">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-3 font-poppins">
+            <h1 className="lg:text-4xl text-2xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-3 font-poppins">
               <div className="p-2 bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl shadow-glow-sm">
                 <LayoutDashboard className="w-8 h-8 text-white" />
               </div>
               Admin Dashboard
             </h1>
-            <p className="text-lg text-gray-600 dark:text-platinum font-poppins">Welcome back! Here's what's happening with PaperPal.</p>
+            <p className="lg:text-lg text-xs text-gray-600 dark:text-platinum font-poppins">Welcome back! Here's what's happening with PaperPal.</p>
           </div>
           <div className="flex items-center space-x-4 mt-4 lg:mt-0">
             <select
@@ -192,7 +192,7 @@ const AdminDashboard = () => {
               <option value="30days">Last 30 days</option>
               <option value="90days">Last 90 days</option>
             </select>
-            <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400 font-poppins">
+            <div className="flex items-center space-x-2 text-xs lg:text-sm text-gray-500 dark:text-gray-400 font-poppins">
               <Calendar className="w-4 h-4" />
               <span>Last updated: {new Date().toLocaleString()}</span>
             </div>
@@ -246,12 +246,12 @@ const AdminDashboard = () => {
               </div>
               <TrendingUp className="w-6 h-6 text-amber-500 dark:text-amber-200" />
             </div>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-80 ">
+              <ResponsiveContainer width="100%"  height="100%">
                 <AreaChart data={weeklyGrowthData}>
                   <defs>
                     <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#FB923C" stopOpacity={0.3} /> {/* Amber for users */}
+                      <stop offset="5%" stopColor="#FB923C" stopOpacity={0.3} /> 
                       <stop offset="95%" stopColor="#FB923C" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorResources" x1="0" y1="0" x2="0" y2="1">
@@ -267,7 +267,8 @@ const AdminDashboard = () => {
                       backgroundColor: '#1F2937',
                       border: 'none',
                       borderRadius: '12px',
-                      color: '#F9FAFB'
+                      color: '#F9FAFB',
+                      
                     }}
                   />
                   <Area
@@ -303,12 +304,13 @@ const AdminDashboard = () => {
               <PieChart className="w-6 h-6 text-amber-500 dark:text-amber-200" />
             </div>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%"  height="100%">
                 <RechartsPieChart>
                   <Pie
                     data={subjectDistribution}
                     cx="50%"
                     cy="50%"
+
                     innerRadius={40}
                     outerRadius={80}
                     paddingAngle={5}
