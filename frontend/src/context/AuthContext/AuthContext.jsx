@@ -100,6 +100,7 @@
 
     const value = {
       user,
+      setUser,
       token,
       isAuthenticated,
       authLoading,
