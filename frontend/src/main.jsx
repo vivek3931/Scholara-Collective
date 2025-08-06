@@ -24,6 +24,8 @@ import AdminResources from "./components/AdminResources/AdminResources.jsx";
 import AdminSetup from "./components/AdminSetup/AdminSetup.jsx";
 import AdminLayout from "./AdminLayout.jsx";
 import Profile from "./components/UserProfile/UserProfile.jsx";
+import Settings from "./components/SettingPage/SettingPage.jsx";
+import AdminSettings from "./components/AdminSetting/AdminSetting.jsx";
 
 // Define your routes
 const router = createBrowserRouter(
@@ -33,6 +35,7 @@ const router = createBrowserRouter(
        <Route path="/login" element={<LoginPage />} />
        <Route path="/register" element={<RegisterPage />} />
        <Route path="/about" element={<AboutPage />} />
+       <Route path="/settings" element={<Settings/>}/>
        <Route path="/setup/admin" element={<AdminSetup />} />
       <Route element={<ProtectedRoute />}>
          <Route path="/resources" element={<ResourcesSection 
@@ -48,6 +51,8 @@ const router = createBrowserRouter(
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="resources" element={<AdminResources />} />
+          <Route path="settings" element={<AdminSettings/>}/>
+
           <Route
             path="settings"
             element={
