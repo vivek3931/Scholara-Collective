@@ -190,6 +190,22 @@ router.get('/', async (req, res) => {
             res.status(500).json({ msg: 'Server error' });
         }
     });
+
+
+ // In resourceRoutes.js (append to existing routes)
+router.get('/my-uploaded', protect, async (req, res) => {
+  try {
+    const resources = await Resource.find({ uploadedBy: req.user.id })
+      .populate('uploadedBy', 'username')
+      .populate('comments.postedBy', 'username')
+      .sort({ createdAt: -1 }); // Sort by most recent
+    res.json({ resources });
+  } catch (err) {
+    console.error('My uploaded resources route error:', err.message);
+    res.status(500).json({ msg: 'Server error while fetching uploaded resources' });
+  }
+});
+
     router.get('/:id', async (req, res) => {
         try {
             const resource = await Resource.findById(req.params.id)
@@ -497,6 +513,8 @@ router.get('/', async (req, res) => {
             res.status(500).json({ msg: 'Server error' });
         }
     });
+
+    // In resourceRoutes.js
 
 
     // === Admin-only Routes ===

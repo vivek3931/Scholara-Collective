@@ -21,6 +21,7 @@ router.post('/login', authController.login);
 // @desc    Get user data by token
 // @access  Private
 router.get('/me', protect, authController.getMe); // 'protect' middleware comes before the controller
+router.patch('/users/profile', protect, authController.updateProfile);
 
 // @route   POST /api/auth/logout
 // @desc    Logout user
