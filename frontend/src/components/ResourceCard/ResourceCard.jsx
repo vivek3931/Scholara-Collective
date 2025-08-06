@@ -1,10 +1,5 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-} from "react";
+
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faDownload,
@@ -18,6 +13,7 @@ import {
   faExternalLinkAlt,
   faChevronLeft,
   faChevronRight,
+  faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
@@ -27,11 +23,12 @@ import "react-pdf/dist/Page/TextLayer.css";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `../../../workers/pdf.worker.min.js`;
 
-const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
+const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal, isSavedPage = false, onUnsave }) => {
   const { token, isAuthenticated } = useAuth();
   const [downloading, setDownloading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [flagging, setFlagging] = useState(false);
+  const [unsaving, setUnsaving] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
@@ -184,7 +181,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
         message:
           "You need to be logged in to download resources. Please log in or create an account.",
         confirmText: "Go to Login",
-        onConfirm: () => console.log("Navigating to login..."),
+        onConfirm: () => window.location.href = "/login", // Adjust route as needed
         cancelText: "Cancel",
         isDismissible: true,
       });
@@ -307,7 +304,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
         message:
           "You need to be logged in to preview resources. Please log in or create an account.",
         confirmText: "Go to Login",
-        onConfirm: () => console.log("Navigating to login..."),
+        onConfirm: () => window.location.href = "/login",
         cancelText: "Cancel",
         isDismissible: true,
       });
@@ -398,7 +395,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
         message:
           "You need to be logged in to save resources to your library. Please log in or create an account.",
         confirmText: "Go to Login",
-        onConfirm: () => console.log("Navigating to login..."),
+        onConfirm: () => window.location.href = "/login",
         cancelText: "Cancel",
         isDismissible: true,
       });
@@ -456,7 +453,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
         message:
           "You need to be logged in to flag resources. Please log in or create an account.",
         confirmText: "Go to Login",
-        onConfirm: () => console.log("Navigating to login..."),
+        onConfirm: () => window.location.href = "/login",
         cancelText: "Cancel",
         isDismissible: true,
       });
@@ -522,6 +519,69 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
     }
   };
 
+  const handleUnsave = async () => {
+    if (!isAuthenticated) {
+      showModal({
+        type: "warning",
+        title: "Authentication Required",
+        message:
+          "You need to be logged in to remove resources from your library. Please log in or create an account.",
+        confirmText: "Go to Login",
+        onConfirm: () => window.location.href = "/login",
+        cancelText: "Cancel",
+        isDismissible: true,
+      });
+      return;
+    }
+
+    showModal({
+      type: "warning",
+      title: "Remove from Library?",
+      message: `Are you sure you want to remove "${resource.title}" from your saved resources?`,
+      confirmText: "Remove",
+      onConfirm: async () => {
+        setUnsaving(true);
+        try {
+          const response = await fetch(
+            `${API_URL}/resources/${resource._id}/unsave`,
+            {
+              method: "PUT",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.msg || "Failed to unsave resource");
+          }
+
+          onUnsave?.(resource._id);
+          showModal({
+            type: "success",
+            title: "Resource Removed",
+            message: "The resource has been removed from your saved library.",
+            confirmText: "OK",
+          });
+        } catch (error) {
+          console.error("Error unsaving resource:", error);
+          showModal({
+            type: "error",
+            title: "Error",
+            message: `Failed to remove resource: ${error.message}`,
+            confirmText: "OK",
+          });
+        } finally {
+          setUnsaving(false);
+        }
+      },
+      cancelText: "Cancel",
+      isDismissible: true,
+    });
+  };
+
   const isPDF =
     resource.cloudinaryUrl &&
     getFileExtension(resource.cloudinaryUrl) === ".pdf";
@@ -582,7 +642,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
           {resource.description || "No description available"}
         </p>
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center  gap-1">
+          <div className="flex items-center gap-1">
             {renderStars(resource.averageRating || 0)}
             <span className="text-xs text-gray-600 dark:text-platinum ml-1">
               (
@@ -637,7 +697,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
             <button
               onClick={handleDownload}
               disabled={downloading}
-              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm font-poppins"
+              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:text-amber-200 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm font-poppins"
               title="Download"
             >
               {downloading ? (
@@ -656,7 +716,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm font-poppins"
+              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:text-amber-200 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm font-poppins"
               title="Save to Library"
             >
               {saving ? (
@@ -675,7 +735,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
             <button
               onClick={handleFlag}
               disabled={flagging}
-              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm font-poppins"
+              className="p-2 rounded-lg bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:text-amber-200 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm font-poppins"
               title="Flag Content"
             >
               {flagging ? (
@@ -691,6 +751,27 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal }) => {
                 />
               )}
             </button>
+            {isSavedPage && (
+              <button
+                onClick={handleUnsave}
+                disabled={unsaving}
+                className="p-2 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900 transition duration-200 disabled:opacity-50 shadow-glow-sm font-poppins"
+                title="Remove from Saved Resources"
+              >
+                {unsaving ? (
+                  <FontAwesomeIcon
+                    icon={faSpinner}
+                    spin
+                    className="text-red-600 dark:text-red-300"
+                  />
+                ) : (
+                  <FontAwesomeIcon
+                    icon={faTrash}
+                    className="text-red-600 dark:text-red-300"
+                  />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

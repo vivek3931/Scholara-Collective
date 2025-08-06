@@ -3,8 +3,6 @@ import { Link, NavLink } from "react-router-dom";
 import {
   Menu,
   X,
-  Moon,
-  Sun,
   Upload,
   Home,
   BookOpen,
@@ -43,7 +41,7 @@ const MobileNavLink = ({ to, icon, text, onClick }) => (
   </Link>
 );
 
-const Navbar = ({ isDarkMode, toggleDarkMode }) => {
+const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
@@ -149,7 +147,7 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg shadow-lg border-b border-gray-200/50 dark:border-charcoal/50 transition-colors duration-300">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-2 group">
-          <img src={logo} alt="Scholara Collective Logo" className="h-full w-full" />
+          <img src={logo} alt="Scholara Collective Logo" className="h-10 w-auto" />
         </Link>
 
         {/* Desktop Navigation Links */}
@@ -166,21 +164,8 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
           <DesktopNavLink to="/about" text="About" />
         </div>
 
-        {/* Right side: Auth/Profile, Dark Mode Toggle, Mobile Menu Button */}
+        {/* Right side: Auth/Profile, Mobile Menu Button */}
         <div className="flex items-center space-x-4">
-          {/* Dark Mode Toggle */}
-          <button
-            onClick={toggleDarkMode}
-            className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
-            aria-label="Toggle dark mode"
-          >
-            {isDarkMode ? (
-              <Sun className="w-6 h-6" />
-            ) : (
-              <Moon className="w-6 h-6" />
-            )}
-          </button>
-
           {/* User Profile / Auth Buttons (Desktop) */}
           {isAuthenticated ? (
             <div className="relative" ref={profileDropdownRef}>
@@ -442,4 +427,4 @@ const Navbar = ({ isDarkMode, toggleDarkMode }) => {
   );
 };
 
-export default Navbar; 
+export default Navbar;

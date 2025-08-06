@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import ResourceCard from "../ResourceCard/ResourceCard";
-import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
+import { faSearch, faSpinner , faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 const ResourcesSection = ({
@@ -65,6 +65,10 @@ const ResourcesSection = ({
     fetchResources();
   }, [searchQuery, filterType, filterCourse, filterSubject, sortBy]); // Added filterSubject dependency
 
+  const handleGoBack = () =>{
+    window.history.back();
+  }
+
   const displayedResources = resources;
 
   return (
@@ -75,6 +79,13 @@ const ResourcesSection = ({
           : "bg-gray-50 dark:bg-transparent"
       } hover:${isFullPage ? "bg-gray-100 dark:bg-zinc-900" : "bg-gray-100"}`}
     >
+      <button
+                onClick={handleGoBack}
+                className={`fixed ${isFullPage ? "visible" : "hidden" } top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal`}
+              >
+                <FontAwesomeIcon icon={faArrowLeft} className="text-sm"/>
+                <span>Back</span>
+              </button>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 max-w-6xl mx-auto">
         <h2 className="text-2xl font-semibold dark:text-white font-poppins">
           Popular Resources

@@ -13,43 +13,21 @@ import {
   faEye,
   faArrowLeft,
 } from "@fortawesome/free-solid-svg-icons";
-
-// Import your existing components and context
 import { useAuth } from "../../context/AuthContext/AuthContext";
 import ResourceCard from "../ResourceCard/ResourceCard"; // Adjust path as needed
 import CustomWarningModal from "../CustomWarningModal/CustomWarningModal";
 
-// Enhanced ResourceCard wrapper with delete button
+// Enhanced ResourceCard wrapper for saved resources
 const SavedResourceCard = ({ resource, onUnsave, showModal }) => {
-  const confirmUnsave = useCallback(() => {
-    showModal({
-      type: "warning",
-      title: "Remove from Library?",
-      message: `Are you sure you want to remove "${resource.title}" from your saved resources?`,
-      confirmText: "Remove",
-      onConfirm: () => onUnsave(resource._id),
-      onCancel: null, // CustomWarningModal can use null to hide the cancel button
-    });
-  }, [resource, onUnsave, showModal]);
-
   return (
-    <div className="relative group">
-      <ResourceCard
-        resource={resource}
-        onSave={() => {}} // Already saved, no action needed
-        onFlag={() => {}} // Handle flag if needed
-        showModal={showModal}
-      />
-      
-      {/* Delete button positioned within the card */}
-      <button
-        onClick={confirmUnsave}
-        className="absolute top-3 right-3 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-100 z-10"
-        title="Remove from saved resources"
-      >
-        <FontAwesomeIcon icon={faTrash} size="sm" />
-      </button>
-    </div>
+    <ResourceCard
+      resource={resource}
+      onSave={() => {}} // Already saved, no action needed
+      onFlag={() => {}} // Handle flag if needed
+      showModal={showModal}
+      isSavedPage={true} // Pass isSavedPage to show delete button
+      onUnsave={onUnsave} // Pass onUnsave handler
+    />
   );
 };
 
@@ -144,8 +122,8 @@ const SavedResourcesPage = () => {
           title: "Resource Removed",
           message: "The resource has been removed from your saved library.",
           confirmText: "OK",
-          onConfirm: () => closeModal(), // Close modal on 'OK'
-          onCancel: null, // Hide cancel button
+          onConfirm: () => closeModal(),
+          onCancel: null,
         });
       } catch (err) {
         console.error("Error unsaving resource:", err);
@@ -276,7 +254,7 @@ const SavedResourcesPage = () => {
           onClick={handleGoBack}
           className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal"
         >
-          <FontAwesomeIcon icon={faArrowLeft} className="text-sm"/>
+          <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
           <span>Back</span>
         </button>
 
@@ -290,7 +268,7 @@ const SavedResourcesPage = () => {
             My Saved Resources
           </h1>
         </div>
-        
+
         <p className="text-gray-600 dark:text-gray-400 mb-8 text-center sm:text-left">
           Your personal library of saved academic resources
         </p>
@@ -505,6 +483,7 @@ const SavedResourcesPage = () => {
           onConfirm={modalConfig.onConfirm}
           cancelText={modalConfig.cancelText}
           onCancel={modalConfig.onCancel}
+          isDismissible={modalConfig.isDismissible}
         />
       )}
     </div>

@@ -169,7 +169,7 @@ const AdminDashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-onyx lg:p-6 p-2 transition-all duration-300 animate-fade-in hover:bg-gray-100">
+    <div className="min-h-screen bg-gray-50 dark:bg-transparent lg:p-6 p-2 transition-all duration-300 animate-fade-in hover:bg-gray-100">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">

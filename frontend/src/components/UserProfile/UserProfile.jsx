@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faUser, faSignOutAlt, faEdit, faSave, faTimes, faCalendarAlt, faEnvelope } from '@fortawesome/free-solid-svg-icons';
-import ResourceCard from '../ResourceCard/ResourceCard.jsx';
+import { faSpinner, faUser, faSignOutAlt, faEdit, faSave, faTimes, faCalendarAlt, faEnvelope  , faArrowLeft} from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../../context/AuthContext/AuthContext.jsx';
 import ProfileResourceCard from '../ProfileResourceCard/ProfileResourceCard.jsx';
 import { useNavigate } from 'react-router-dom';
 
 const Profile = ({ showModal }) => {
-  const { user, token, logout, error: authError, clearError } = useAuth();
+  const { user, token, logout, setUser , error: authError, clearError } = useAuth();
   const [resources, setResources] = useState([]);
   const [loadingResources, setLoadingResources] = useState(true);
   const [error, setError] = useState(null);
@@ -93,13 +92,24 @@ const Profile = ({ showModal }) => {
     }
   };
 
+  const handleGoBack = () =>{
+    window.history.back();
+  }
+   
   const displayError = error || authError;
 
   return (
     <section className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-onyx dark:via-charcoal dark:to-onyx transition-all duration-300 animate-fade-in">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <button
+                        onClick={handleGoBack}
+                        className={`fixed  top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal`}
+                      >
+                        <FontAwesomeIcon icon={faArrowLeft} className="text-sm"/>
+                        <span>Back</span>
+                      </button>
         {/* Profile Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+        <div className="flex flex-col pt-10 sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white font-poppins">
               My Profile
