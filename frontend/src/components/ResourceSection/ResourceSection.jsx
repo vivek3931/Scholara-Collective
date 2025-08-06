@@ -75,7 +75,7 @@ const ResourcesSection = ({
     <section
       className={`px-4 py-8 max-w-full mx-auto min-h-screen transition-all duration-300 animate-fade-in ${
         isFullPage
-          ? "bg-gray-100 dark:bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx"
+          ? "bg-gray-100 dark:bg-gradient-to-br pt-16 dark:from-onyx dark:via-charcoal dark:to-onyx"
           : "bg-gray-50 dark:bg-transparent"
       } hover:${isFullPage ? "bg-gray-100 dark:bg-zinc-900" : "bg-gray-100"}`}
     >
