@@ -41,8 +41,8 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-platinum/80 dark:bg-onyx transition-colors duration-200 p-4 font-poppins animate-fade-in">
-            <div className="bg-white dark:bg-onyx/90 p-8 rounded-xl shadow-glow-sm w-full max-w-md border border-gray-200 dark:border-onyx transition-colors duration-200">
+        <div className="min-h-screen flex items-center justify-center bg-platinum/80 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx transition-colors duration-200 p-4 font-poppins animate-fade-in">
+            <div className="bg-white dark:bg-onyx/60 p-8 rounded-xl shadow-glow-sm w-full max-w-md border border-gray-200 dark:border-onyx transition-colors duration-200">
                 <h2 className="text-3xl font-bold text-center bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 bg-clip-text text-transparent mb-6 flex items-center justify-center gap-2">
                     <LogIn size={32} className="text-amber-500"/>
                     <span>Login to PaperPal</span>
@@ -62,7 +62,7 @@ const LoginPage = () => {
                         <input
                             type="email"
                             id="email"
-                            className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx/90 border border-gray-300 dark:border-gray-600 text-charcoal dark:text-platinum focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-colors duration-200"
+                            className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx/90 border border-gray-300 dark:border-charcoal text-charcoal dark:text-platinum focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-colors duration-200"
                             placeholder="Enter your email"
                             value={email}
                             onChange={(e) => { setLocalError(null); setEmail(e.target.value); }}
@@ -77,7 +77,7 @@ const LoginPage = () => {
                         <input
                             type="password"
                             id="password"
-                            className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx/90 border border-gray-300 dark:border-gray-600 text-charcoal dark:text-platinum focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-colors duration-200"
+                            className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx/90 border border-gray-300 dark:border-charcoal text-charcoal dark:text-platinum focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-colors duration-200"
                             placeholder="Enter your password"
                             value={password}
                             onChange={(e) => { setLocalError(null); setPassword(e.target.value); }}
