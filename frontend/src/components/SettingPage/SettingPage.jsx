@@ -182,7 +182,7 @@ const Settings = () => {
         
       </div>
        {/* Header */}  {/* Main Content */}
-      <main className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+      <main className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-16 flex-1">
         <div className="max-w-4xl mx-auto animate-fade-in">
            {/* Page Header */}
           <div className="mb-8">
