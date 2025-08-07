@@ -1,9 +1,9 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-
-// IMPORTANT: Ensure you have process.env.JWT_SECRET defined in your .env file
-// Example: JWT_SECRET=your_super_secret_jwt_key_here
+const sendEmail = require('../utils/emailSender');
+const crypto = require('crypto');
+const mongoose = require('mongoose'); // Import mongoose for sessions
 
 const signToken = (payload) => {
     return new Promise((resolve, reject) => {
@@ -36,36 +36,312 @@ exports.register = async (req, res) => {
             email,
             password,
             role: role || 'student',
-            bio: bio || '', // Default to empty string if not provided
+            bio: bio || '',
+            isVerified: false,
         });
 
         await user.save();
 
-        const payload = {
-            user: {
-                id: user.id,
-                roles: [user.role],
-            },
-        };
-
-        const token = await signToken(payload);
-
         res.status(201).json({
-            token,
-            user: {
-                _id: user._id,
-                username: user.username,
-                email: user.email,
-                roles: [user.role],
-                bio: user.bio,
-            },
-            message: 'Registration successful!',
+            message: 'Registration initiated. Please verify your email.',
         });
     } catch (err) {
         console.error('Registration Error:', err.message);
         res.status(500).send('Server Error during registration');
     }
 };
+
+// Complete sendRegistrationOtp function
+exports.sendRegistrationOtp = async (req, res) => {
+    const { email } = req.body;
+    try {
+        console.log('--- sendRegistrationOtp hit ---');
+        console.log('Email received:', email);
+
+        // Validate email format
+        if (!email || !email.includes('@')) {
+            return res.status(400).json({ message: 'Valid email address is required.' });
+        }
+
+        // Check if user exists and is already verified
+        let user = await User.findOne({ email }).select('+otp +otpExpires');
+
+        if (user && user.isVerified) {
+            console.log('User already verified, rejecting request');
+            return res.status(400).json({ message: 'Email already registered and verified.' });
+        }
+
+        // If user doesn't exist or is unverified temporary user
+        if (!user || (user.username.startsWith('temp_user_') && !user.isVerified)) {
+            console.log('Creating/updating temporary user');
+            
+            // Generate a random password for the temporary user
+            const tempPassword = crypto.randomBytes(16).toString('hex');
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(tempPassword, salt);
+            
+            // Update or create user
+            user = user || new User({
+                email,
+                username: `temp_user_${Date.now()}`,
+                password: hashedPassword,
+                isVerified: false,
+            });
+
+            // Ensure these fields are reset for new OTP requests
+            user.password = hashedPassword; // Re-hash a new temporary password if needed
+            user.isVerified = false;
+            user.otp = undefined;
+            user.otpExpires = undefined;
+            
+            await user.save();
+            console.log('Temporary user created/updated');
+        }
+
+        // Generate OTP
+        const otp = crypto.randomInt(100000, 999999).toString();
+        const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes from now
+
+        console.log('Generated OTP:', otp);
+        console.log('OTP expires at:', new Date(otpExpires));
+
+        // Save OTP to user
+        user.otp = otp;
+        user.otpExpires = new Date(otpExpires);
+        await user.save();
+
+        console.log('OTP saved to user. User OTP:', user.otp, 'Expires:', user.otpExpires);
+
+        // Email content
+        const emailSubject = 'Your Scholara Collective Registration OTP';
+        const emailHtml = `
+            <div style="font-family: 'Inter', sans-serif; line-height: 1.6; color: #333; background-color: #f8f8f8; padding: 20px; border-radius: 8px; max-width: 600px; margin: 20px auto; border: 1px solid #e0e0e0; box-shadow: 0 4px 8px rgba(0,0,0,0.05);">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td style="padding-bottom: 20px; text-align: center;">
+                            <h1 style="color: #F59E0B; font-size: 28px; margin: 0; padding: 0;">Scholara Collective</h1>
+                            <p style="color: #666; font-size: 14px; margin-top: 5px;">Your Hub for Knowledge Exchange</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 20px; background-color: #ffffff; border-radius: 8px;">
+                            <p style="font-size: 16px; margin-bottom: 15px;">Hello,</p>
+                            <p style="font-size: 16px; margin-bottom: 20px;">
+                                Thank you for registering with Scholara Collective. To complete your registration and verify your email address, please use the following One-Time Password (OTP):
+                            </p>
+                            <div style="text-align: center; margin-bottom: 30px;">
+                                <h2 style="background-color: #FFFBEB; color: #D97706; font-size: 36px; letter-spacing: 4px; padding: 15px 25px; border-radius: 8px; display: inline-block; border: 1px dashed #FCD34D;">
+                                    ${otp}
+                                </h2>
+                            </div>
+                            <p style="font-size: 14px; color: #555; margin-bottom: 15px;">
+                                This OTP is valid for the next <strong>10 minutes</strong>. Please do not share this code with anyone.
+                            </p>
+                            <p style="font-size: 14px; color: #555;">
+                                If you did not attempt to register with Scholara Collective, please disregard this email.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-top: 25px; text-align: center; font-size: 12px; color: #888;">
+                            <p>&copy; ${new Date().getFullYear()} Scholara Collective. All rights reserved.</p>
+                            <p>
+                                <a href="mailto:support@scholara.com" style="color: #F59E0B; text-decoration: none;">Support</a> |
+                                <a href="https://yourwebsite.com/privacy" style="color: #F59E0B; text-decoration: none;">Privacy Policy</a>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        `;
+
+        // Send email
+        await sendEmail({
+            email: user.email,
+            subject: emailSubject,
+            html: emailHtml,
+            text: `Your OTP for Scholara Collective registration is: ${otp}. It is valid for 10 minutes.`,
+        });
+
+        console.log('OTP email sent successfully');
+
+        res.status(200).json({ 
+            message: 'OTP sent successfully to your email.',
+            debug: {
+                email: user.email,
+                otpGenerated: true,
+                otpExpires: user.otpExpires
+            }
+        });
+
+    } catch (err) {
+        console.error('Send OTP Error:', err.message);
+        console.error('Full error:', err);
+        res.status(500).json({ 
+            message: 'Server Error during OTP sending',
+            error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+        });
+    }
+};
+
+// Complete verifyRegistrationOtp function
+exports.verifyRegistrationOtp = async (req, res) => {
+    console.log('--- verifyRegistrationOtp hit ---');
+    console.log('Request Body:', req.body);
+
+    const { username, email, password, otp } = req.body;
+
+    // Input validation
+    if (!username || !email || !password || !otp) {
+        return res.status(400).json({ 
+            success: false,
+            message: 'All fields are required: username, email, password, and OTP.' 
+        });
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+        // 1. Find user with OTP fields (force fresh database read within transaction)
+        const user = await User.findOne({ email })
+            .select('+otp +otpExpires +password') // Ensure these are selected
+            .session(session);
+
+        if (!user) {
+            await session.abortTransaction();
+            return res.status(404).json({ 
+                success: false,
+                message: 'No registration request found for this email.' 
+            });
+        }
+
+        // 2. Debug logs for verification context
+        console.log('Verification Context:', {
+            dbOtp: user.otp,
+            receivedOtp: otp,
+            dbType: typeof user.otp,
+            receivedType: typeof otp,
+            currentTime: new Date(),
+            expiresAt: user.otpExpires,
+            timeDifference: user.otpExpires ? new Date(user.otpExpires).getTime() - new Date().getTime() : 'N/A'
+        });
+
+        const isAlreadyVerified = user.isVerified;
+        if (isAlreadyVerified) {
+            await session.abortTransaction();
+            return res.status(409).json({
+                success: false,
+                message: 'Email already verified. Please login instead.',
+                isAlreadyVerified: true // Flag for frontend
+            });
+        }
+
+        // 3. Use the schema method for OTP validation
+        const isOtpValidAndNotExpired = user.verifyOtp(otp);
+
+        if (!isOtpValidAndNotExpired) {
+            // If the combined check fails, differentiate why for better feedback
+            const isOtpExpired = user.otpExpires ? new Date(user.otpExpires) < new Date() : true;
+            
+            if (!user.otp || !user.otpExpires) { // No OTP was ever set or cleared
+                 await session.abortTransaction();
+                 return res.status(400).json({
+                     success: false,
+                     message: 'No valid OTP found. Please request a new OTP.'
+                 });
+            } else if (isOtpExpired) {
+                await session.abortTransaction();
+                return res.status(400).json({
+                    success: false,
+                    message: 'OTP has expired. Please request a new OTP.',
+                    isOtpExpired: true // Flag for frontend
+                });
+            } else { // It must be an invalid OTP if not expired and not missing
+                await session.abortTransaction();
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid OTP. Please check and try again.',
+                    debug: {
+                        dbOtp: user.otp,
+                        receivedOtp: otp,
+                        comparison: String(user.otp).trim() === String(otp).trim()
+                    }
+                });
+            }
+        }
+
+        // 4. Username uniqueness check
+        const existingUsername = await User.findOne({
+            username,
+            _id: { $ne: user._id }
+        }).session(session);
+
+        if (existingUsername) {
+            await session.abortTransaction();
+            return res.status(400).json({
+                success: false,
+                message: 'Username is already taken.'
+            });
+        }
+
+        // 5. Hash the new password provided during verification
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // 6. Update user details and mark as verified
+        user.username = username;
+        user.password = hashedPassword; // Update with the new, hashed password
+        user.isVerified = true;
+        user.otp = undefined;
+        user.otpExpires = undefined;
+        user.stats.lastLogin = new Date();
+
+        await user.save({ session });
+
+        // 7. Generate JWT token
+        const token = await signToken({
+            user: {
+                id: user.id,
+                roles: [user.role],
+            },
+        });
+
+        await session.commitTransaction();
+
+        return res.status(200).json({
+            success: true,
+            token,
+            user: {
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+                roles: [user.role],
+                isVerified: user.isVerified,
+            },
+            message: 'Registration successful!',
+        });
+
+    } catch (transactionErr) {
+        await session.abortTransaction();
+        console.error('Verify OTP Transaction Error:', {
+            message: transactionErr.message,
+            stack: transactionErr.stack,
+            time: new Date()
+        });
+        return res.status(500).json({
+            success: false,
+            message: 'Server error during verification',
+            error: process.env.NODE_ENV === 'development' ? {
+                message: transactionErr.message,
+                stack: transactionErr.stack
+            } : undefined
+        });
+    } finally {
+        session.endSession();
+    }
+};
+
 
 exports.login = async (req, res) => {
     const { email, password } = req.body;
@@ -74,6 +350,10 @@ exports.login = async (req, res) => {
         let user = await User.findOne({ email });
         if (!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        if (!user.isVerified) {
+            return res.status(403).json({ message: 'Please verify your email address before logging in.' });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
@@ -98,6 +378,7 @@ exports.login = async (req, res) => {
                 email: user.email,
                 roles: [user.role],
                 bio: user.bio,
+                isVerified: user.isVerified,
             },
             message: 'Login successful!',
         });
@@ -109,7 +390,7 @@ exports.login = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
     try {
-        const { username, email, notifications, bio } = req.body; // Added email and notifications
+        const { username, email, notifications, bio } = req.body;
         const user = await User.findByIdAndUpdate(
             req.user.id,
             { username, email, notifications, bio },
@@ -137,7 +418,7 @@ exports.getMe = async (req, res) => {
             username: user.username,
             email: user.email,
             roles: [user.role],
-            notifications: user.notifications, // Added notifications
+            notifications: user.notifications,
             bio: user.bio,
         });
     } catch (err) {
@@ -180,6 +461,7 @@ exports.setupAdmin = async (req, res) => {
             password,
             role: 'admin',
             bio: '',
+            isVerified: true,
         });
 
         await newAdmin.save();
