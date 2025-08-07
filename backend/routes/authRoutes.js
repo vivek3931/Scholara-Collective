@@ -1,16 +1,25 @@
 // backend/routes/authRoutes.js
 const express = require('express');
 const router = express.Router();
-// No need for bcrypt, jwt, User here anymore, as they are used in the controller
 const { protect } = require('../middleware/authMiddleware'); // Still need middleware
 
 // Import your controller functions
 const authController = require('../controllers/authController'); // Adjust path as needed
 
 // @route   POST /api/auth/register
-// @desc    Register a new user
+// @desc    Register a new user (This might now just initiate the process for OTP)
 // @access  Public
 router.post('/register', authController.register);
+
+// @route   POST /api/auth/send-registration-otp
+// @desc    Send OTP to user's email for registration verification
+// @access  Public
+router.post('/send-registration-otp', authController.sendRegistrationOtp);
+
+// @route   POST /api/auth/verify-registration-otp
+// @desc    Verify OTP and complete user registration
+// @access  Public
+router.post('/verify-registration-otp', authController.verifyRegistrationOtp);
 
 // @route   POST /api/auth/login
 // @desc    Authenticate user & get token
