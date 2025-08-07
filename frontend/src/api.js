@@ -64,13 +64,33 @@ export const login = async (credentials) => {
   return { user, token };
 };
 
+// The original register function might still be used for other flows if needed,
+// but for the OTP flow, verifyRegistrationOtp will handle the final registration.
 export const register = async (userData) => {
   const response = await api.post('/auth/register', userData);
-  // Optionally log in user immediately after registration
-  // const { token, user } = response.data;
-  // localStorage.setItem('token', token);
-  // localStorage.setItem('user', JSON.stringify(user));
   return response.data;
+};
+
+// New function to send OTP for registration
+export const sendRegistrationOtp = async ({ email }) => {
+  try {
+    const response = await api.post('/auth/send-registration-otp', { email });
+    return response.data; // Backend should confirm OTP sent
+  } catch (error) {
+    console.error('API Error sending OTP:', error);
+    throw error; // Re-throw to be caught by AuthContext
+  }
+};
+
+// New function to verify OTP and complete registration
+export const verifyRegistrationOtp = async ({ username, email, password, otp }) => {
+  try {
+    const response = await api.post('/auth/verify-registration-otp', { username, email, password, otp });
+    return response.data; // Backend should return user and token on success
+  } catch (error) {
+    console.error('API Error verifying OTP and registering:', error);
+    throw error; // Re-throw to be caught by AuthContext
+  }
 };
 
 export const logout = async () => {

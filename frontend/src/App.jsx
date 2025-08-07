@@ -1,144 +1,132 @@
-import React, { useState } from "react";
-import Navbar from "./components/Navbar/Navbar";
-import Hero from "./components/Hero/Hero";
-import SearchSection from "./components/SearchSection/SearchSection";
-import ResourcesSection from "./components/ResourceSection/ResourceSection.jsx";
-import StatsSection from "./components/StatsSection/StatsSection";
-import Footer from "./components/Footer/Footer";
-import CustomWarningModal from "./components/CustomWarningModal/CustomWarningModal";
-import ChatbotToggle from "./components/ChatbotToggle/ChatbotToggle";
-import { useTheme } from "./context/ThemeProvider/ThemeProvider.jsx";
-import "./index.css";
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import Navbar from './components/Navbar/Navbar';
+import Hero from './components/Hero/Hero';
+import SearchSection from './components/SearchSection/SearchSection';
+import ResourcesSection from './components/ResourcesSection/ResourcesSection';
+import StatsSection from './components/StatsSection/StatsSection';
+import Footer from './components/Footer/Footer';
+import { useTheme } from './context/ThemeProvider/ThemeProvider';
+import { useModal } from './context/ModalContext/ModalContext';
+import './index.css';
+
+// Animation variants for section transitions
+const sectionVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.6,
+      ease: [0.16, 1, 0.3, 1],
+      when: "beforeChildren",
+      staggerChildren: 0.1
+    }
+  }
+};
 
 function App() {
-  // Use the new hook to get the theme state and toggle function
-  // The 'useTheme' hook is now available because we've imported it above.
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const { showModal } = useModal();
 
-  // Search and filter states
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("All");
-  const [filterCourse, setFilterCourse] = useState("All");
-  const [filterSubject, setFilterSubject] = useState("All");
-  const [sortBy, setSortBy] = useState("recent"); // Modal state
-  const [isOpen , setIsOpen] = useState(false);
-
-  const [modalState, setModalState] = useState({
-    isOpen: false,
-    type: "warning",
-    title: "",
-    message: "",
-    confirmText: "OK",
-    onConfirm: null,
-    cancelText: "Cancel",
-    onCancel: null,
-    showCloseButton: true,
-    isDismissible: true,
+  // Search and filter states with localStorage persistence
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return localStorage.getItem('searchQuery') || '';
+  });
+  
+  const [filterType, setFilterType] = useState(() => {
+    return localStorage.getItem('filterType') || 'All';
+  });
+  
+  const [filterCourse, setFilterCourse] = useState(() => {
+    return localStorage.getItem('filterCourse') || 'All';
+  });
+  
+  const [filterSubject, setFilterSubject] = useState(() => {
+    return localStorage.getItem('filterSubject') || 'All';
+  });
+  
+  const [sortBy, setSortBy] = useState(() => {
+    return localStorage.getItem('sortBy') || 'recent';
   });
 
-  const showModal = ({
-    type = "warning",
-    title = "Alert",
-    message = "Something happened.",
-    confirmText = "OK",
-    onConfirm = null,
-    cancelText = "Cancel",
-    onCancel = null,
-    showCloseButton = true,
-    isDismissible = true,
-  }) => {
-    setModalState({
-      isOpen: true,
-      type,
-      title,
-      message,
-      confirmText,
-      onConfirm: onConfirm
-        ? () => {
-            onConfirm();
-            hideModal();
-          }
-        : null,
-      cancelText,
-      onCancel: onCancel
-        ? () => {
-            onCancel();
-            hideModal();
-          }
-        : null,
-      showCloseButton,
-      isDismissible,
-    });
-  };
-
-  const hideModal = () => {
-    setModalState((prev) => ({ ...prev, isOpen: false }));
-  };
+  // Persist state to localStorage
+  useEffect(() => {
+    localStorage.setItem('searchQuery', searchQuery);
+    localStorage.setItem('filterType', filterType);
+    localStorage.setItem('filterCourse', filterCourse);
+    localStorage.setItem('filterSubject', filterSubject);
+    localStorage.setItem('sortBy', sortBy);
+  }, [searchQuery, filterType, filterCourse, filterSubject, sortBy]);
 
   const resetFilters = () => {
-    setSearchQuery("");
-    setFilterType("All");
-    setFilterCourse("All");
-    setFilterSubject("All");
-    setSortBy("recent");
+    setSearchQuery('');
+    setFilterType('All');
+    setFilterCourse('All');
+    setFilterSubject('All');
+    setSortBy('recent');
+    
     showModal({
-      type: "success",
-      title: "Filters Reset",
-      message: "All search filters have been cleared.",
-      confirmText: "OK",
+      type: 'success',
+      title: 'Filters Reset',
+      message: 'All search filters have been cleared.',
+      confirmText: 'OK',
     });
   };
 
   return (
-    <div
-      className={`App min-h-screen bg-platinum/95 custom-scrollbar bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx text-gray-800 dark:text-gray-200 font-poppins transition-colors duration-300`}
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className={`min-h-screen from-pearl via-ivory to-cream custom-scrollbar bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx text-gray-800 dark:text-gray-200 font-poppins transition-colors duration-300`}
     >
       <Navbar isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
-
-      <Hero />
-
-      <SearchSection
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        filterType={filterType}
-        setFilterType={setFilterType}
-        filterCourse={filterCourse}
-        setFilterCourse={setFilterCourse}
-        filterSubject={filterSubject}
-        setFilterSubject={setFilterSubject}
-        resetFilters={resetFilters}
-        showModal={showModal}
-      />
-
-      <ResourcesSection
-        searchQuery={searchQuery}
-        filterType={filterType}
-        filterCourse={filterCourse}
-        filterSubject={filterSubject}
-        sortBy={sortBy}
-        setSortBy={setSortBy}
-        showModal={showModal}
-      />
-
-      <StatsSection />
+      
+      <motion.div
+        variants={sectionVariants}
+        initial="hidden"
+        animate="visible"
+        className="space-y-12 pb-12"
+      >
+        <Hero />
+        
+        <motion.section variants={sectionVariants}>
+          <SearchSection
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            filterType={filterType}
+            setFilterType={setFilterType}
+            filterCourse={filterCourse}
+            setFilterCourse={setFilterCourse}
+            filterSubject={filterSubject}
+            setFilterSubject={setFilterSubject}
+            resetFilters={resetFilters}
+            showModal={showModal}
+          />
+        </motion.section>
+        
+        <motion.section variants={sectionVariants}>
+          <ResourcesSection
+            searchQuery={searchQuery}
+            filterType={filterType}
+            filterCourse={filterCourse}
+            filterSubject={filterSubject}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
+            showModal={showModal}
+            isFullPage={false}
+            showSearchControls={false}
+          />
+        </motion.section>
+        
+        <motion.section variants={sectionVariants}>
+          <StatsSection />
+        </motion.section>
+      </motion.div>
+      
       <Footer />
-
-      <CustomWarningModal
-        isOpen={modalState.isOpen}
-        onClose={hideModal}
-        type={modalState.type}
-        title={modalState.title}
-        message={modalState.message}
-        confirmText={modalState.confirmText}
-        onConfirm={modalState.onConfirm}
-        cancelText={modalState.cancelText}
-        onCancel={modalState.onCancel}
-        showCloseButton={modalState.showCloseButton}
-        isDismissible={modalState.isDismissible}
-      />
-
-      <ChatbotToggle isOpen={isOpen} setIsOpen={setIsOpen} />
-    </div>
+    </motion.div>
   );
 }
 
