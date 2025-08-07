@@ -1,6 +1,5 @@
-// server/models/User.js
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs'); // For password hashing
+const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
     username: {
@@ -15,49 +14,51 @@ const userSchema = new mongoose.Schema({
         unique: true,
         trim: true,
         lowercase: true,
-        match: [/.+@.+\..+/, 'Please fill a valid email address'] // Basic email validation
+        match: [/.+@.+\..+/, 'Please fill a valid email address']
     },
     password: {
         type: String,
         required: function() {
-            // Password is not required if using Google OAuth
             return !this.googleId;
         }
     },
-    googleId: { // For Google OAuth
+    googleId: {
         type: String,
         unique: true,
-        sparse: true // Allows null values to not violate unique constraint
+        sparse: true
     },
-    
-    // ENHANCED: Updated role field to support admin roles
     role: {
         type: String,
-        enum: ['student', 'admin', 'superadmin', 'guest'], // Added admin roles
+        enum: ['student', 'admin', 'superadmin', 'guest'],
         default: 'student'
     },
-    
-    // ENHANCED: Added admin-specific fields
     isActive: {
         type: Boolean,
-        default: true // For admin to activate/deactivate users
+        default: true
     },
-    
-    // Your existing fields
+    // CHANGED: from isEmailVerified to isVerified
+    isVerified: {
+        type: Boolean,
+        default: false
+    },
+    // MOVED: bio from profile to root level
+    bio: {
+        type: String,
+        maxlength: 500,
+        default: ''
+    },
     uploadedResources: [
         {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Resource'
         }
     ],
-    savedResources: [ // For the personal library feature
+    savedResources: [
         {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Resource'
         }
     ],
-    
-    // ENHANCED: Additional user profile fields (optional)
     profile: {
         institution: {
             type: String,
@@ -73,15 +74,9 @@ const userSchema = new mongoose.Schema({
             type: Number,
             min: 1,
             max: 10
-        },
-        bio: {
-            type: String,
-            maxlength: 500,
-            default: ''
         }
+        // REMOVED: bio (moved to root level)
     },
-    
-    // ENHANCED: Activity tracking for admin dashboard
     stats: {
         uploadCount: {
             type: Number,
@@ -96,29 +91,29 @@ const userSchema = new mongoose.Schema({
             default: Date.now
         }
     },
-    
-    // ENHANCED: Admin notes (for admin use)
     adminNotes: {
         type: String,
         default: '',
-        select: false // Don't include in regular queries
-    },
-    
-    // ENHANCED: Account verification fields
-    isEmailVerified: {
-        type: Boolean,
-        default: false
-    },
-    emailVerificationToken: {
-        type: String,
         select: false
     },
-    emailVerificationExpiry: {
-        type: Date,
-        select: false
-    },
-    
-    // ENHANCED: Password reset fields
+    // KEEP: OTP fields (these are correct)
+    otp: {
+    type: String,
+    select: false,
+    trim: true,  // Add trim to ensure no whitespace
+    validate: {
+        validator: function(v) {
+            return /^\d{6}$/.test(v); // Ensure 6-digit OTP
+        },
+        message: props => `${props.value} is not a valid 6-digit OTP!`
+    }
+},
+   otpExpires: {
+    type: Date,
+    select: false,
+    index: { expires: '10m' } // Auto-expire after 10 minutes
+},
+    // OPTIONAL: Keep these if you use password reset functionality
     passwordResetToken: {
         type: String,
         select: false
@@ -127,33 +122,28 @@ const userSchema = new mongoose.Schema({
         type: Date,
         select: false
     },
-    
-    // Your existing timestamp field
     createdAt: {
         type: Date,
         default: Date.now
     },
-    
-    // ENHANCED: Add updatedAt for better tracking
     updatedAt: {
         type: Date,
         default: Date.now
     }
 });
 
-// ENHANCED: Add indexes for better performance
+// Add indexes for better performance
 userSchema.index({ email: 1 });
 userSchema.index({ username: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ createdAt: -1 });
+userSchema.index({ otpExpires: 1 });
 
-// Your existing pre-save middleware (enhanced)
+// Pre-save middleware
 userSchema.pre('save', async function(next) {
-    // Update the updatedAt field
     this.updatedAt = new Date();
     
-    // Your existing password hashing logic
     if (this.isModified('password') && this.password) {
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
@@ -161,12 +151,45 @@ userSchema.pre('save', async function(next) {
     next();
 });
 
-// Your existing password comparison method
+userSchema.methods.verifyOtp = function(enteredOtp) {
+    // Debug logs
+    console.log('OTP Verification:', {
+        storedOtp: this.otp,
+        enteredOtp: enteredOtp,
+        typeMatch: typeof this.otp === typeof enteredOtp,
+        timeRemaining: this.timeUntilOtpExpiry / 1000 + ' seconds'
+    });
+
+    // Convert both to string and trim whitespace
+    const cleanStored = String(this.otp).trim();
+    const cleanEntered = String(enteredOtp).trim();
+    
+    return cleanStored === cleanEntered && this.otpExpires > new Date();
+};
+
+// Update pre-save hook to handle OTP changes
+userSchema.pre('save', async function(next) {
+    this.updatedAt = new Date();
+    
+    if (this.isModified('password') && this.password) {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+    }
+    
+    // Auto-set OTP expiration if OTP is being set
+    if (this.isModified('otp') && this.otp) {
+        this.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    }
+    
+    next();
+});
+
+// Password comparison method
 userSchema.methods.matchPassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// ENHANCED: Additional methods for admin functionality
+// Admin functionality methods
 userSchema.methods.isAdmin = function() {
     return this.role === 'admin' || this.role === 'superadmin';
 };
@@ -176,20 +199,16 @@ userSchema.methods.isSuperAdmin = function() {
 };
 
 userSchema.methods.canManageUser = function(targetUser) {
-    // Super admin can manage anyone except other super admins
     if (this.role === 'superadmin') {
         return targetUser.role !== 'superadmin' || this._id.equals(targetUser._id);
     }
-    
-    // Regular admin can manage students and guests
     if (this.role === 'admin') {
         return ['student', 'guest'].includes(targetUser.role);
     }
-    
     return false;
 };
 
-// ENHANCED: Method to get user statistics
+// User statistics method
 userSchema.methods.getStats = async function() {
     const Resource = mongoose.model('Resource');
     
@@ -208,12 +227,12 @@ userSchema.methods.getStats = async function() {
     };
 };
 
-// ENHANCED: Static method to get admin users
+// Static method to get admin users
 userSchema.statics.getAdmins = function() {
     return this.find({ role: { $in: ['admin', 'superadmin'] } });
 };
 
-// ENHANCED: Static method to get active users
+// Static method to get active users
 userSchema.statics.getActiveUsers = function() {
     return this.find({ isActive: true });
 };
