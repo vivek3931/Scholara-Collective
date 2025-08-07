@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCloudUploadAlt, faSearch } from "@fortawesome/free-solid-svg-icons";
-import { MotionPathPlugin } from "gsap/MotionPathPlugin";
+import { CloudUpload, Search } from "lucide-react";
 import { Link } from "react-router-dom";
-import { gsap } from "gsap";
 
 const Hero = () => {
   const heroRef = useRef(null);
@@ -12,7 +9,6 @@ const Hero = () => {
   const particlesRef = useRef([]);
 
   useEffect(() => {
-    gsap.registerPlugin(MotionPathPlugin);
     // Enhanced glow effect with smooth cursor following
     const handleMouseMove = (event) => {
       if (heroRef.current && glowRef.current && raysRef.current) {
@@ -20,128 +16,103 @@ const Hero = () => {
         let mouseX = event.clientX - rect.left;
         let mouseY = event.clientY - rect.top;
 
-        const glowSize = 800;
+        const glowSize = Math.min(800, rect.width * 0.8, rect.height * 0.8);
 
         // Center the glow on the cursor
         mouseX = mouseX - glowSize / 2;
         mouseY = mouseY - glowSize / 2;
 
-        // Animate main glow with smooth delay
-        gsap.to(glowRef.current, {
-          x: mouseX,
-          y: mouseY,
-          duration: 1.5,
-          ease: "power2.out",
-          overwrite: true,
-        });
+        // Animate main glow with smooth delay using CSS transitions
+        if (glowRef.current) {
+          glowRef.current.style.transform = `translate(${mouseX}px, ${mouseY}px)`;
+          glowRef.current.style.transition = 'transform 1.5s ease-out';
+        }
 
         // Animate rays with slightly more delay for layered effect
-        gsap.to(raysRef.current, {
-          x: mouseX,
-          y: mouseY,
-          duration: 2,
-          ease: "power3.out",
-          overwrite: true,
-        });
+        if (raysRef.current) {
+          raysRef.current.style.transform = `translate(${mouseX}px, ${mouseY}px)`;
+          raysRef.current.style.transition = 'transform 2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        }
       }
     };
 
     const setInitialGlowPosition = () => {
       if (heroRef.current && glowRef.current && raysRef.current) {
         const rect = heroRef.current.getBoundingClientRect();
-        const centerX = rect.width / 2 - 400;
-        const centerY = rect.height / 2 - 400;
+        const glowSize = Math.min(800, rect.width * 0.8, rect.height * 0.8);
+        const centerX = rect.width / 2 - glowSize / 2;
+        const centerY = rect.height / 2 - glowSize / 2;
 
-        gsap.set([glowRef.current, raysRef.current], {
-          x: centerX,
-          y: centerY,
-        });
+        glowRef.current.style.transform = `translate(${centerX}px, ${centerY}px)`;
+        raysRef.current.style.transform = `translate(${centerX}px, ${centerY}px)`;
       }
     };
 
-    // Enhanced particle animation with multiple types and behaviors
+    // Enhanced particle animation with responsive positioning
     const createParticleAnimation = () => {
       if (heroRef.current && particlesRef.current.length > 0) {
         const rect = heroRef.current.getBoundingClientRect();
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
+        
+        // Responsive particle count based on screen size
+        const isMobile = rect.width < 768;
+        const activeParticles = isMobile ? 25 : 50;
 
         particlesRef.current.forEach((particle, index) => {
+          // Hide extra particles on mobile
+          if (index >= activeParticles) {
+            if (particle) {
+              particle.style.opacity = '0';
+              particle.style.display = 'none';
+            }
+            return;
+          } else {
+            if (particle) {
+              particle.style.display = 'block';
+            }
+          }
+
           // Randomly determine particle type (0: small dot, 1: medium glow, 2: large spark)
           const particleType = Math.floor(Math.random() * 3);
 
-          // Set initial properties based on type
+          // Responsive sizing
+          const baseSize = isMobile ? 0.7 : 1;
           const size =
             particleType === 0
-              ? gsap.utils.random(2, 4)
+              ? (Math.random() * 2 + 2) * baseSize
               : particleType === 1
-              ? gsap.utils.random(4, 6)
-              : gsap.utils.random(6, 10);
+              ? (Math.random() * 4 + 3) * baseSize
+              : (Math.random() * 6 + 4) * baseSize;
 
           const opacity =
             particleType === 0
-              ? gsap.utils.random(0.3, 0.6)
+              ? Math.random() * 0.3 + 0.3
               : particleType === 1
-              ? gsap.utils.random(0.4, 0.8)
-              : gsap.utils.random(0.6, 1);
-
-          const blur = particleType === 0 ? 0 : particleType === 1 ? 2 : 4;
+              ? Math.random() * 0.4 + 0.4
+              : Math.random() * 0.4 + 0.6;
 
           // Generate random angle for radial distribution with some variation
-          const baseAngle = (index / particlesRef.current.length) * Math.PI * 2;
-          const angle = baseAngle + gsap.utils.random(-0.5, 0.5);
+          const baseAngle = (index / activeParticles) * Math.PI * 2;
+          const angle = baseAngle + (Math.random() - 0.5);
 
-          // Different behaviors based on particle type
-          if (particleType === 0) {
-            // Small dots - fast and linear movement
-            animateParticle(particle, {
-              centerX,
-              centerY,
-              angle,
-              minDistance: 100,
-              maxDistance: Math.max(rect.width, rect.height) * 0.6,
-              duration: gsap.utils.random(3, 5),
-              size,
-              opacity,
-              blur,
-              delay: index * 0.1,
-              ease: "none",
-              shape: "circle",
-            });
-          } else if (particleType === 1) {
-            // Medium glows - slower with easing
-            animateParticle(particle, {
-              centerX,
-              centerY,
-              angle,
-              minDistance: 150,
-              maxDistance: Math.max(rect.width, rect.height) * 0.7,
-              duration: gsap.utils.random(5, 8),
-              size,
-              opacity,
-              blur,
-              delay: index * 0.15,
-              ease: "sine.out",
-              shape: "circle",
-            });
-          } else {
-            // Large sparks - irregular movement with rotation
-            animateParticle(particle, {
-              centerX,
-              centerY,
-              angle,
-              minDistance: 200,
-              maxDistance: Math.max(rect.width, rect.height) * 0.8,
-              duration: gsap.utils.random(7, 10),
-              size,
-              opacity,
-              blur,
-              delay: index * 0.2,
-              ease: "power2.inOut",
-              shape: Math.random() > 0.5 ? "circle" : "rectangle",
-              rotation: gsap.utils.random(0, 360),
-            });
-          }
+          // Responsive distance calculations
+          const minDistance = isMobile ? 50 : 100;
+          const maxDistance = Math.min(rect.width, rect.height) * (isMobile ? 0.35 : 0.6);
+
+          animateParticle(particle, {
+            centerX,
+            centerY,
+            angle,
+            minDistance,
+            maxDistance: maxDistance * (particleType === 0 ? 0.8 : particleType === 1 ? 0.9 : 1),
+            duration: particleType === 0 ? Math.random() * 2 + 3 : particleType === 1 ? Math.random() * 3 + 5 : Math.random() * 3 + 7,
+            size,
+            opacity,
+            delay: index * (particleType === 0 ? 0.1 : particleType === 1 ? 0.15 : 0.2),
+            containerWidth: rect.width,
+            containerHeight: rect.height,
+          });
         });
       }
     };
@@ -157,94 +128,80 @@ const Hero = () => {
         duration,
         size,
         opacity,
-        blur,
         delay,
-        ease,
-        shape,
-        rotation = 0,
+        containerWidth,
+        containerHeight,
       }
     ) => {
+      if (!particle) return;
+
       // Calculate random distance from center
-      const distance = gsap.utils.random(minDistance, maxDistance);
+      const distance = Math.random() * (maxDistance - minDistance) + minDistance;
 
       // Calculate end position based on angle and distance
-      const endX = centerX + Math.cos(angle) * distance;
-      const endY = centerY + Math.sin(angle) * distance;
+      let endX = centerX + Math.cos(angle) * distance;
+      let endY = centerY + Math.sin(angle) * distance;
 
-      // Random path variation for more organic movement
-      const midX =
-        centerX + Math.cos(angle) * distance * gsap.utils.random(0.3, 0.7);
-      const midY =
-        centerY + Math.sin(angle) * distance * gsap.utils.random(0.3, 0.7);
+      // Ensure particles stay within container bounds with padding
+      const padding = 50;
+      endX = Math.max(padding, Math.min(containerWidth - padding, endX));
+      endY = Math.max(padding, Math.min(containerHeight - padding, endY));
 
       // Set initial properties
-      gsap.set(particle, {
-        x: centerX,
-        y: centerY,
-        opacity: 0,
-        scale: 0,
-        rotation: rotation,
-        width: size,
-        height: size,
-        filter: blur > 0 ? `blur(${blur}px)` : "none",
-      });
+      particle.style.left = centerX + 'px';
+      particle.style.top = centerY + 'px';
+      particle.style.width = size + 'px';
+      particle.style.height = size + 'px';
+      particle.style.opacity = '0';
+      particle.style.transform = 'translate(-50%, -50%) scale(0)';
 
-      // Create motion path for more interesting movement
-      const path = [
-        { x: centerX, y: centerY },
-        { x: midX, y: midY },
-        { x: endX, y: endY },
-      ];
+      // Animate the particle
+      setTimeout(() => {
+        if (particle) {
+          particle.style.transition = `all ${duration}s ease-out`;
+          particle.style.left = endX + 'px';
+          particle.style.top = endY + 'px';
+          particle.style.opacity = opacity;
+          particle.style.transform = 'translate(-50%, -50%) scale(1)';
 
-      // Animate along the path
-      gsap.to(particle, {
-        motionPath: {
-          path: path,
-          autoRotate: shape === "rectangle",
-          align: shape === "rectangle" ? "self" : "none",
-        },
-        opacity: opacity,
-        scale: 1,
-        duration: duration,
-        ease: ease,
-        delay: delay,
-        onComplete: () => {
-          // Fade out and restart
-          gsap.to(particle, {
-            opacity: 0,
-            scale: 0,
-            duration: 1.5,
-            ease: "power2.in",
-            onComplete: () => {
-              // Slightly modify parameters for variation
-              const newAngle = angle + gsap.utils.random(-0.3, 0.3);
-              const newDistance = gsap.utils.random(
-                minDistance * 0.8,
-                maxDistance * 1.2
-              );
-              animateParticle(particle, {
-                centerX,
-                centerY,
-                angle: newAngle,
-                minDistance,
-                maxDistance: newDistance,
-                duration: duration * gsap.utils.random(0.8, 1.2),
-                size,
-                opacity,
-                blur,
-                delay: 0,
-                ease,
-                shape,
-                rotation,
-              });
-            },
-          });
-        },
-      });
+          // Restart animation after completion
+          setTimeout(() => {
+            if (particle) {
+              particle.style.transition = `all 1.5s ease-in`;
+              particle.style.opacity = '0';
+              particle.style.transform = 'translate(-50%, -50%) scale(0)';
+
+              // Restart with new parameters
+              setTimeout(() => {
+                const newAngle = angle + (Math.random() - 0.5) * 0.6;
+                const newDistance = Math.random() * (maxDistance * 1.2 - minDistance * 0.8) + minDistance * 0.8;
+                animateParticle(particle, {
+                  centerX,
+                  centerY,
+                  angle: newAngle,
+                  minDistance,
+                  maxDistance: Math.min(newDistance, containerWidth * 0.4, containerHeight * 0.4),
+                  duration: duration * (Math.random() * 0.4 + 0.8),
+                  size,
+                  opacity,
+                  delay: 0,
+                  containerWidth,
+                  containerHeight,
+                });
+              }, 1500);
+            }
+          }, duration * 1000);
+        }
+      }, delay * 1000);
     };
 
     setInitialGlowPosition();
-    createParticleAnimation();
+    
+    // Add a small delay for initial load to ensure proper measurements
+    const initTimeout = setTimeout(() => {
+      setInitialGlowPosition();
+      createParticleAnimation();
+    }, 100);
 
     const handleResize = () => {
       setInitialGlowPosition();
@@ -252,13 +209,16 @@ const Hero = () => {
     };
 
     window.addEventListener("resize", handleResize);
-    heroRef.current?.addEventListener("mousemove", handleMouseMove);
+    if (heroRef.current) {
+      heroRef.current.addEventListener("mousemove", handleMouseMove);
+    }
 
     return () => {
-      heroRef.current?.removeEventListener("mousemove", handleMouseMove);
+      clearTimeout(initTimeout);
+      if (heroRef.current) {
+        heroRef.current.removeEventListener("mousemove", handleMouseMove);
+      }
       window.removeEventListener("resize", handleResize);
-      gsap.killTweensOf([glowRef.current, raysRef.current]);
-      particlesRef.current.forEach((particle) => gsap.killTweensOf(particle));
     };
   }, []);
 
@@ -304,7 +264,6 @@ const Hero = () => {
               ? `0 0 ${size * 1.5}px ${color}`
               : `0 0 ${size}px ${color}`,
           zIndex: 8,
-          transform: "translate(-50%, -50%)",
           opacity: 0, // Start invisible (animation will handle opacity)
         }}
       />
@@ -315,15 +274,15 @@ const Hero = () => {
     <section
       ref={heroRef}
       className="relative py-20 px-4 text-center min-h-screen flex items-center justify-center
-                 bg-gray-50 dark:bg-transparent rounded-2xl transition-colors duration-500 overflow-hidden"
+                  rounded-2xl transition-colors duration-500 overflow-hidden"
     >
       {/* Enhanced Radial Rays - Outer layer */}
       <div
         ref={raysRef}
         className="absolute z-0 rounded-full pointer-events-none"
         style={{
-          width: "800px",
-          height: "800px",
+          width: "min(800px, 80vw, 80vh)",
+          height: "min(800px, 80vw, 80vh)",
           background: `
             radial-gradient(circle at center, 
               rgba(251, 146, 60, 0.15) 0%,
@@ -343,8 +302,8 @@ const Hero = () => {
         ref={glowRef}
         className="absolute z-1 rounded-full pointer-events-none"
         style={{
-          width: "800px",
-          height: "800px",
+          width: "min(800px, 80vw, 80vh)",
+          height: "min(800px, 80vw, 80vh)",
           background: `
             radial-gradient(circle at center, 
               rgba(251, 146, 60, 0.3) 0%,
@@ -363,8 +322,8 @@ const Hero = () => {
       <div
         className="absolute z-2 rounded-full pointer-events-none"
         style={{
-          width: "400px",
-          height: "400px",
+          width: "min(400px, 40vw, 40vh)",
+          height: "min(400px, 40vw, 40vh)",
           left: "50%",
           top: "50%",
           transform: "translate(-50%, -50%)",
@@ -384,7 +343,7 @@ const Hero = () => {
 
       <div className="relative max-w-4xl mx-auto z-10">
         <h1
-          className="text-3xl sm:text-4xl lg:text-6xl font-extrabold mb-4 sm:mb-5 leading-tight animate-fade-in-up
+          className="text-3xl sm:text-4xl lg:text-6xl font-extrabold mb-4 sm:mb-5 leading-tight
                    text-gray-900 dark:text-white"
         >
           Unlock Your{" "}
@@ -393,29 +352,25 @@ const Hero = () => {
           </span>
         </h1>
         <p
-          className="text-base sm:text-lg lg:text-xl mb-8 sm:mb-10 max-w-2xl mx-auto animate-fade-in-up delay-200
+          className="text-base sm:text-lg lg:text-xl mb-8 sm:mb-10 max-w-2xl mx-auto
                    text-gray-700 dark:text-gray-300"
         >
           Seamlessly discover, contribute, and organize a wealth of study
           materials – from notes to past papers, all in one place, absolutely
           free!
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up delay-400 max-w-lg sm:max-w-none mx-auto">
-          <Link
-            to="upload"
-            className="flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 font-bold rounded-lg shadow-glow-sm cursor-pointer
-                     transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-glow-sm
+        <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-lg sm:max-w-none mx-auto">
+          <Link to={'/upload'}
+            className="flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 font-bold rounded-lg cursor-pointer
+                     transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-0.5
                      bg-gradient-to-r from-orange-500 to-yellow-500 text-white
-                     hover:from-orange-600 hover:to-yellow-600 text-sm sm:text-base"
+                     hover:from-orange-600 hover:to-yellow-600 text-sm sm:text-base
+                     shadow-lg hover:shadow-xl"
           >
-            <FontAwesomeIcon
-              icon={faCloudUploadAlt}
-              className="text-lg sm:text-xl"
-            />
+            <CloudUpload className="w-5 h-5" />
             <span>Upload Your Resources</span>
           </Link>
-          <Link
-            to="resources"
+          <Link to={'/resources'}
             className="flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 font-semibold rounded-lg cursor-pointer
                      transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-0.5
                      bg-transparent text-orange-600 border-2 border-orange-500
@@ -423,7 +378,7 @@ const Hero = () => {
                      hover:bg-orange-500 hover:text-white hover:border-orange-500
                      dark:hover:bg-orange-500 dark:hover:text-white text-sm sm:text-base"
           >
-            <FontAwesomeIcon icon={faSearch} className="text-lg sm:text-xl" />
+            <Search className="w-5 h-5" />
             <span>Explore Study Materials</span>
           </Link>
         </div>

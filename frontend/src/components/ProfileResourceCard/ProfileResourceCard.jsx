@@ -1,3 +1,4 @@
+// ProfileResourceCard.jsx
 import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -8,8 +9,8 @@ import {
   faTrashAlt,
 } from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "../../context/AuthContext/AuthContext";
-import CustomWarningModal from "../CustomWarningModal/CustomWarningModal.jsx";
 import { useNavigate } from "react-router-dom";
+import { useModal } from "../../context/ModalContext/ModalContext";
 
 const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
   const { token, isAuthenticated, user } = useAuth();
@@ -19,22 +20,26 @@ const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
   const [flagging, setFlagging] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
-  const [modal, setModal] = useState({
-    isOpen: false,
-    type: "",
-    title: "",
-    message: "",
-    confirmText: "Confirm",
-    cancelText: "Cancel",
-    onConfirm: () => {},
-    onCancel: () => {},
-    isDismissible: true,
-  });
+
+  // REMOVED: Local modal state is no longer needed
+  // const [modal, setModal] = useState({
+  //   isOpen: false,
+  //   type: "",
+  //   title: "",
+  //   message: "",
+  //   confirmText: "Confirm",
+  //   cancelText: "Cancel",
+  //   onConfirm: () => {},
+  //   onCancel: () => {},
+  //   isDismissible: true,
+  // });
+
+  // NEW: Get the showModal function from the context
+  const { showModal } = useModal();
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   useEffect(() => {
-    // Reset state if the resource prop changes
     setIsDeleted(false);
     setDeleting(false);
   }, [resource]);
@@ -55,45 +60,21 @@ const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
     return "";
   };
 
-  const openModal = (
-    type,
-    title,
-    message,
-    confirmText = "Confirm",
-    cancelText = "Cancel",
-    onConfirm,
-    onCancel,
-    isDismissible = true
-  ) => {
-    setModal({
-      isOpen: true,
-      type,
-      title,
-      message,
-      confirmText,
-      cancelText,
-      onConfirm: onConfirm || closeModal,
-      onCancel: onCancel || closeModal,
-      isDismissible,
-    });
-  };
+  // REMOVED: The local openModal and closeModal functions are now replaced by the hook
+  // const openModal = (...) => { ... };
+  // const closeModal = () => { ... };
 
-  const closeModal = () => {
-    setModal({ ...modal, isOpen: false });
-  };
 
   const handleDownload = async () => {
     if (!isAuthenticated) {
-      openModal(
-        "warning",
-        "Authentication Required",
-        "You need to be logged in to download resources. Please log in or create an account.",
-        "Go to Login",
-        "Cancel",
-        () => navigate("/login"),
-        undefined,
-        true
-      );
+      showModal({ // UPDATED: Use showModal from the hook
+        type: "warning",
+        title: "Authentication Required",
+        message: "You need to be logged in to download resources. Please log in or create an account.",
+        confirmText: "Go to Login",
+        cancelText: "Cancel",
+        onConfirm: () => navigate("/login"),
+      });
       return;
     }
 
@@ -132,12 +113,12 @@ const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
 
-      openModal(
-        "success",
-        "Download Started",
-        "Your download has started successfully!",
-        "OK"
-      );
+      showModal({ // UPDATED: Use showModal from the hook
+        type: "success",
+        title: "Download Started",
+        message: "Your download has started successfully!",
+        confirmText: "OK",
+      });
 
       await fetch(`${API_URL}/resources/${resource._id}/increment-download`, {
         method: "PUT",
@@ -145,12 +126,12 @@ const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
       });
     } catch (error) {
       console.error("Download failed:", error);
-      openModal(
-        "error",
-        "Download Failed",
-        `Could not download the file: ${error.message}. Please try again.`,
-        "Close"
-      );
+      showModal({ // UPDATED: Use showModal from the hook
+        type: "error",
+        title: "Download Failed",
+        message: `Could not download the file: ${error.message}. Please try again.`,
+        confirmText: "Close",
+      });
     } finally {
       setDownloading(false);
     }
@@ -158,16 +139,14 @@ const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
 
   const handleSave = async () => {
     if (!isAuthenticated) {
-      openModal(
-        "warning",
-        "Authentication Required",
-        "You need to be logged in to save resources to your library. Please log in or create an account.",
-        "Go to Login",
-        "Cancel",
-        () => navigate("/login"),
-        undefined,
-        true
-      );
+      showModal({ // UPDATED: Use showModal from the hook
+        type: "warning",
+        title: "Authentication Required",
+        message: "You need to be logged in to save resources to your library. Please log in or create an account.",
+        confirmText: "Go to Login",
+        cancelText: "Cancel",
+        onConfirm: () => navigate("/login"),
+      });
       return;
     }
 
@@ -183,28 +162,28 @@ const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
 
       const data = await response.json();
       if (response.ok) {
-        openModal(
-          "success",
-          "Resource Saved!",
-          "This resource has been successfully added to your library!",
-          "Great!"
-        );
+        showModal({ // UPDATED: Use showModal from the hook
+          type: "success",
+          title: "Resource Saved!",
+          message: "This resource has been successfully added to your library!",
+          confirmText: "Great!"
+        });
       } else {
-        openModal(
-          "error",
-          "Failed to Save",
-          `Could not save resource: ${data.msg || "Unknown error"}`,
-          "OK"
-        );
+        showModal({ // UPDATED: Use showModal from the hook
+          type: "error",
+          title: "Failed to Save",
+          message: `Could not save resource: ${data.msg || "Unknown error"}`,
+          confirmText: "OK",
+        });
       }
     } catch (error) {
       console.error("Save error:", error);
-      openModal(
-        "error",
-        "Save Error",
-        "An unexpected error occurred while saving the resource. Please try again.",
-        "OK"
-      );
+      showModal({ // UPDATED: Use showModal from the hook
+        type: "error",
+        title: "Save Error",
+        message: "An unexpected error occurred while saving the resource. Please try again.",
+        confirmText: "OK",
+      });
     } finally {
       setSaving(false);
     }
@@ -212,27 +191,25 @@ const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
 
   const handleFlag = async () => {
     if (!isAuthenticated) {
-      openModal(
-        "warning",
-        "Authentication Required",
-        "You need to be logged in to flag resources. Please log in or create an account.",
-        "Go to Login",
-        "Cancel",
-        () => navigate("/login"),
-        undefined,
-        true
-      );
+      showModal({ // UPDATED: Use showModal from the hook
+        type: "warning",
+        title: "Authentication Required",
+        message: "You need to be logged in to flag resources. Please log in or create an account.",
+        confirmText: "Go to Login",
+        cancelText: "Cancel",
+        onConfirm: () => navigate("/login"),
+      });
       return;
     }
 
     const reason = prompt("Please provide a reason for flagging this resource:");
     if (!reason?.trim()) {
-      openModal(
-        "info",
-        "Flagging Cancelled",
-        "Flagging was cancelled because no reason was provided.",
-        "OK"
-      );
+      showModal({ // UPDATED: Use showModal from the hook
+        type: "info",
+        title: "Flagging Cancelled",
+        message: "Flagging was cancelled because no reason was provided.",
+        confirmText: "OK",
+      });
       return;
     }
 
@@ -249,41 +226,41 @@ const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
 
       const data = await response.json();
       if (response.ok) {
-        openModal(
-          "success",
-          "Resource Flagged",
-          "This resource has been flagged for review. Thank you for helping us maintain content quality!",
-          "Got It"
-        );
+        showModal({ // UPDATED: Use showModal from the hook
+          type: "success",
+          title: "Resource Flagged",
+          message: "This resource has been flagged for review. Thank you for helping us maintain content quality!",
+          confirmText: "Got It",
+        });
       } else {
-        openModal(
-          "error",
-          "Failed to Flag",
-          `Could not flag resource: ${data.msg || "Unknown error"}`,
-          "OK"
-        );
+        showModal({ // UPDATED: Use showModal from the hook
+          type: "error",
+          title: "Failed to Flag",
+          message: `Could not flag resource: ${data.msg || "Unknown error"}`,
+          confirmText: "OK",
+        });
       }
     } catch (error) {
       console.error("Flag error:", error);
-      openModal(
-        "error",
-        "Flagging Error",
-        "An unexpected error occurred while flagging the resource. Please try again.",
-        "OK"
-      );
+      showModal({ // UPDATED: Use showModal from the hook
+        type: "error",
+        title: "Flagging Error",
+        message: "An unexpected error occurred while flagging the resource. Please try again.",
+        confirmText: "OK",
+      });
     } finally {
       setFlagging(false);
     }
   };
 
   const handleDelete = async () => {
-    openModal(
-      "danger",
-      "Confirm Deletion",
-      `Are you sure you want to delete "${resource.title}"? This action cannot be undone.`,
-      "Delete",
-      "Cancel",
-      async () => {
+    showModal({ // UPDATED: Use showModal from the hook
+      type: "danger",
+      title: "Confirm Deletion",
+      message: `Are you sure you want to delete "${resource.title}"? This action cannot be undone.`,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      onConfirm: async () => {
         setDeleting(true);
         try {
           const response = await fetch(
@@ -296,63 +273,45 @@ const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
               },
             }
           );
-
           const data = await response.json();
-
           if (!response.ok) {
             throw new Error(
               data.msg ||
-                `HTTP error! Status: ${response.status} (${response.statusText})`
+              `HTTP error! Status: ${response.status} (${response.statusText})`
             );
           }
-
           setIsDeleted(true);
           if (onResourceDeleted) {
             onResourceDeleted(resource._id);
           }
-
-          openModal(
-            "success",
-            "Resource Deleted",
-            "The resource has been successfully deleted.",
-            "OK"
-          );
+          showModal({ // UPDATED: Use showModal from the hook
+            type: "success",
+            title: "Resource Deleted",
+            message: "The resource has been successfully deleted.",
+            confirmText: "OK"
+          });
         } catch (error) {
           console.error("Delete error:", error.message);
-          openModal(
-            "error",
-            "Deletion Failed",
-            `Could not delete resource: ${error.message}`,
-            "Close"
-          );
+          showModal({ // UPDATED: Use showModal from the hook
+            type: "error",
+            title: "Deletion Failed",
+            message: `Could not delete resource: ${error.message}`,
+            confirmText: "Close"
+          });
         } finally {
           setDeleting(false);
         }
       },
-      undefined,
-      true
-    );
+    });
   };
 
-  // Don't render if the resource is deleted
   if (isDeleted) {
     return null;
   }
 
   return (
     <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-glow-sm overflow-hidden border border-gray-200 dark:border-gray-700 transition-all hover:shadow-lg">
-      <CustomWarningModal
-        isOpen={modal.isOpen}
-        onClose={closeModal}
-        type={modal.type}
-        title={modal.title}
-        message={modal.message}
-        confirmText={modal.confirmText}
-        cancelText={modal.cancelText}
-        onConfirm={modal.onConfirm}
-        onCancel={modal.onCancel}
-        isDismissible={modal.isDismissible}
-      />
+      {/* REMOVED: The CustomWarningModal component is no longer rendered here */}
       <div className="p-4">
         <div className="flex justify-between items-start gap-2">
           <div className="flex-1 min-w-0">
@@ -375,11 +334,9 @@ const ProfileResourceCard = ({ resource, onResourceDeleted }) => {
             {resource.fileType || "File"}
           </span>
         </div>
-
         <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 line-clamp-2">
           {resource.description || "No description"}
         </p>
-
         <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
           <div className="text-xs text-gray-500 dark:text-gray-400">
             {resource.downloads || 0} downloads

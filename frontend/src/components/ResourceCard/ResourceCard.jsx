@@ -1,4 +1,4 @@
-
+// ResourceCard.jsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -18,13 +18,16 @@ import {
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { useAuth } from "../../context/AuthContext/AuthContext";
+import { useModal } from "../../context/ModalContext/ModalContext";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `../../../workers/pdf.worker.min.js`;
 
-const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal, isSavedPage = false, onUnsave }) => {
+// REMOVED: `showModal` prop is no longer in the function signature
+const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false, onUnsave }) => {
   const { token, isAuthenticated } = useAuth();
+  const { showModal } = useModal(); // <-- NEW: Get showModal from the context
   const [downloading, setDownloading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [flagging, setFlagging] = useState(false);
@@ -460,63 +463,61 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal, isSavedP
       return;
     }
 
-    const reason = prompt(
-      "Please provide a reason for flagging this resource:"
-    );
-    if (!reason?.trim()) {
-      showModal({
-        type: "info",
-        title: "Flagging Cancelled",
-        message: "Flagging was cancelled because no reason was provided.",
-        confirmText: "OK",
-      });
-      return;
-    }
+    // UPDATED: Replaced the native `prompt()` with a custom modal confirmation
+    showModal({
+      type: "info",
+      title: "Confirm Flagging",
+      message: "Are you sure you want to flag this resource for review? This action cannot be undone.",
+      confirmText: "Flag",
+      onConfirm: async () => {
+        setFlagging(true);
+        try {
+          const response = await fetch(
+            `${API_URL}/resources/${resource._id}/flag`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ reason: "Reported by user" }), // Simplified reason
+            }
+          );
 
-    setFlagging(true);
-    try {
-      const response = await fetch(
-        `${API_URL}/resources/${resource._id}/flag`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ reason: reason.trim() }),
+          const data = await response.json();
+          if (response.ok) {
+            showModal({
+              type: "success",
+              title: "Resource Flagged",
+              message:
+                "This resource has been flagged for review. Thank you for helping us maintain content quality!",
+              confirmText: "Got It",
+            });
+            onFlag?.(resource._id);
+          } else {
+            showModal({
+              type: "error",
+              title: "Failed to Flag",
+              message: `Could not flag resource: ${data.msg || "Unknown error"}`,
+              confirmText: "OK",
+            });
+          }
+        } catch (error) {
+          console.error("Flag error:", error);
+          showModal({
+            type: "error",
+            title: "Flagging Error",
+            message:
+              "An unexpected error occurred while flagging the resource. Please try again.",
+            confirmText: "OK",
+          });
+        } finally {
+          setFlagging(false);
         }
-      );
-
-      const data = await response.json();
-      if (response.ok) {
-        showModal({
-          type: "success",
-          title: "Resource Flagged",
-          message:
-            "This resource has been flagged for review. Thank you for helping us maintain content quality!",
-          confirmText: "Got It",
-        });
-        onFlag?.(resource._id);
-      } else {
-        showModal({
-          type: "error",
-          title: "Failed to Flag",
-          message: `Could not flag resource: ${data.msg || "Unknown error"}`,
-          confirmText: "OK",
-        });
-      }
-    } catch (error) {
-      console.error("Flag error:", error);
-      showModal({
-        type: "error",
-        title: "Flagging Error",
-        message:
-          "An unexpected error occurred while flagging the resource. Please try again.",
-        confirmText: "OK",
-      });
-    } finally {
-      setFlagging(false);
-    }
+      },
+      cancelText: "Cancel",
+      isDismissible: true,
+    });
   };
 
   const handleUnsave = async () => {
@@ -606,7 +607,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, showModal, isSavedP
   const handleModalContentMouseMove = useCallback((e) => {}, []);
 
   return (
-    <div className="bg-white dark:bg-onyx/50 rounded-2xl overflow-hidden shadow-lg border border-gray-200 dark:border-onyx animate-fade-in font-poppins">
+    <div className="bg-white dark:bg-charcoal/95 rounded-2xl overflow-hidden shadow-glow-sm animate-fade-in font-poppins">
       <div
         className="h-36 flex items-center justify-center text-white relative"
         style={{ backgroundColor: genericBgColor }}

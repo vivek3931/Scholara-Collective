@@ -1,15 +1,14 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTwitter, faFacebookF, faInstagram, faLinkedinIn } from '@fortawesome/free-brands-svg-icons';
-
+import logo from '../../assets/logo.svg'
 const Footer = () => {
   return (
     <footer className="bg-gray-100 dark:bg-transparent pt-12 pb-6 border-t border-gray-200 dark:border-t-charcoal font-poppins animate-fade-in">
       <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         <div className="footer-col">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-white font-bold shadow-glow-sm">PP</div>
-            <div className="text-xl font-semibold bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 bg-clip-text text-transparent font-poppins">Scholara Collective</div>
+          <div className="flex items-center mb-4">
+            <img src={logo} alt="main_logo" />
           </div>
           <p className="text-sm text-gray-600 dark:text-platinum mb-4">
             Scholara Collective is an open platform for students to share and discover academic resources to help each other succeed.
