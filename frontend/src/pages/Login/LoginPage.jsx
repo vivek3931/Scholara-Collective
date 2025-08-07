@@ -2,21 +2,22 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext/AuthContext.jsx';
+import { useModal } from '../../context/ModalContext/ModalContext.jsx'; // Import useModal
 import { LogIn } from 'lucide-react';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [localError, setLocalError] = useState(null);
+    // const [localError, setLocalError] = useState(null); // No longer needed
     const [isLoggingIn, setIsLoggingIn] = useState(false);
-
 
     const navigate = useNavigate();
     const { login } = useAuth();
+    const { showModal, hideModal } = useModal(); // Destructure showModal and hideModal
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLocalError(null);
+        // setLocalError(null); // No longer needed
         setIsLoggingIn(true);
 
         try {
@@ -32,9 +33,17 @@ const LoginPage = () => {
                 navigate('/');
             }
         } catch (error) {
-            // Catch the error thrown by the login function and set local error state
+            // Catch the error thrown by the login function and display it using the modal
             const errorMessage = error.response?.data?.message || 'Login failed. Please check your credentials.';
-            setLocalError(errorMessage);
+            showModal({
+                type: 'error',
+                title: 'Login Failed',
+                message: errorMessage,
+                confirmText: 'OK',
+                onConfirm: hideModal, // Close modal on OK
+                showCloseButton: true,
+                isDismissible: true,
+            });
         } finally {
             setIsLoggingIn(false);
         }
@@ -43,16 +52,16 @@ const LoginPage = () => {
     return (
         <div className="min-h-screen flex items-center justify-center bg-platinum/80 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx transition-colors duration-200 p-4 font-poppins animate-fade-in">
             <div className="bg-white dark:bg-onyx/60 p-8 rounded-xl shadow-glow-sm w-full max-w-md border border-gray-200 dark:border-onyx transition-colors duration-200">
-                <h2 className="text-3xl font-bold text-center bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 bg-clip-text text-transparent mb-6 flex items-center justify-center gap-2">
+                <h2 className="text-2xl font-bold text-center bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 bg-clip-text text-transparent mb-6 flex items-center justify-center gap-2">
                     <LogIn size={32} className="text-amber-500"/>
-                    <span>Login to PaperPal</span>
+                    <span>Login to Scholar Collective</span>
                 </h2>
 
-                {localError && (
+                {/* {localError && ( // This block is removed as errors are now handled by the modal
                     <p className="bg-amber-50/80 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 p-3 rounded-md mb-4 text-center font-poppins border border-amber-200 dark:border-amber-800">
                         {localError}
                     </p>
-                )}
+                )} */}
 
                 <form onSubmit={handleSubmit} className="space-y-4" aria-label="Login form">
                     <div>
@@ -65,7 +74,7 @@ const LoginPage = () => {
                             className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx/90 border border-gray-300 dark:border-charcoal text-charcoal dark:text-platinum focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-colors duration-200"
                             placeholder="Enter your email"
                             value={email}
-                            onChange={(e) => { setLocalError(null); setEmail(e.target.value); }}
+                            onChange={(e) => { /* setLocalError(null); */ setEmail(e.target.value); }} // Removed setLocalError
                             required
                             disabled={isLoggingIn}
                         />
@@ -80,7 +89,7 @@ const LoginPage = () => {
                             className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx/90 border border-gray-300 dark:border-charcoal text-charcoal dark:text-platinum focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-colors duration-200"
                             placeholder="Enter your password"
                             value={password}
-                            onChange={(e) => { setLocalError(null); setPassword(e.target.value); }}
+                            onChange={(e) => { /* setLocalError(null); */ setPassword(e.target.value); }} // Removed setLocalError
                             required
                             disabled={isLoggingIn}
                         />
