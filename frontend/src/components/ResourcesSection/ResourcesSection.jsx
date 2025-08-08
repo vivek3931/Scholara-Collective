@@ -200,7 +200,7 @@ const ResourcesSection = ({
             >
               <Search size={24} className="text-amber-600 dark:text-amber-200" />
             </motion.div>
-            <span>Find Academic Resources</span>
+            <span className='dark:text-white text-black'>Find Academic Resources</span>
           </h2>
           <form className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="relative">
@@ -320,47 +320,41 @@ const ResourcesSection = ({
       </motion.div>
       {loading && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="text-center py-12 flex flex-col items-center justify-center text-gray-600 dark:text-platinum font-poppins"
-        >
-          <motion.div
-            animate={{ 
-              rotate: 360,
-              scale: [1, 1.1, 1]
-            }}
-            transition={{
-              rotate: { 
-                repeat: Infinity, 
-                duration: 1.5, 
-                ease: "linear" 
-              },
-              scale: {
-                repeat: Infinity,
-                repeatType: "reverse",
-                duration: 1
-              }
-            }}
-          >
-            <FontAwesomeIcon
-              icon={faSpinner}
-              size="2x"
-              className="mb-4 text-amber-600 dark:text-amber-200"
-            />
-          </motion.div>
-          <motion.p
-            animate={{
-              opacity: [0.6, 1, 0.6]
-            }}
-            transition={{
-              repeat: Infinity,
-              duration: 2
-            }}
-          >
-            Loading resources...
-          </motion.p>
-        </motion.div>
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{ duration: 0.3 }}
+  className="text-center py-12 flex flex-col items-center justify-center text-gray-600 dark:text-platinum font-poppins"
+>
+  <motion.div
+    animate={{ 
+      rotate: 360, 
+    }}
+    transition={{
+      rotate: { 
+        repeat: Infinity, 
+        duration: 1.5, 
+        ease: "linear" 
+      }
+    }}
+  >
+    <FontAwesomeIcon
+      icon={faSpinner}
+      size="2x"
+      className="mb-4 text-amber-600 dark:text-amber-200"
+    />
+  </motion.div>
+  <motion.p
+    animate={{
+      opacity: [0.6, 1, 0.6]
+    }}
+    transition={{
+      repeat: Infinity,
+      duration: 2
+    }}
+  >
+    Loading resources...
+  </motion.p>
+</motion.div>
       )}
       {error && (
         <motion.div
@@ -536,4 +530,4 @@ const Dropdown = ({ label, icon: Icon, options, selectedValue, onSelect, classNa
   );
 };
 
-export default ResourcesSection;
+export default ResourcesSection; 
