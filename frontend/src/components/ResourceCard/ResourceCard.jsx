@@ -1,4 +1,4 @@
-// ResourceCard.jsx
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -24,10 +24,9 @@ import "react-pdf/dist/Page/TextLayer.css";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `../../../workers/pdf.worker.min.js`;
 
-// REMOVED: `showModal` prop is no longer in the function signature
 const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false, onUnsave }) => {
   const { token, isAuthenticated } = useAuth();
-  const { showModal } = useModal(); // <-- NEW: Get showModal from the context
+  const { showModal } = useModal();
   const [downloading, setDownloading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [flagging, setFlagging] = useState(false);
@@ -45,9 +44,46 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
   const [previewDataUrl, setPreviewDataUrl] = useState(null);
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+  // Fix cursor blinking by managing body styles when modal opens/closes
   useEffect(() => {
-    console.log("ResourceCard rendered");
-  });
+    if (showPreviewModal) {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+
+      // Prevent cursor blinking and disable text selection when modal is open
+      document.body.style.overflow = "hidden";
+      document.body.style.cursor = "default";
+      document.body.style.userSelect = "none";
+      document.body.style.webkitUserSelect = "none";
+      document.body.style.msUserSelect = "none";
+      document.body.style.mozUserSelect = "none";
+      
+      // Add a class to body for additional CSS control
+      document.body.classList.add('modal-open');
+    } else {
+      // Restore original styles
+      document.body.style.overflow = "";
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+      document.body.style.msUserSelect = "";
+      document.body.style.mozUserSelect = "";
+      
+      document.body.classList.remove('modal-open');
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.body.style.webkitUserSelect = "";
+      document.body.style.msUserSelect = "";
+      document.body.style.mozUserSelect = "";
+      document.body.classList.remove('modal-open');
+    };
+  }, [showPreviewModal]);
 
   useEffect(() => {
     return () => {
@@ -72,7 +108,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
     return "bg-amber-100 text-amber-800 dark:bg-amber-950/90 dark:text-amber-200 font-poppins";
   };
 
-  const genericBgColor = "#F59E0B"; // amber-500 from tailwind.config.js
+  const genericBgColor = "#F59E0B";
 
   const renderStars = (rating) => {
     const fullStars = Math.floor(rating);
@@ -184,7 +220,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
         message:
           "You need to be logged in to download resources. Please log in or create an account.",
         confirmText: "Go to Login",
-        onConfirm: () => window.location.href = "/login", // Adjust route as needed
+        onConfirm: () => window.location.href = "/login",
         cancelText: "Cancel",
         isDismissible: true,
       });
@@ -463,7 +499,6 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
       return;
     }
 
-    // UPDATED: Replaced the native `prompt()` with a custom modal confirmation
     showModal({
       type: "info",
       title: "Confirm Flagging",
@@ -480,7 +515,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`,
               },
-              body: JSON.stringify({ reason: "Reported by user" }), // Simplified reason
+              body: JSON.stringify({ reason: "Reported by user" }),
             }
           );
 
@@ -603,8 +638,6 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
     },
     [handleClosePreviewModal]
   );
-
-  const handleModalContentMouseMove = useCallback((e) => {}, []);
 
   return (
     <div className="bg-white dark:bg-charcoal/95 rounded-2xl overflow-hidden shadow-glow-sm animate-fade-in font-poppins">
@@ -779,13 +812,26 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
 
       {showPreviewModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4 overflow-auto"
+          className="fixed inset-0 z-[100] flex items-center pt-20 scroll-container justify-center bg-black bg-opacity-75 p-4 overflow-hidden"
+          style={{
+            cursor: 'default',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            msUserSelect: 'none',
+            MozUserSelect: 'none'
+          }}
           onClick={handleModalBackgroundClick}
         >
           <div
-            className="relative bg-white dark:bg-onyx/90 rounded-lg shadow-xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col font-poppins"
+            className="relative bg-white dark:bg-onyx/90 rounded-lg shadow-xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col font-poppins pointer-events-auto"
+            style={{
+              cursor: 'default',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              msUserSelect: 'none',
+              MozUserSelect: 'none'
+            }}
             onClick={(e) => e.stopPropagation()}
-            onMouseMove={handleModalContentMouseMove}
           >
             <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-onyx flex-shrink-0">
               <h2 className="text-xl font-semibold text-gray-900 dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:bg-clip-text dark:text-transparent font-poppins">
@@ -798,6 +844,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                       onClick={handleZoomOut}
                       disabled={zoom <= 0.5}
                       className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                      style={{ cursor: 'pointer' }}
                     >
                       <ZoomOut size={20} />
                     </button>
@@ -805,6 +852,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                       onClick={handleZoomIn}
                       disabled={zoom >= 3}
                       className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                      style={{ cursor: 'pointer' }}
                     >
                       <ZoomIn size={20} />
                     </button>
@@ -814,6 +862,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                   onClick={handleDownload}
                   disabled={downloading}
                   className="p-2 rounded-full bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:text-amber-200 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm"
+                  style={{ cursor: 'pointer' }}
                   title="Download File"
                 >
                   {downloading ? (
@@ -825,6 +874,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                 <button
                   onClick={handleClosePreviewModal}
                   className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 shadow-glow-sm"
+                  style={{ cursor: 'pointer' }}
                   title="Close Preview"
                 >
                   <FontAwesomeIcon icon={faTimes} size="lg" />
@@ -834,7 +884,15 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
             <div
               ref={previewContainerRef}
               className="flex-1 overflow-auto p-4 flex items-center justify-center"
-              style={{ minHeight: 0, scrollbarWidth: "none" }}
+              style={{ 
+                minHeight: 0, 
+                scrollbarWidth: "none",
+                cursor: 'default',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                msUserSelect: 'none',
+                MozUserSelect: 'none'
+              }}
               onClick={(e) => e.stopPropagation()}
             >
               {previewLoading && !previewError && (
@@ -855,6 +913,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                     <button
                       onClick={handleDownload}
                       className="mt-4 px-4 py-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-onyx/90 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:hover:bg-amber-950/90 rounded-md shadow-glow-sm font-poppins"
+                      style={{ cursor: 'pointer' }}
                       disabled={downloading}
                     >
                       {downloading ? (
@@ -875,6 +934,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                       target="_blank"
                       rel="noopener noreferrer"
                       className="mt-2 ml-2 inline-flex items-center px-4 py-2 border border-gray-300 dark:border-onyx rounded-md shadow-sm text-sm text-gray-700 dark:text-platinum bg-white dark:bg-onyx/90 hover:bg-gray-50 dark:hover:bg-amber-50/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-200 font-poppins"
+                      style={{ cursor: 'pointer' }}
                     >
                       <FontAwesomeIcon
                         icon={faExternalLinkAlt}
@@ -897,7 +957,8 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                           <button
                             onClick={() => changePage(-1)}
                             disabled={pageNumber <= 1}
-                            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-amber-100/90 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-amber-800 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                            style={{ cursor: pageNumber <= 1 ? 'default' : 'pointer' }}
                           >
                             <FontAwesomeIcon icon={faChevronLeft} />
                           </button>
@@ -907,7 +968,8 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                           <button
                             onClick={() => changePage(1)}
                             disabled={pageNumber >= numPages}
-                            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-amber-100/90 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-amber-800 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                            style={{ cursor: pageNumber >= numPages ? 'default' : 'pointer' }}
                           >
                             <FontAwesomeIcon icon={faChevronRight} />
                           </button>
@@ -919,6 +981,13 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                       src={previewDataUrl}
                       alt={resource.title}
                       className="max-w-full max-h-full object-contain"
+                      style={{
+                        cursor: 'default',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                        msUserSelect: 'none',
+                        MozUserSelect: 'none'
+                      }}
                       onLoad={() => setPreviewLoading(false)}
                       onError={() => {
                         setPreviewError("Failed to load image preview.");
@@ -945,6 +1014,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                       <button
                         onClick={handleDownload}
                         className="px-4 py-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-onyx/90 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:hover:bg-amber-950/90 rounded-md shadow-glow-sm font-poppins"
+                        style={{ cursor: 'pointer' }}
                         disabled={downloading}
                       >
                         {downloading ? (
@@ -964,6 +1034,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                           target="_blank"
                           rel="noopener noreferrer"
                           className="mt-2 ml-2 inline-flex items-center px-4 py-2 border border-gray-300 dark:border-onyx rounded-md shadow-sm text-sm text-gray-700 dark:text-platinum bg-white dark:bg-onyx/90 hover:bg-gray-50 dark:hover:bg-amber-50/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-200 font-poppins"
+                          style={{ cursor: 'pointer' }}
                         >
                           <FontAwesomeIcon
                             icon={faExternalLinkAlt}
