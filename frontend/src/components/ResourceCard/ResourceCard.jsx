@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom"; // Add this import
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faDownload,
@@ -639,6 +639,257 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
     [handleClosePreviewModal]
   );
 
+  // Create the modal component
+  const modalContent = showPreviewModal && (
+    <div
+      className="modal-backdrop fixed inset-0 flex items-center pt-20 scroll-container justify-center bg-black bg-opacity-75 p-4 overflow-hidden"
+      style={{
+        cursor: 'default',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        msUserSelect: 'none',
+        MozUserSelect: 'none',
+        zIndex: 2147483647, // Maximum z-index
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0
+      }}
+      onClick={handleModalBackgroundClick}
+    >
+      <div
+        className="modal-content relative bg-white dark:bg-onyx/90 rounded-lg shadow-xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col font-poppins pointer-events-auto"
+        style={{
+          cursor: 'default',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          msUserSelect: 'none',
+          MozUserSelect: 'none',
+          zIndex: 2147483647,
+          position: 'relative'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-onyx flex-shrink-0">
+          <h2 className="text-xl font-semibold text-gray-900 dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:bg-clip-text dark:text-transparent font-poppins">
+            Preview: {resource.title}
+          </h2>
+          <div className="flex items-center gap-2">
+            {isPDF && !previewError && (
+              <>
+                <button
+                  onClick={handleZoomOut}
+                  disabled={zoom <= 0.5}
+                  className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <ZoomOut size={20} />
+                </button>
+                <button
+                  onClick={handleZoomIn}
+                  disabled={zoom >= 3}
+                  className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <ZoomIn size={20} />
+                </button>
+              </>
+            )}
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="p-2 rounded-full bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:text-amber-200 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm"
+              style={{ cursor: 'pointer' }}
+              title="Download File"
+            >
+              {downloading ? (
+                <FontAwesomeIcon icon={faSpinner} spin />
+              ) : (
+                <FontAwesomeIcon icon={faDownload} />
+              )}
+            </button>
+            <button
+              onClick={handleClosePreviewModal}
+              className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 shadow-glow-sm"
+              style={{ cursor: 'pointer' }}
+              title="Close Preview"
+            >
+              <FontAwesomeIcon icon={faTimes} size="lg" />
+            </button>
+          </div>
+        </div>
+        <div
+          ref={previewContainerRef}
+          className="flex-1 overflow-auto p-4 flex items-center justify-center"
+          style={{ 
+            minHeight: 0, 
+            scrollbarWidth: "none",
+            cursor: 'default',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            msUserSelect: 'none',
+            MozUserSelect: 'none'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {previewLoading && !previewError && (
+            <div className="flex flex-col items-center justify-center text-gray-600 dark:text-platinum font-poppins">
+              <FontAwesomeIcon
+                icon={faSpinner}
+                spin
+                size="2x"
+                className="mb-3 text-amber-600 dark:text-amber-200"
+              />
+              <span>Loading preview...</span>
+            </div>
+          )}
+          {previewError && (
+            <div className="text-center text-red-600 dark:text-amber-300 font-poppins">
+              <p className="mb-2">{previewError}</p>
+              {useFallback && (
+                <button
+                  onClick={handleDownload}
+                  className="mt-4 px-4 py-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-onyx/90 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:hover:bg-amber-950/90 rounded-md shadow-glow-sm font-poppins"
+                  style={{ cursor: 'pointer' }}
+                  disabled={downloading}
+                >
+                  {downloading ? (
+                    <FontAwesomeIcon
+                      icon={faSpinner}
+                      spin
+                      className="mr-2"
+                    />
+                  ) : (
+                    <FontAwesomeIcon icon={faDownload} className="mr-2" />
+                  )}
+                  Download File
+                </button>
+              )}
+              {resource.cloudinaryUrl && (
+                <a
+                  href={resource.cloudinaryUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 ml-2 inline-flex items-center px-4 py-2 border border-gray-300 dark:border-onyx rounded-md shadow-sm text-sm text-gray-700 dark:text-platinum bg-white dark:bg-onyx/90 hover:bg-gray-50 dark:hover:bg-amber-50/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-200 font-poppins"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <FontAwesomeIcon
+                    icon={faExternalLinkAlt}
+                    className="mr-2 text-amber-600 dark:text-amber-200"
+                  />{" "}
+                  Open in New Tab
+                </a>
+              )}
+            </div>
+          )}
+          {!previewLoading && !previewError && previewDataUrl && (
+            <>
+              {isPDF ? (
+                <div className="flex flex-col items-center w-full h-full">
+                  <Document {...documentProps}>
+                    <Page key={`page_${pageNumber}`} {...pageProps} />
+                  </Document>
+                  {numPages > 1 && (
+                    <div className="flex justify-center items-center mt-4 gap-4 bg-gray-100 dark:bg-amber-950/90 p-2 rounded-lg flex-shrink-0">
+                      <button
+                        onClick={() => changePage(-1)}
+                        disabled={pageNumber <= 1}
+                        className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-amber-800 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                        style={{ cursor: pageNumber <= 1 ? 'default' : 'pointer' }}
+                      >
+                        <FontAwesomeIcon icon={faChevronLeft} />
+                      </button>
+                      <span className="text-gray-700 dark:text-platinum font-poppins">
+                        Page {pageNumber} of {numPages}
+                      </span>
+                      <button
+                        onClick={() => changePage(1)}
+                        disabled={pageNumber >= numPages}
+                        className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-amber-800 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
+                        style={{ cursor: pageNumber >= numPages ? 'default' : 'pointer' }}
+                      >
+                        <FontAwesomeIcon icon={faChevronRight} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : isImage ? (
+                <img
+                  src={previewDataUrl}
+                  alt={resource.title}
+                  className="max-w-full max-h-full object-contain"
+                  style={{
+                    cursor: 'default',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    msUserSelect: 'none',
+                    MozUserSelect: 'none'
+                  }}
+                  onLoad={() => setPreviewLoading(false)}
+                  onError={() => {
+                    setPreviewError("Failed to load image preview.");
+                    setUseFallback(true);
+                    setPreviewLoading(false);
+                    showModal({
+                      type: "error",
+                      title: "Image Preview Failed",
+                      message:
+                        "Could not load image preview. The file might be corrupted or in an unsupported format.",
+                      confirmText: "OK",
+                    });
+                  }}
+                />
+              ) : (
+                <div className="text-center text-gray-600 dark:text-platinum font-poppins">
+                  <p className="mb-2">
+                    This file type is not directly previewable in the
+                    browser.
+                  </p>
+                  <p className="mb-4">
+                    Please download the file to view it.
+                  </p>
+                  <button
+                    onClick={handleDownload}
+                    className="px-4 py-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-onyx/90 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:hover:bg-amber-950/90 rounded-md shadow-glow-sm font-poppins"
+                    style={{ cursor: 'pointer' }}
+                    disabled={downloading}
+                  >
+                    {downloading ? (
+                      <FontAwesomeIcon
+                        icon={faSpinner}
+                        spin
+                        className="mr-2"
+                      />
+                    ) : (
+                      <FontAwesomeIcon icon={faDownload} className="mr-2" />
+                    )}
+                    Download File
+                  </button>
+                  {resource.cloudinaryUrl && (
+                    <a
+                      href={resource.cloudinaryUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 ml-2 inline-flex items-center px-4 py-2 border border-gray-300 dark:border-onyx rounded-md shadow-sm text-sm text-gray-700 dark:text-platinum bg-white dark:bg-onyx/90 hover:bg-gray-50 dark:hover:bg-amber-50/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-200 font-poppins"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <FontAwesomeIcon
+                        icon={faExternalLinkAlt}
+                        className="mr-2 text-amber-600 dark:text-amber-200"
+                      />{" "}
+                      Open in New Tab
+                    </a>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="bg-white dark:bg-charcoal/95 rounded-2xl overflow-hidden shadow-glow-sm animate-fade-in font-poppins">
       <div
@@ -810,247 +1061,8 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
         </div>
       </div>
 
-      {showPreviewModal && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center pt-20 scroll-container justify-center bg-black bg-opacity-75 p-4 overflow-hidden"
-          style={{
-            cursor: 'default',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            msUserSelect: 'none',
-            MozUserSelect: 'none'
-          }}
-          onClick={handleModalBackgroundClick}
-        >
-          <div
-            className="relative bg-white dark:bg-onyx/90 rounded-lg shadow-xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col font-poppins pointer-events-auto"
-            style={{
-              cursor: 'default',
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
-              msUserSelect: 'none',
-              MozUserSelect: 'none'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-onyx flex-shrink-0">
-              <h2 className="text-xl font-semibold text-gray-900 dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:bg-clip-text dark:text-transparent font-poppins">
-                Preview: {resource.title}
-              </h2>
-              <div className="flex items-center gap-2">
-                {isPDF && !previewError && (
-                  <>
-                    <button
-                      onClick={handleZoomOut}
-                      disabled={zoom <= 0.5}
-                      className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <ZoomOut size={20} />
-                    </button>
-                    <button
-                      onClick={handleZoomIn}
-                      disabled={zoom >= 3}
-                      className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <ZoomIn size={20} />
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={handleDownload}
-                  disabled={downloading}
-                  className="p-2 rounded-full bg-gray-100 text-amber-600 hover:bg-gray-200 dark:bg-onyx/90 dark:text-amber-200 hover:scale-105 dark:hover:bg-charcoal transition duration-200 disabled:opacity-50 shadow-glow-sm"
-                  style={{ cursor: 'pointer' }}
-                  title="Download File"
-                >
-                  {downloading ? (
-                    <FontAwesomeIcon icon={faSpinner} spin />
-                  ) : (
-                    <FontAwesomeIcon icon={faDownload} />
-                  )}
-                </button>
-                <button
-                  onClick={handleClosePreviewModal}
-                  className="p-2 rounded-full hover:bg-gray-100 hover:scale-105 dark:hover:bg-charcoal transition duration-200 text-gray-600 dark:text-amber-200 shadow-glow-sm"
-                  style={{ cursor: 'pointer' }}
-                  title="Close Preview"
-                >
-                  <FontAwesomeIcon icon={faTimes} size="lg" />
-                </button>
-              </div>
-            </div>
-            <div
-              ref={previewContainerRef}
-              className="flex-1 overflow-auto p-4 flex items-center justify-center"
-              style={{ 
-                minHeight: 0, 
-                scrollbarWidth: "none",
-                cursor: 'default',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                msUserSelect: 'none',
-                MozUserSelect: 'none'
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {previewLoading && !previewError && (
-                <div className="flex flex-col items-center justify-center text-gray-600 dark:text-platinum font-poppins">
-                  <FontAwesomeIcon
-                    icon={faSpinner}
-                    spin
-                    size="2x"
-                    className="mb-3 text-amber-600 dark:text-amber-200"
-                  />
-                  <span>Loading preview...</span>
-                </div>
-              )}
-              {previewError && (
-                <div className="text-center text-red-600 dark:text-amber-300 font-poppins">
-                  <p className="mb-2">{previewError}</p>
-                  {useFallback && (
-                    <button
-                      onClick={handleDownload}
-                      className="mt-4 px-4 py-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-onyx/90 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:hover:bg-amber-950/90 rounded-md shadow-glow-sm font-poppins"
-                      style={{ cursor: 'pointer' }}
-                      disabled={downloading}
-                    >
-                      {downloading ? (
-                        <FontAwesomeIcon
-                          icon={faSpinner}
-                          spin
-                          className="mr-2"
-                        />
-                      ) : (
-                        <FontAwesomeIcon icon={faDownload} className="mr-2" />
-                      )}
-                      Download File
-                    </button>
-                  )}
-                  {resource.cloudinaryUrl && (
-                    <a
-                      href={resource.cloudinaryUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 ml-2 inline-flex items-center px-4 py-2 border border-gray-300 dark:border-onyx rounded-md shadow-sm text-sm text-gray-700 dark:text-platinum bg-white dark:bg-onyx/90 hover:bg-gray-50 dark:hover:bg-amber-50/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-200 font-poppins"
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <FontAwesomeIcon
-                        icon={faExternalLinkAlt}
-                        className="mr-2 text-amber-600 dark:text-amber-200"
-                      />{" "}
-                      Open in New Tab
-                    </a>
-                  )}
-                </div>
-              )}
-              {!previewLoading && !previewError && previewDataUrl && (
-                <>
-                  {isPDF ? (
-                    <div className="flex flex-col items-center w-full h-full">
-                      <Document {...documentProps}>
-                        <Page key={`page_${pageNumber}`} {...pageProps} />
-                      </Document>
-                      {numPages > 1 && (
-                        <div className="flex justify-center items-center mt-4 gap-4 bg-gray-100 dark:bg-amber-950/90 p-2 rounded-lg flex-shrink-0">
-                          <button
-                            onClick={() => changePage(-1)}
-                            disabled={pageNumber <= 1}
-                            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-amber-800 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
-                            style={{ cursor: pageNumber <= 1 ? 'default' : 'pointer' }}
-                          >
-                            <FontAwesomeIcon icon={faChevronLeft} />
-                          </button>
-                          <span className="text-gray-700 dark:text-platinum font-poppins">
-                            Page {pageNumber} of {numPages}
-                          </span>
-                          <button
-                            onClick={() => changePage(1)}
-                            disabled={pageNumber >= numPages}
-                            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-amber-800 text-gray-600 dark:text-amber-200 disabled:opacity-50 shadow-glow-sm"
-                            style={{ cursor: pageNumber >= numPages ? 'default' : 'pointer' }}
-                          >
-                            <FontAwesomeIcon icon={faChevronRight} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ) : isImage ? (
-                    <img
-                      src={previewDataUrl}
-                      alt={resource.title}
-                      className="max-w-full max-h-full object-contain"
-                      style={{
-                        cursor: 'default',
-                        userSelect: 'none',
-                        WebkitUserSelect: 'none',
-                        msUserSelect: 'none',
-                        MozUserSelect: 'none'
-                      }}
-                      onLoad={() => setPreviewLoading(false)}
-                      onError={() => {
-                        setPreviewError("Failed to load image preview.");
-                        setUseFallback(true);
-                        setPreviewLoading(false);
-                        showModal({
-                          type: "error",
-                          title: "Image Preview Failed",
-                          message:
-                            "Could not load image preview. The file might be corrupted or in an unsupported format.",
-                          confirmText: "OK",
-                        });
-                      }}
-                    />
-                  ) : (
-                    <div className="text-center text-gray-600 dark:text-platinum font-poppins">
-                      <p className="mb-2">
-                        This file type is not directly previewable in the
-                        browser.
-                      </p>
-                      <p className="mb-4">
-                        Please download the file to view it.
-                      </p>
-                      <button
-                        onClick={handleDownload}
-                        className="px-4 py-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-onyx/90 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:hover:bg-amber-950/90 rounded-md shadow-glow-sm font-poppins"
-                        style={{ cursor: 'pointer' }}
-                        disabled={downloading}
-                      >
-                        {downloading ? (
-                          <FontAwesomeIcon
-                            icon={faSpinner}
-                            spin
-                            className="mr-2"
-                          />
-                        ) : (
-                          <FontAwesomeIcon icon={faDownload} className="mr-2" />
-                        )}
-                        Download File
-                      </button>
-                      {resource.cloudinaryUrl && (
-                        <a
-                          href={resource.cloudinaryUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 ml-2 inline-flex items-center px-4 py-2 border border-gray-300 dark:border-onyx rounded-md shadow-sm text-sm text-gray-700 dark:text-platinum bg-white dark:bg-onyx/90 hover:bg-gray-50 dark:hover:bg-amber-50/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-200 font-poppins"
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <FontAwesomeIcon
-                            icon={faExternalLinkAlt}
-                            className="mr-2 text-amber-600 dark:text-amber-200"
-                          />{" "}
-                          Open in New Tab
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Render modal using portal to document.body */}
+      {modalContent && createPortal(modalContent, document.body)}
     </div>
   );
 });
