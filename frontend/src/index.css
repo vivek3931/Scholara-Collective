@@ -21,11 +21,8 @@
   --color-amber-600: 180 83 9; /* amber-600 */
   --color-amber-950: 69 26 3; /* amber-950 */
   --color-yellow-500: 234 179 8; 
-  /* Note: scrollbar-width on :root might conflict with Webkit pseudo-elements
-           in some Chrome versions, as discussed previously.
-           It's generally better to apply standard scrollbar properties
-           conditionally or only on the specific scrollable element. */
-  scrollbar-width: thin; /* Custom scrollbar width */
+    scrollbar-width: none;
+
 }
 
 .dark {
@@ -45,105 +42,95 @@
   --color-yellow-500: 234 179 8; /* yellow-500 */
 }
 
+/* Base styles */
 body {
   font-family: 'Poppins', sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
   min-height: 100vh;
 }
 
-.backdrop-fallback {
-  background-color: rgba(0, 0, 0, 0.5);
+.scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--color-amber-400)) transparent;
 }
 
-.custom-scrollbar {
-  /* Common styles if any (e.g., smooth scrolling) */
-  scroll-behavior: smooth;
-
-  /* --- Firefox-specific styles (standard properties) --- */
-  scrollbar-width: none; /* Can be 'auto', 'thin', or 'none' */
-  scrollbar-color: var(--color-amber-400) transparent; /* thumb color track color */
-
-  /* --- Webkit-specific styles (pseudo-elements) --- */
-  /* These will apply to Chrome, Safari, Edge if not overridden by
-     global scrollbar-width/scrollbar-color or if @supports is used. */
-  &::-webkit-scrollbar {
-    width: 8px; /* Width for vertical scrollbar */
-    height: 8px; /* Height for horizontal scrollbar */
-    background: transparent; /* A transparent background for the overall scrollbar area */
-  }
-  
-   @font-face {
-        font-family: 'Playfair Display';
-        font-style: normal;
-        font-weight: 700;
-        src: url(data:font/woff2;base64,d09GMgABAAAA...) format('woff2');
-      }
-      @font-face {
-        font-family: 'Montserrat';
-        font-style: normal;
-        font-weight: 600;
-        src: url(data:font/woff2;base64,d09GMgABAAAA...) format('woff2');
-      }
-      text {
-        font-family: 'Playfair Display', Georgia, serif;
-      }
-
-
-  &::-webkit-scrollbar-track {
-    background: transparent; /* Transparent track for a clean look */
-    border-radius: 4px; /* Rounded track edges */
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--color-amber-400); /* Amber-colored thumb */
-    border-radius: 4px; /* Rounded thumb for a modern feel */
-    border: 2px solid transparent; /* Optional: adds padding effect */
-    background-clip: content-box; /* Ensures border doesn't affect thumb color */
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: var(--color-amber-500); /* Slightly darker amber on hover */
-    background-clip: content-box;
-  }
+.scroll-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
+.scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-container::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--color-amber-400));
+  border-radius: 3px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* Animation utilities */
 @layer utilities {
   .shadow-glow-sm {
-    box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.1), 0 2px 4px -1px rgba(245, 158, 11, 0.06);
+    box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.1), 
+                0 2px 4px -1px rgba(245, 158, 11, 0.06);
   }
 
   .animate-fade-in {
-    animation: fadeIn 0.5s ease-in-out;
+    animation: fadeIn 0.3s ease-out forwards;
   }
 
   @keyframes fadeIn {
-    0% { opacity: 0; transform: translateY(10px); }
-    100% { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
-}
 
-@layer utilities {
   .animate-fade-in-up {
-    animation: fadeInUp 0.5s ease-in-out;
+    animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   @keyframes fadeInUp {
-    0% {
+    from {
       opacity: 0;
-      transform: translateY(20px);
+      transform: translateY(12px);
     }
-    100% {
+    to {
       opacity: 1;
       transform: translateY(0);
     }
   }
 
-  .delay-200 {
-    animation-delay: 200ms;
+  .no-animation {
+    animation: none !important;
+    transition: none !important;
   }
 
-  .delay-400 {
-    animation-delay: 400ms;
+  .will-change-transform {
+    will-change: transform;
+  }
+}
+
+/* Font faces */
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 700;
+  src: url(data:font/woff2;base64,d09GMgABAAAA...) format('woff2');
+}
+
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 600;
+  src: url(data:font/woff2;base64,d09GMgABAAAA...) format('woff2');
+}
+
+@media (max-width: 768px) {
+  .search-container {
+    padding: 1rem;
+  }
+  .search-input {
+    font-size: 16px; /* Prevent iOS zoom */
   }
 }
 

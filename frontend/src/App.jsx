@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import Navbar from './components/Navbar/Navbar';
 import Hero from './components/Hero/Hero';
@@ -7,10 +7,9 @@ import ResourcesSection from './components/ResourcesSection/ResourcesSection';
 import StatsSection from './components/StatsSection/StatsSection';
 import Footer from './components/Footer/Footer';
 import { useTheme } from './context/ThemeProvider/ThemeProvider';
+import Loader from './components/Loader/Loader';
 import { useModal } from './context/ModalContext/ModalContext';
-import './index.css';
 
-// Animation variants for section transitions
 const sectionVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
@@ -25,30 +24,35 @@ const sectionVariants = {
   }
 };
 
+
 function App() {
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { showModal } = useModal();
 
-  // Search and filter states with localStorage persistence
-  const [searchQuery, setSearchQuery] = useState(() => {
-    return localStorage.getItem('searchQuery') || '';
-  });
-  
-  const [filterType, setFilterType] = useState(() => {
-    return localStorage.getItem('filterType') || 'All';
-  });
-  
-  const [filterCourse, setFilterCourse] = useState(() => {
-    return localStorage.getItem('filterCourse') || 'All';
-  });
-  
-  const [filterSubject, setFilterSubject] = useState(() => {
-    return localStorage.getItem('filterSubject') || 'All';
-  });
-  
-  const [sortBy, setSortBy] = useState(() => {
-    return localStorage.getItem('sortBy') || 'recent';
-  });
+  const [loading, setLoading] = useState(true);
+
+  // Simulate initial load
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 800); // loader visible for 0.8s
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Initialize state with localStorage or defaults
+  const [searchQuery, setSearchQuery] = useState(() => 
+    localStorage.getItem('searchQuery') ?? ''
+  );
+  const [filterType, setFilterType] = useState(() => 
+    localStorage.getItem('filterType') ?? 'All'
+  );
+  const [filterCourse, setFilterCourse] = useState(() => 
+    localStorage.getItem('filterCourse') ?? 'All'
+  );
+  const [filterSubject, setFilterSubject] = useState(() => 
+    localStorage.getItem('filterSubject') ?? 'All'
+  );
+  const [sortBy, setSortBy] = useState(() => 
+    localStorage.getItem('sortBy') ?? 'recent'
+  );
 
   // Persist state to localStorage
   useEffect(() => {
@@ -59,7 +63,7 @@ function App() {
     localStorage.setItem('sortBy', sortBy);
   }, [searchQuery, filterType, filterCourse, filterSubject, sortBy]);
 
-  const resetFilters = () => {
+  const resetFilters = useCallback(() => {
     setSearchQuery('');
     setFilterType('All');
     setFilterCourse('All');
@@ -72,7 +76,11 @@ function App() {
       message: 'All search filters have been cleared.',
       confirmText: 'OK',
     });
-  };
+  }, [showModal]);
+
+  if (loading) {
+    return <Loader />;
+  }
 
   return (
     <motion.div
@@ -102,7 +110,6 @@ function App() {
             filterSubject={filterSubject}
             setFilterSubject={setFilterSubject}
             resetFilters={resetFilters}
-            showModal={showModal}
           />
         </motion.section>
         
@@ -114,7 +121,6 @@ function App() {
             filterSubject={filterSubject}
             sortBy={sortBy}
             setSortBy={setSortBy}
-            showModal={showModal}
             isFullPage={false}
             showSearchControls={false}
           />
