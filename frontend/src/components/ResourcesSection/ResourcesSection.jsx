@@ -1,13 +1,33 @@
-// ResourcesSection.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import ResourceCard from '../ResourceCard/ResourceCard';
-import { faSearch, faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Search, Filter, BookOpen, FileText, FileQuestion, FileCheck2, GraduationCap, ChevronDown, RefreshCcw, X, Clock, Calculator, Atom, Bookmark, FlaskConical } from 'lucide-react';
-import { useDebounce } from 'use-debounce';
-import { useModal } from '../../context/ModalContext/ModalContext';
+// ResourcesSection.jsx - Fixed version with suggestions
+import React, { useState, useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import ResourceCard from "../ResourceCard/ResourceCard";
+import {
+  faSearch,
+  faSpinner,
+  faArrowLeft,
+} from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  Search,
+  Filter,
+  BookOpen,
+  FileText,
+  FileQuestion,
+  FileCheck2,
+  GraduationCap,
+  ChevronDown,
+  RefreshCcw,
+  X,
+  Clock,
+  Calculator,
+  Atom,
+  Bookmark,
+  FlaskConical,
+} from "lucide-react";
+import { useDebounce } from "use-debounce";
+import { useModal } from "../../context/ModalContext/ModalContext";
 
 const ResourcesSection = ({
   searchQuery: propSearchQuery,
@@ -18,27 +38,36 @@ const ResourcesSection = ({
   setSortBy: propSetSortBy,
   isFullPage = false,
   showSearchControls = false,
+  fetchSuggestions, // Add this prop
+  recentSearches = [], // Add this prop
+  addRecentSearch, // Add this prop
 }) => {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const [localSearchQuery, setLocalSearchQuery] = useState('');
-  const [localFilterType, setLocalFilterType] = useState('All');
-  const [localFilterCourse, setLocalFilterCourse] = useState('All');
-  const [localFilterSubject, setLocalFilterSubject] = useState('All');
-  const [localSortBy, setLocalSortBy] = useState('recent');
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const [localFilterType, setLocalFilterType] = useState("All");
+  const [localFilterCourse, setLocalFilterCourse] = useState("All");
+  const [localFilterSubject, setLocalFilterSubject] = useState("All");
+  const [localSortBy, setLocalSortBy] = useState("recent");
   const [isFiltering, setIsFiltering] = useState(false);
   const [debouncedSearchQuery] = useDebounce(localSearchQuery, 500);
   const inputRef = useRef(null);
 
+  // Add suggestions state
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const dropdownRef = useRef(null);
+
   const {
-    searchQuery = propSearchQuery || '',
-    filterType = propFilterType || 'All',
-    filterCourse = propFilterCourse || 'All',
-    filterSubject = propFilterSubject || 'All',
-    sortBy = propSortBy || 'recent',
+    searchQuery = propSearchQuery || "",
+    filterType = propFilterType || "All",
+    filterCourse = propFilterCourse || "All",
+    filterSubject = propFilterSubject || "All",
+    sortBy = propSortBy || "recent",
     focusInput = false,
   } = location.state || {};
 
@@ -50,19 +79,57 @@ const ResourcesSection = ({
     setLocalSortBy(sortBy);
     if (focusInput && inputRef.current) {
       inputRef.current.focus();
+      // Auto-open suggestions if specified in state
+      if (location.state?.autoOpenSuggestions) {
+        setShowSuggestions(true);
+      }
     }
-  }, [searchQuery, filterType, filterCourse, filterSubject, sortBy, focusInput]);
+  }, [
+    searchQuery,
+    filterType,
+    filterCourse,
+    filterSubject,
+    sortBy,
+    focusInput,
+    location.state,
+  ]);
 
   const setSortBy = propSetSortBy || setLocalSortBy;
-
-  // NEW: Get the `showModal` function directly from the context
   const { showModal } = useModal();
-  // REMOVED: The old fallback function is no longer necessary
-  // const showModal = propShowModal || (({ type, title, message, confirmText }) => {
-  //   alert(`${type}: ${title} - ${message}`);
-  // });
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  // Add suggestions fetching logic
+  useEffect(() => {
+    const getSuggestions = async () => {
+      if (localSearchQuery.trim().length > 1 && fetchSuggestions) {
+        setIsLoadingSuggestions(true);
+        try {
+          const data = await fetchSuggestions(localSearchQuery);
+          setSuggestions(data);
+        } catch (err) {
+          console.error('Error fetching suggestions:', err);
+          setSuggestions([]);
+        } finally {
+          setIsLoadingSuggestions(false);
+        }
+      } else {
+        setSuggestions([]);
+      }
+    };
+
+    getSuggestions();
+  }, [localSearchQuery, fetchSuggestions]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const fetchResources = async () => {
@@ -70,13 +137,18 @@ const ResourcesSection = ({
       setError(null);
       try {
         const queryParams = new URLSearchParams();
-        if (localSearchQuery) queryParams.append('search', localSearchQuery);
-        if (localFilterType && localFilterType !== 'All') queryParams.append('type', localFilterType);
-        if (localFilterCourse && localFilterCourse !== 'All') queryParams.append('course', localFilterCourse);
-        if (localFilterSubject && localFilterSubject !== 'All') queryParams.append('subject', localFilterSubject);
-        if (localSortBy === 'popular') queryParams.append('sortBy', 'downloads');
-        if (localSortBy === 'rating') queryParams.append('sortBy', 'averageRating');
-        if (localSortBy === 'recent') queryParams.append('sortBy', 'createdAt');
+        if (localSearchQuery) queryParams.append("search", localSearchQuery);
+        if (localFilterType && localFilterType !== "All")
+          queryParams.append("type", localFilterType);
+        if (localFilterCourse && localFilterCourse !== "All")
+          queryParams.append("course", localFilterCourse);
+        if (localFilterSubject && localFilterSubject !== "All")
+          queryParams.append("subject", localFilterSubject);
+        if (localSortBy === "popular")
+          queryParams.append("sortBy", "downloads");
+        if (localSortBy === "rating")
+          queryParams.append("sortBy", "averageRating");
+        if (localSortBy === "recent") queryParams.append("sortBy", "createdAt");
 
         const url = `${API_URL}/resources?${queryParams.toString()}`;
         const response = await fetch(url);
@@ -90,40 +162,46 @@ const ResourcesSection = ({
         } else if (data && Array.isArray(data.resources)) {
           setResources(data.resources);
         } else {
-          console.error('API response format is not as expected:', data);
+          console.error("API response format is not as expected:", data);
           setResources([]);
         }
       } catch (err) {
-        console.error('Failed to fetch resources:', err);
-        setError('Failed to load resources. Please try again.');
+        console.error("Failed to fetch resources:", err);
+        setError("Failed to load resources. Please try again.");
         setResources([]);
       } finally {
         setLoading(false);
       }
     };
     fetchResources();
-  }, [debouncedSearchQuery, localFilterType, localFilterCourse, localFilterSubject, localSortBy]);
+  }, [
+    debouncedSearchQuery,
+    localFilterType,
+    localFilterCourse,
+    localFilterSubject,
+    localSortBy,
+  ]);
 
   const typeOptions = [
-    { value: 'All', label: 'All Types', icon: BookOpen },
-    { value: 'Notes', label: 'Notes', icon: FileText },
-    { value: 'Question Paper', label: 'Question Papers', icon: FileQuestion },
-    { value: 'Model Answer', label: 'Model Answers', icon: FileCheck2 },
-    { value: 'Revision Sheet', label: 'Revision Sheets', icon: FileText },
+    { value: "All", label: "All Types", icon: BookOpen },
+    { value: "Notes", label: "Notes", icon: FileText },
+    { value: "Question Paper", label: "Question Papers", icon: FileQuestion },
+    { value: "Model Answer", label: "Model Answers", icon: FileCheck2 },
+    { value: "Revision Sheet", label: "Revision Sheets", icon: FileText },
   ];
   const courseOptions = [
-    { value: 'All', label: 'All Courses', icon: GraduationCap },
-    { value: 'B.Sc.', label: 'B.Sc.', icon: GraduationCap },
-    { value: 'B.Tech', label: 'B.Tech', icon: GraduationCap },
-    { value: 'B.A.', label: 'B.A.', icon: GraduationCap },
-    { value: 'M.Sc.', label: 'M.Sc.', icon: GraduationCap },
+    { value: "All", label: "All Courses", icon: GraduationCap },
+    { value: "B.Sc.", label: "B.Sc.", icon: GraduationCap },
+    { value: "B.Tech", label: "B.Tech", icon: GraduationCap },
+    { value: "B.A.", label: "B.A.", icon: GraduationCap },
+    { value: "M.Sc.", label: "M.Sc.", icon: GraduationCap },
   ];
   const subjectOptions = [
-    { value: 'All', label: 'All Subjects', icon: BookOpen },
-    { value: 'Mathematics', label: 'Math', icon: Calculator },
-    { value: 'Physics', label: 'Physics', icon: Atom },
-    { value: 'Chemistry', label: 'Chemistry', icon: FlaskConical },
-    { value: 'English', label: 'English', icon: Bookmark },
+    { value: "All", label: "All Subjects", icon: BookOpen },
+    { value: "Mathematics", label: "Math", icon: Calculator },
+    { value: "Physics", label: "Physics", icon: Atom },
+    { value: "Chemistry", label: "Chemistry", icon: FlaskConical },
+    { value: "English", label: "English", icon: Bookmark },
   ];
 
   const handleFilterSelect = (setter) => (value) => {
@@ -133,33 +211,51 @@ const ResourcesSection = ({
   };
 
   const handleReset = () => {
-    setLocalSearchQuery('');
-    setLocalFilterType('All');
-    setLocalFilterCourse('All');
-    setLocalFilterSubject('All');
-    setLocalSortBy('recent');
+    setLocalSearchQuery("");
+    setLocalFilterType("All");
+    setLocalFilterCourse("All");
+    setLocalFilterSubject("All");
+    setLocalSortBy("recent");
     showModal({
-      type: 'success',
-      title: 'Filters Reset',
-      message: 'All search filters have been cleared.',
-      confirmText: 'OK',
+      type: "success",
+      title: "Filters Reset",
+      message: "All search filters have been cleared.",
+      confirmText: "OK",
     });
   };
 
   const handleSearchSubmit = () => {
-    if (localSearchQuery.trim()) {
-      // Update resources with new search query
+    const trimmedQuery = localSearchQuery.trim();
+    if (trimmedQuery && addRecentSearch) {
+      addRecentSearch(trimmedQuery);
+      setShowSuggestions(false);
     }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       handleSearchSubmit();
-    } else if (e.key === 'Escape') {
-      setLocalSearchQuery('');
-      inputRef.current.blur();
+    } else if (e.key === "Escape") {
+      setLocalSearchQuery("");
+      setShowSuggestions(false);
+      inputRef.current?.blur();
     }
+  };
+
+  // Add suggestion selection handler
+  const handleSuggestionClick = (suggestion) => {
+    setLocalSearchQuery(suggestion);
+    setShowSuggestions(false);
+    if (addRecentSearch) {
+      addRecentSearch(suggestion);
+    }
+    inputRef.current?.focus();
+  };
+
+  // Add input interaction handler
+  const handleInputInteraction = () => {
+    setShowSuggestions(true);
   };
 
   const displayedResources = resources;
@@ -171,21 +267,23 @@ const ResourcesSection = ({
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       className={`px-4 py-8 max-w-full mx-auto min-h-screen transition-all duration-300 ${
         isFullPage
-          ? 'bg-gray-100 dark:bg-gradient-to-br pt-16 dark:from-onyx dark:via-charcoal dark:to-onyx'
-          : 'bg-transparent'
+          ? "bg-gray-100 dark:bg-gradient-to-br pt-16 dark:from-onyx dark:via-charcoal dark:to-onyx"
+          : "bg-transparent"
       }`}
     >
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        onClick={() => navigate('/')}
-        className={`fixed ${isFullPage ? 'visible' : 'hidden'} top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal`}
+        onClick={() => navigate("/")}
+        className={`fixed ${
+          isFullPage ? "visible" : "hidden"
+        } top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal`}
       >
         <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
         <span>Back</span>
       </motion.button>
       {showSearchControls && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -193,24 +291,32 @@ const ResourcesSection = ({
         >
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 font-poppins">
             <motion.div
-              animate={{ 
+              animate={{
                 rotate: [0, 5, -5, 0],
-                transition: { duration: 1.5, repeat: Infinity }
+                transition: { duration: 1.5, repeat: Infinity },
               }}
             >
-              <Search size={24} className="text-amber-600 dark:text-amber-200" />
+              <Search
+                size={24}
+                className="text-amber-600 dark:text-amber-200"
+              />
             </motion.div>
-            <span className='dark:text-white text-black'>Find Academic Resources</span>
+            <span className="dark:text-white text-black">
+              Find Academic Resources
+            </span>
           </h2>
-          <form className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <form className="grid grid-cols-1 md:grid-cols-3 gap-5" ref={dropdownRef}>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="text-amber-600 dark:text-amber-200" size={20} />
+                <Search
+                  className="text-amber-600 dark:text-amber-200"
+                  size={20}
+                />
               </div>
               <motion.div
                 whileFocus={{
                   boxShadow: "0 0 0 2px rgba(245, 158, 11, 0.5)",
-                  scale: 1.01
+                  scale: 1.01,
                 }}
                 transition={{ type: "spring", stiffness: 400, damping: 15 }}
               >
@@ -222,6 +328,8 @@ const ResourcesSection = ({
                   value={localSearchQuery}
                   onChange={(e) => setLocalSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  onFocus={handleInputInteraction}
+                  onClick={handleInputInteraction}
                 />
               </motion.div>
               {localSearchQuery && (
@@ -229,12 +337,90 @@ const ResourcesSection = ({
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                   type="button"
-                  onClick={() => setLocalSearchQuery('')}
+                  onClick={() => {
+                    setLocalSearchQuery("");
+                    setShowSuggestions(false);
+                  }}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
-                  <X className="text-gray-400 hover:text-gray-600 dark:hover:text-amber-200" size={20} />
+                  <X
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-amber-200"
+                    size={20}
+                  />
                 </motion.button>
               )}
+
+              {/* Add suggestions dropdown */}
+              <AnimatePresence>
+                {showSuggestions && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 10 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute z-50 mt-1 w-full bg-white dark:bg-onyx/95 rounded-lg shadow-xl border border-gray-200 dark:border-charcoal max-h-60 overflow-auto"
+                  >
+                    {isLoadingSuggestions ? (
+                      <div className="px-4 py-2 flex items-center justify-center gap-2">
+                        <FontAwesomeIcon
+                          icon={faSpinner}
+                          spin
+                          className="text-amber-600 dark:text-amber-200"
+                        />
+                        <span className="text-sm dark:text-gray-200">Loading suggestions...</span>
+                      </div>
+                    ) : (
+                      <>
+                        {suggestions.length > 0 && (
+                          <>
+                            <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-charcoal">
+                              Suggestions
+                            </div>
+                            {suggestions.map((item) => (
+                              <motion.div
+                                key={item._id}
+                                whileHover={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}
+                                className="px-4 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
+                                onMouseDown={() => handleSuggestionClick(item.title)}
+                              >
+                                <Search size={16} className="text-amber-600 dark:text-amber-200" />
+                                <span className="dark:text-gray-200">{item.title}</span>
+                              </motion.div>
+                            ))}
+                          </>
+                        )}
+
+                        {recentSearches.length > 0 && (
+                          <>
+                            <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-charcoal">
+                              Recent Searches
+                            </div>
+                            {recentSearches.map((search, index) => (
+                              <motion.div
+                                key={index}
+                                whileHover={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}
+                                className="px-4 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
+                                onMouseDown={() => handleSuggestionClick(search)}
+                              >
+                                <Clock size={16} className="text-amber-600 dark:text-amber-200" />
+                                <span className="dark:text-gray-200">{search}</span>
+                              </motion.div>
+                            ))}
+                          </>
+                        )}
+
+                        {!isLoadingSuggestions && suggestions.length === 0 && recentSearches.length === 0 && (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                            {localSearchQuery.trim().length > 0 
+                              ? "No suggestions found" 
+                              : "Type to search for resources"}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <Dropdown
               label="Filter by type"
@@ -269,13 +455,17 @@ const ResourcesSection = ({
               onClick={handleReset}
               className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-onyx rounded-lg shadow-sm text-sm font-medium bg-white hover:bg-gray-50 dark:bg-onyx/90 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-amber-950/40 transition-colors duration-200 sm:ml-auto w-full sm:w-auto justify-center"
             >
-              <RefreshCcw size={16} className="text-amber-600 dark:text-amber-200" />
+              <RefreshCcw
+                size={16}
+                className="text-amber-600 dark:text-amber-200"
+              />
               Reset Filters
             </motion.button>
           </div>
         </motion.div>
       )}
-      <motion.div 
+      {/* Rest of your existing JSX remains the same */}
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
@@ -320,41 +510,41 @@ const ResourcesSection = ({
       </motion.div>
       {loading && (
         <motion.div
-  initial={{ opacity: 0 }}
-  animate={{ opacity: 1 }}
-  transition={{ duration: 0.3 }}
-  className="text-center py-12 flex flex-col items-center justify-center text-gray-600 dark:text-platinum font-poppins"
->
-  <motion.div
-    animate={{ 
-      rotate: 360, 
-    }}
-    transition={{
-      rotate: { 
-        repeat: Infinity, 
-        duration: 1.5, 
-        ease: "linear" 
-      }
-    }}
-  >
-    <FontAwesomeIcon
-      icon={faSpinner}
-      size="2x"
-      className="mb-4 text-amber-600 dark:text-amber-200"
-    />
-  </motion.div>
-  <motion.p
-    animate={{
-      opacity: [0.6, 1, 0.6]
-    }}
-    transition={{
-      repeat: Infinity,
-      duration: 2
-    }}
-  >
-    Loading resources...
-  </motion.p>
-</motion.div>
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="text-center py-12 flex flex-col items-center justify-center text-gray-600 dark:text-platinum font-poppins"
+        >
+          <motion.div
+            animate={{
+              rotate: 360,
+            }}
+            transition={{
+              rotate: {
+                repeat: Infinity,
+                duration: 1.5,
+                ease: "linear",
+              },
+            }}
+          >
+            <FontAwesomeIcon
+              icon={faSpinner}
+              size="2x"
+              className="mb-4 text-amber-600 dark:text-amber-200"
+            />
+          </motion.div>
+          <motion.p
+            animate={{
+              opacity: [0.6, 1, 0.6],
+            }}
+            transition={{
+              repeat: Infinity,
+              duration: 2,
+            }}
+          >
+            Loading resources...
+          </motion.p>
+        </motion.div>
       )}
       {error && (
         <motion.div
@@ -374,12 +564,12 @@ const ResourcesSection = ({
           className="text-center py-12"
         >
           <div className="max-w-md mx-auto">
-            <motion.div 
+            <motion.div
               animate={{
                 y: [0, -5, 0],
-                transition: { repeat: Infinity, duration: 2 }
+                transition: { repeat: Infinity, duration: 2 },
               }}
-              className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-amber-50/80 flex items-center justify-center shadow-glow-sm"
+              className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-charcoal flex items-center justify-center shadow-glow-sm"
             >
               <FontAwesomeIcon
                 icon={faSearch}
@@ -406,9 +596,9 @@ const ResourcesSection = ({
             transition: {
               when: "beforeChildren",
               staggerChildren: 0.1,
-              staggerDirection: 1
-            }
-          }
+              staggerDirection: 1,
+            },
+          },
         }}
       >
         {displayedResources.map((resource) => (
@@ -423,16 +613,11 @@ const ResourcesSection = ({
                 transition: {
                   type: "spring",
                   stiffness: 300,
-                  damping: 20
-                }
-              }
-            }}
-            whileHover={{
-              y: -5,
-              transition: { duration: 0.2 }
+                  damping: 20,
+                },
+              },
             }}
           >
-            {/* UPDATED: The `showModal` prop is no longer passed here */}
             <ResourceCard resource={resource} />
           </motion.div>
         ))}
@@ -441,11 +626,21 @@ const ResourcesSection = ({
   );
 };
 
-const Dropdown = ({ label, icon: Icon, options, selectedValue, onSelect, className, loading }) => {
+const Dropdown = ({
+  label,
+  icon: Icon,
+  options,
+  selectedValue,
+  onSelect,
+  className,
+  loading,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  const selectedOption = options.find(option => option.value === selectedValue) || { label: 'All', icon: BookOpen };
+  const selectedOption = options.find(
+    (option) => option.value === selectedValue
+  ) || { label: "All", icon: BookOpen };
 
   const toggleDropdown = () => !loading && setIsOpen(!isOpen);
 
@@ -460,8 +655,8 @@ const Dropdown = ({ label, icon: Icon, options, selectedValue, onSelect, classNa
         setIsOpen(false);
       }
     };
-    window.addEventListener('mousedown', handleOutsideClick);
-    return () => window.removeEventListener('mousedown', handleOutsideClick);
+    window.addEventListener("mousedown", handleOutsideClick);
+    return () => window.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
   return (
@@ -471,7 +666,11 @@ const Dropdown = ({ label, icon: Icon, options, selectedValue, onSelect, classNa
         whileTap={{ scale: 0.98 }}
         type="button"
         className={`px-4 py-3 w-full rounded-xl border transition-all duration-200 flex items-center justify-between shadow-glow-sm
-          ${loading ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-amber-400 dark:hover:border-amber-200'}
+          ${
+            loading
+              ? "cursor-not-allowed opacity-70"
+              : "cursor-pointer hover:border-amber-400 dark:hover:border-amber-200"
+          }
           border-gray-300 dark:border-onyx bg-white hover:bg-gray-50 dark:bg-onyx/90 text-gray-700 dark:text-gray-200
           focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-200`}
         onClick={toggleDropdown}
@@ -479,48 +678,67 @@ const Dropdown = ({ label, icon: Icon, options, selectedValue, onSelect, classNa
       >
         <span className="flex items-center gap-2">
           {loading ? (
-            <FontAwesomeIcon icon={faSpinner} spin className="text-amber-600 dark:text-amber-200" />
+            <FontAwesomeIcon
+              icon={faSpinner}
+              spin
+              className="text-amber-600 dark:text-amber-200"
+            />
           ) : (
-            Icon && <Icon className="text-amber-600 dark:text-amber-200" size={20} />
+            Icon && (
+              <Icon className="text-amber-600 dark:text-amber-200" size={20} />
+            )
           )}
           {selectedOption.label}
         </span>
-        <ChevronDown className={`text-amber-600 dark:text-amber-200 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} size={20} />
+        <ChevronDown
+          className={`text-amber-600 dark:text-amber-200 transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+          size={20}
+        />
       </motion.button>
       {isOpen && (
         <motion.ul
           initial={{ opacity: 0, y: -5, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -5 }}
-          transition={{ 
+          transition={{
             type: "spring",
             stiffness: 500,
-            damping: 30
+            damping: 30,
           }}
           className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-onyx/90 rounded-xl shadow-xl border border-gray-200 dark:border-onyx z-50 max-h-60 overflow-auto"
         >
           {options.map((option) => (
             <motion.li
               key={option.value}
-              whileHover={{ 
-                backgroundColor: option.value === selectedValue 
-                  ? 'rgba(253, 230, 138, 0.5)' 
-                  : 'rgba(249, 250, 251, 0.5)',
+              whileHover={{
+                backgroundColor:
+                  option.value === selectedValue
+                    ? "rgba(253, 230, 138, 0.5)"
+                    : "rgba(249, 250, 251, 0.5)",
                 dark: {
-                  backgroundColor: option.value === selectedValue
-                    ? 'rgba(120, 53, 15, 0.7)'
-                    : 'rgba(68, 64, 60, 0.4)'
-                }
+                  backgroundColor:
+                    option.value === selectedValue
+                      ? "rgba(120, 53, 15, 0.7)"
+                      : "rgba(68, 64, 60, 0.4)",
+                },
               }}
               whileTap={{ scale: 0.98 }}
               className={`flex items-center gap-2 px-4 py-3 cursor-pointer transition-colors font-poppins
-                ${option.value === selectedValue
-                  ? 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-200'
-                  : 'hover:bg-gray-50 dark:hover:bg-amber-950/40 text-gray-700 dark:text-gray-200'
+                ${
+                  option.value === selectedValue
+                    ? "bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-200"
+                    : "hover:bg-gray-50 dark:hover:bg-amber-950/40 text-gray-700 dark:text-gray-200"
                 }`}
               onClick={() => handleSelect(option.value)}
             >
-              {option.icon && <option.icon size={16} className="min-w-4 text-amber-600 dark:text-amber-200" />}
+              {option.icon && (
+                <option.icon
+                  size={16}
+                  className="min-w-4 text-amber-600 dark:text-amber-200"
+                />
+              )}
               {option.label}
             </motion.li>
           ))}
@@ -530,4 +748,4 @@ const Dropdown = ({ label, icon: Icon, options, selectedValue, onSelect, classNa
   );
 };
 
-export default ResourcesSection; 
+export default ResourcesSection;
