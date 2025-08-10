@@ -1,5 +1,5 @@
-// ResourcesSection.jsx - Fixed version with suggestions
-import React, { useState, useEffect, useRef } from "react";
+// ResourcesSection.jsx - Optimized version with caching and performance improvements
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ResourceCard from "../ResourceCard/ResourceCard";
@@ -29,6 +29,10 @@ import {
 import { useDebounce } from "use-debounce";
 import { useModal } from "../../context/ModalContext/ModalContext";
 
+// Create a simple cache outside component to persist across re-renders
+const resourcesCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 const ResourcesSection = ({
   searchQuery: propSearchQuery,
   filterType: propFilterType,
@@ -38,12 +42,12 @@ const ResourcesSection = ({
   setSortBy: propSetSortBy,
   isFullPage = false,
   showSearchControls = false,
-  fetchSuggestions, // Add this prop
-  recentSearches = [], // Add this prop
-  addRecentSearch, // Add this prop
+  fetchSuggestions,
+  recentSearches = [],
+  addRecentSearch,
 }) => {
   const [resources, setResources] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false, set to true only when needed
   const [error, setError] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -61,6 +65,10 @@ const ResourcesSection = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const dropdownRef = useRef(null);
+  
+  // Add ref to track if initial load is done
+  const initialLoadDone = useRef(false);
+  const lastFetchParams = useRef(null);
 
   const {
     searchQuery = propSearchQuery || "",
@@ -79,7 +87,6 @@ const ResourcesSection = ({
     setLocalSortBy(sortBy);
     if (focusInput && inputRef.current) {
       inputRef.current.focus();
-      // Auto-open suggestions if specified in state
       if (location.state?.autoOpenSuggestions) {
         setShowSuggestions(true);
       }
@@ -98,14 +105,48 @@ const ResourcesSection = ({
   const { showModal } = useModal();
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-  // Add suggestions fetching logic
+  // Create cache key for current query
+  const createCacheKey = useCallback((searchQuery, filterType, filterCourse, filterSubject, sortBy) => {
+    return `${searchQuery}-${filterType}-${filterCourse}-${filterSubject}-${sortBy}`;
+  }, []);
+
+  // Check if we should skip fetch (same params as last fetch)
+  const shouldSkipFetch = useMemo(() => {
+    const currentParams = {
+      search: debouncedSearchQuery,
+      type: localFilterType,
+      course: localFilterCourse,
+      subject: localFilterSubject,
+      sort: localSortBy
+    };
+    
+    const paramsString = JSON.stringify(currentParams);
+    const lastParamsString = JSON.stringify(lastFetchParams.current);
+    
+    return paramsString === lastParamsString && initialLoadDone.current;
+  }, [debouncedSearchQuery, localFilterType, localFilterCourse, localFilterSubject, localSortBy]);
+
+  // Add suggestions fetching logic with caching
   useEffect(() => {
     const getSuggestions = async () => {
       if (localSearchQuery.trim().length > 1 && fetchSuggestions) {
+        const suggestionsCacheKey = `suggestions-${localSearchQuery}`;
+        const cached = resourcesCache.get(suggestionsCacheKey);
+        
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+          setSuggestions(cached.data);
+          return;
+        }
+        
         setIsLoadingSuggestions(true);
         try {
           const data = await fetchSuggestions(localSearchQuery);
           setSuggestions(data);
+          // Cache suggestions
+          resourcesCache.set(suggestionsCacheKey, {
+            data,
+            timestamp: Date.now()
+          });
         } catch (err) {
           console.error('Error fetching suggestions:', err);
           setSuggestions([]);
@@ -131,49 +172,116 @@ const ResourcesSection = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    const fetchResources = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const queryParams = new URLSearchParams();
-        if (localSearchQuery) queryParams.append("search", localSearchQuery);
-        if (localFilterType && localFilterType !== "All")
-          queryParams.append("type", localFilterType);
-        if (localFilterCourse && localFilterCourse !== "All")
-          queryParams.append("course", localFilterCourse);
-        if (localFilterSubject && localFilterSubject !== "All")
-          queryParams.append("subject", localFilterSubject);
-        if (localSortBy === "popular")
-          queryParams.append("sortBy", "downloads");
-        if (localSortBy === "rating")
-          queryParams.append("sortBy", "averageRating");
-        if (localSortBy === "recent") queryParams.append("sortBy", "createdAt");
+  // Optimized fetch function with caching
+  const fetchResources = useCallback(async (isRefresh = false) => {
+    // Skip if same parameters and not a refresh
+    if (shouldSkipFetch && !isRefresh) {
+      return;
+    }
 
-        const url = `${API_URL}/resources?${queryParams.toString()}`;
-        const response = await fetch(url);
+    const cacheKey = createCacheKey(
+      debouncedSearchQuery,
+      localFilterType,
+      localFilterCourse,
+      localFilterSubject,
+      localSortBy
+    );
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setResources(data);
-        } else if (data && Array.isArray(data.resources)) {
-          setResources(data.resources);
-        } else {
-          console.error("API response format is not as expected:", data);
-          setResources([]);
-        }
-      } catch (err) {
-        console.error("Failed to fetch resources:", err);
-        setError("Failed to load resources. Please try again.");
-        setResources([]);
-      } finally {
-        setLoading(false);
+    // Check cache first (unless it's a refresh)
+    if (!isRefresh) {
+      const cached = resourcesCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        setResources(cached.data);
+        initialLoadDone.current = true;
+        return;
       }
+    }
+
+    // Update last fetch params
+    lastFetchParams.current = {
+      search: debouncedSearchQuery,
+      type: localFilterType,
+      course: localFilterCourse,
+      subject: localFilterSubject,
+      sort: localSortBy
     };
-    fetchResources();
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const queryParams = new URLSearchParams();
+      if (debouncedSearchQuery) queryParams.append("search", debouncedSearchQuery);
+      if (localFilterType && localFilterType !== "All")
+        queryParams.append("type", localFilterType);
+      if (localFilterCourse && localFilterCourse !== "All")
+        queryParams.append("course", localFilterCourse);
+      if (localFilterSubject && localFilterSubject !== "All")
+        queryParams.append("subject", localFilterSubject);
+      if (localSortBy === "popular")
+        queryParams.append("sortBy", "downloads");
+      if (localSortBy === "rating")
+        queryParams.append("sortBy", "averageRating");
+      if (localSortBy === "recent") queryParams.append("sortBy", "createdAt");
+
+      const url = `${API_URL}/resources?${queryParams.toString()}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      let resourcesData = [];
+
+      if (Array.isArray(data)) {
+        resourcesData = data;
+      } else if (data && Array.isArray(data.resources)) {
+        resourcesData = data.resources;
+      } else {
+        console.error("API response format is not as expected:", data);
+        resourcesData = [];
+      }
+
+      setResources(resourcesData);
+      
+      // Cache the results
+      resourcesCache.set(cacheKey, {
+        data: resourcesData,
+        timestamp: Date.now()
+      });
+
+      initialLoadDone.current = true;
+    } catch (err) {
+      console.error("Failed to fetch resources:", err);
+      setError("Failed to load resources. Please try again.");
+      setResources([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    debouncedSearchQuery,
+    localFilterType,
+    localFilterCourse,
+    localFilterSubject,
+    localSortBy,
+    API_URL,
+    createCacheKey,
+    shouldSkipFetch,
+  ]);
+
+  // Initial load effect
+  useEffect(() => {
+    if (!initialLoadDone.current) {
+      fetchResources();
+    }
+  }, []);
+
+  // Subsequent updates effect
+  useEffect(() => {
+    if (initialLoadDone.current) {
+      fetchResources();
+    }
   }, [
     debouncedSearchQuery,
     localFilterType,
@@ -189,6 +297,7 @@ const ResourcesSection = ({
     { value: "Model Answer", label: "Model Answers", icon: FileCheck2 },
     { value: "Revision Sheet", label: "Revision Sheets", icon: FileText },
   ];
+  
   const courseOptions = [
     { value: "All", label: "All Courses", icon: GraduationCap },
     { value: "B.Sc.", label: "B.Sc.", icon: GraduationCap },
@@ -196,6 +305,7 @@ const ResourcesSection = ({
     { value: "B.A.", label: "B.A.", icon: GraduationCap },
     { value: "M.Sc.", label: "M.Sc.", icon: GraduationCap },
   ];
+  
   const subjectOptions = [
     { value: "All", label: "All Subjects", icon: BookOpen },
     { value: "Mathematics", label: "Math", icon: Calculator },
@@ -210,19 +320,28 @@ const ResourcesSection = ({
     setTimeout(() => setIsFiltering(false), 300);
   };
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setLocalSearchQuery("");
     setLocalFilterType("All");
     setLocalFilterCourse("All");
     setLocalFilterSubject("All");
     setLocalSortBy("recent");
+    
+    // Clear cache for reset
+    resourcesCache.clear();
+    initialLoadDone.current = false;
+    
     showModal({
       type: "success",
       title: "Filters Reset",
       message: "All search filters have been cleared.",
       confirmText: "OK",
     });
-  };
+  }, [showModal]);
+
+  const handleRefresh = useCallback(() => {
+    fetchResources(true);
+  }, [fetchResources]);
 
   const handleSearchSubmit = () => {
     const trimmedQuery = localSearchQuery.trim();
@@ -243,7 +362,6 @@ const ResourcesSection = ({
     }
   };
 
-  // Add suggestion selection handler
   const handleSuggestionClick = (suggestion) => {
     setLocalSearchQuery(suggestion);
     setShowSuggestions(false);
@@ -253,12 +371,14 @@ const ResourcesSection = ({
     inputRef.current?.focus();
   };
 
-  // Add input interaction handler
   const handleInputInteraction = () => {
     setShowSuggestions(true);
   };
 
-  const displayedResources = resources;
+  const displayedResources = useMemo(() => resources, [resources]);
+
+  // Show loading only on initial load or when explicitly refreshing
+  const showLoadingState = loading && (!initialLoadDone.current || resources.length === 0);
 
   return (
     <motion.section
@@ -282,6 +402,7 @@ const ResourcesSection = ({
         <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
         <span>Back</span>
       </motion.button>
+
       {showSearchControls && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -350,7 +471,7 @@ const ResourcesSection = ({
                 </motion.button>
               )}
 
-              {/* Add suggestions dropdown */}
+              {/* Suggestions dropdown */}
               <AnimatePresence>
                 {showSuggestions && (
                   <motion.div
@@ -422,6 +543,7 @@ const ResourcesSection = ({
                 )}
               </AnimatePresence>
             </div>
+            
             <Dropdown
               label="Filter by type"
               icon={Filter}
@@ -447,24 +569,42 @@ const ResourcesSection = ({
               loading={isFiltering}
             />
           </form>
+          
           <div className="mt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="button"
-              onClick={handleReset}
-              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-onyx rounded-lg shadow-sm text-sm font-medium bg-white hover:bg-gray-50 dark:bg-onyx/90 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-amber-950/40 transition-colors duration-200 sm:ml-auto w-full sm:w-auto justify-center"
-            >
-              <RefreshCcw
-                size={16}
-                className="text-amber-600 dark:text-amber-200"
-              />
-              Reset Filters
-            </motion.button>
+            <div className="flex gap-2">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                type="button"
+                onClick={handleReset}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-onyx rounded-lg shadow-sm text-sm font-medium bg-white hover:bg-gray-50 dark:bg-onyx/90 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-amber-950/40 transition-colors duration-200"
+              >
+                <RefreshCcw
+                  size={16}
+                  className="text-amber-600 dark:text-amber-200"
+                />
+                Reset Filters
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                type="button"
+                onClick={handleRefresh}
+                disabled={loading}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-onyx rounded-lg shadow-sm text-sm font-medium bg-white hover:bg-gray-50 dark:bg-onyx/90 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-amber-950/40 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RefreshCcw
+                  size={16}
+                  className={`text-amber-600 dark:text-amber-200 ${loading ? 'animate-spin' : ''}`}
+                />
+                Refresh
+              </motion.button>
+            </div>
           </div>
         </motion.div>
       )}
-      {/* Rest of your existing JSX remains the same */}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -472,7 +612,14 @@ const ResourcesSection = ({
         className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 max-w-6xl mx-auto"
       >
         <h2 className="text-2xl font-semibold dark:text-white font-poppins">
-          Popular Resources
+          Popular Resources {loading && initialLoadDone.current && (
+            <FontAwesomeIcon
+              icon={faSpinner}
+              spin
+              className="ml-2 text-amber-600 dark:text-amber-200"
+              size="sm"
+            />
+          )}
         </h2>
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-600 dark:text-platinum font-poppins">
@@ -508,7 +655,8 @@ const ResourcesSection = ({
           </div>
         </div>
       </motion.div>
-      {loading && (
+
+      {showLoadingState && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -546,6 +694,7 @@ const ResourcesSection = ({
           </motion.p>
         </motion.div>
       )}
+
       {error && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -556,7 +705,8 @@ const ResourcesSection = ({
           Error: {error}
         </motion.div>
       )}
-      {!loading && !error && displayedResources.length === 0 && (
+
+      {!showLoadingState && !error && displayedResources.length === 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -585,6 +735,7 @@ const ResourcesSection = ({
           </div>
         </motion.div>
       )}
+
       <motion.div
         className="max-w-6xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mx-auto gap-8"
         initial="hidden"
