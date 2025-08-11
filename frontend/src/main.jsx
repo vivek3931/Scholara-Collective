@@ -168,7 +168,7 @@ const router = createBrowserRouter(
         path="*"
         element={
           <AnimatedRoute>
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx">
               <motion.div
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
