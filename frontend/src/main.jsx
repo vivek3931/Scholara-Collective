@@ -206,7 +206,7 @@ const AppWithAnimations = () => {
   // const location = useLocation();
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence  >
       <RouterProvider router={router} key={location.pathname} />
       <CustomWarningModal />
       <ChatbotToggle />

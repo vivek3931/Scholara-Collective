@@ -48,6 +48,8 @@ body {
   min-height: 100vh;
 }
 
+
+
 .scroll-container {
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--color-amber-400)) transparent;
@@ -110,6 +112,8 @@ body {
   }
 }
 
+
+
 /* Font faces */
 @font-face {
   font-family: 'Playfair Display';
@@ -133,4 +137,78 @@ body {
     font-size: 16px; /* Prevent iOS zoom */
   }
 }
+.modal-backdrop {
+  z-index: 9999 !important;
+}
 
+.modal-content {
+  z-index: 10000 !important;
+}
+
+
+/* Add this to your existing index.css file to prevent white flash */
+
+/* Ensure root elements have your dark theme colors */
+html, body, #root {
+  color: rgb(255, 255, 255); /* Your platinum text color */
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Ensure the dark class is applied immediately */
+html.dark, body.dark, #root.dark {
+ background: linear-gradient(
+    to bottom right,
+    #1a1a1d, /* onyx */
+    #333333, /* charcoal */
+    #1a1a1d  /* onyx */
+  );   color: rgb(var(--color-text-primary));
+}
+
+/* Prevent any transition delays on background colors during route changes */
+html, body, #root, .dark {
+  transition: none !important;
+}
+
+/* Re-enable transitions after initial load */
+html.loaded, body.loaded, #root.loaded {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Your existing scroll styles with theme integration */
+.scroll-container::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--color-amber-400));
+}
+
+/* Dark scrollbar for route transition containers */
+.route-container::-webkit-scrollbar {
+  width: 6px;
+  background-color: rgb(28, 37, 38); /* onyx */
+}
+
+.route-container::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--color-amber-400));
+  border-radius: 3px;
+}
+
+/* Prevent flash during theme switching */
+* {
+  box-sizing: border-box;
+}
+
+
+
+/* Animation performance optimizations */
+.route-animation {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: opacity;
+}
+
+/* Prevent white flash on slower devices */
+@media (prefers-reduced-motion: no-preference) {
+  .route-transition {
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
