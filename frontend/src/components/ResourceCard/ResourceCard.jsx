@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { createPortal } from "react-dom"; // Add this import
+import { createPortal } from "react-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faDownload,
@@ -38,13 +38,129 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
   const [useFallback, setUseFallback] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [loadingTimeout, setLoadingTimeout] = useState(null);
-  const previewContainerRef = useRef(null);
   const [previewDataUrl, setPreviewDataUrl] = useState(null);
+  
+  // Refs for cleanup and abort control
+  const previewContainerRef = useRef(null);
+  const abortControllerRef = useRef(null);
+  const loadingTimeoutRef = useRef(null);
+  const previewDataUrlRef = useRef(null);
+  const isPreviewMountedRef = useRef(false);
+  
+  // Cache management - using a Map to store cached previews
+  const previewCacheRef = useRef(new Map());
+  const cacheTimeoutRef = useRef(new Map());
+  
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  
+  // Cache settings
+  const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+  const MAX_CACHE_SIZE = 20; // Maximum number of cached previews
 
-  // Fix cursor blinking by managing body styles when modal opens/closes
+  // Cache management functions
+  const getCachedPreview = useCallback((resourceId) => {
+    const cached = previewCacheRef.current.get(resourceId);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log(`Using cached preview for resource: ${resourceId}`);
+      return cached.dataUrl;
+    }
+    return null;
+  }, [CACHE_DURATION]);
+
+  const setCachedPreview = useCallback((resourceId, dataUrl) => {
+    const cache = previewCacheRef.current;
+    const timeouts = cacheTimeoutRef.current;
+    
+    // Implement LRU cache by removing oldest entries if cache is full
+    if (cache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = cache.keys().next().value;
+      const oldEntry = cache.get(oldestKey);
+      if (oldEntry) {
+        URL.revokeObjectURL(oldEntry.dataUrl);
+        cache.delete(oldestKey);
+        
+        if (timeouts.has(oldestKey)) {
+          clearTimeout(timeouts.get(oldestKey));
+          timeouts.delete(oldestKey);
+        }
+      }
+    }
+    
+    // Add new entry to cache
+    cache.set(resourceId, {
+      dataUrl,
+      timestamp: Date.now()
+    });
+    
+    // Set up automatic cleanup after cache duration
+    const timeoutId = setTimeout(() => {
+      const entry = cache.get(resourceId);
+      if (entry) {
+        URL.revokeObjectURL(entry.dataUrl);
+        cache.delete(resourceId);
+        timeouts.delete(resourceId);
+      }
+    }, CACHE_DURATION);
+    
+    timeouts.set(resourceId, timeoutId);
+    
+    console.log(`Cached preview for resource: ${resourceId}, cache size: ${cache.size}`);
+  }, [CACHE_DURATION, MAX_CACHE_SIZE]);
+
+  const clearCache = useCallback(() => {
+    // Clean up all cached URLs
+    previewCacheRef.current.forEach((entry) => {
+      URL.revokeObjectURL(entry.dataUrl);
+    });
+    previewCacheRef.current.clear();
+    
+    // Clear all timeouts
+    cacheTimeoutRef.current.forEach((timeoutId) => {
+      clearTimeout(timeoutId);
+    });
+    cacheTimeoutRef.current.clear();
+    
+    console.log('Preview cache cleared');
+  }, []);
+
+  // Cleanup function for preview resources (but preserve cache)
+  const cleanupPreviewResources = useCallback(() => {
+    // Cancel any ongoing fetch request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
+    // Clear loading timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    
+    // Only revoke current preview URL if it's not cached
+    if (previewDataUrlRef.current) {
+      const isCached = Array.from(previewCacheRef.current.values()).some(
+        entry => entry.dataUrl === previewDataUrlRef.current
+      );
+      
+      if (!isCached) {
+        URL.revokeObjectURL(previewDataUrlRef.current);
+      }
+      previewDataUrlRef.current = null;
+    }
+    
+    // Reset preview state
+    setPreviewDataUrl(null);
+    setPreviewLoading(false);
+    setPreviewError(null);
+    setUseFallback(false);
+    setNumPages(null);
+    setPageNumber(1);
+    setZoom(1);
+    isPreviewMountedRef.current = false;
+  }, []);
+
+  // Handle modal body styles
   useEffect(() => {
     if (showPreviewModal) {
       if (document.activeElement instanceof HTMLElement) {
@@ -85,12 +201,30 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
     };
   }, [showPreviewModal]);
 
+  // Cleanup on component unmount
   useEffect(() => {
     return () => {
-      if (loadingTimeout) clearTimeout(loadingTimeout);
-      if (previewDataUrl) URL.revokeObjectURL(previewDataUrl);
+      cleanupPreviewResources();
+      clearCache(); // Clear cache on unmount
     };
-  }, [loadingTimeout, previewDataUrl]);
+  }, [cleanupPreviewResources, clearCache]);
+
+  // Start loading timeout with proper cleanup
+  const startLoadingTimeout = useCallback(() => {
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+    }
+    
+    loadingTimeoutRef.current = setTimeout(() => {
+      if (isPreviewMountedRef.current) {
+        setUseFallback(true);
+        setPreviewError(
+          "Preview is taking too long to load. You might want to download the file instead."
+        );
+        setPreviewLoading(false);
+      }
+    }, 30000);
+  }, []);
 
   const getTypeClasses = (type) => {
     const normalizedType = type?.toLowerCase();
@@ -155,61 +289,40 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
     return "";
   };
 
-  const startLoadingTimeout = useCallback(() => {
-    clearLoadingTimeout();
-    const timeout = setTimeout(() => {
-      setUseFallback(true);
-      setPreviewError(
-        "Preview is taking too long to load. You might want to download the file instead."
-      );
-    }, 30000);
-    setLoadingTimeout(timeout);
-  }, []);
-
-  const clearLoadingTimeout = useCallback(() => {
-    if (loadingTimeout) {
-      clearTimeout(loadingTimeout);
-      setLoadingTimeout(null);
-    }
-  }, [loadingTimeout]);
-
-  const resetPreviewState = useCallback(() => {
-    setPreviewLoading(false);
-    setPreviewError(null);
-    setUseFallback(false);
-    setRetryCount(0);
-    setNumPages(null);
-    setPageNumber(1);
-    setZoom(1);
-    clearLoadingTimeout();
-    if (previewDataUrl) {
-      URL.revokeObjectURL(previewDataUrl);
-      setPreviewDataUrl(null);
-    }
-  }, [previewDataUrl, clearLoadingTimeout]);
-
   const onDocumentLoadSuccess = useCallback(
     ({ numPages }) => {
-      console.log("PDF loaded successfully, pages:", numPages);
-      setNumPages(numPages);
-      setPreviewLoading(false);
-      setPreviewError(null);
-      clearLoadingTimeout();
+      if (isPreviewMountedRef.current) {
+        console.log("PDF loaded successfully, pages:", numPages);
+        setNumPages(numPages);
+        setPreviewLoading(false);
+        setPreviewError(null);
+        
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+      }
     },
-    [clearLoadingTimeout]
+    []
   );
 
   const onDocumentLoadError = useCallback(
     (error) => {
-      console.error("Error loading PDF document:", error);
-      setPreviewError(
-        "Failed to load PDF preview. It might be corrupted or incompatible."
-      );
-      setUseFallback(true);
-      setPreviewLoading(false);
-      clearLoadingTimeout();
+      if (isPreviewMountedRef.current) {
+        console.error("Error loading PDF document:", error);
+        setPreviewError(
+          "Failed to load PDF preview. It might be corrupted or incompatible."
+        );
+        setUseFallback(true);
+        setPreviewLoading(false);
+        
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+      }
     },
-    [clearLoadingTimeout]
+    []
   );
 
   const handleDownload = async () => {
@@ -352,14 +465,37 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
 
     console.log("Opening preview modal");
     setShowPreviewModal(true);
+    isPreviewMountedRef.current = true;
+    
+    // Check if preview is already cached
+    const cachedDataUrl = getCachedPreview(resource._id);
+    if (cachedDataUrl) {
+      // Use cached data immediately
+      previewDataUrlRef.current = cachedDataUrl;
+      setPreviewDataUrl(cachedDataUrl);
+      setPreviewLoading(false);
+      setPreviewError(null);
+      return;
+    }
+
+    // Clean up any existing preview resources first (but preserve cache)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+    }
+    
     setPreviewLoading(true);
     setPreviewError(null);
     setUseFallback(false);
-    setRetryCount(0);
-    setPreviewDataUrl(null);
+    
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
     startLoadingTimeout();
 
     try {
+      console.log(`Fetching preview for resource: ${resource._id}`);
       const response = await fetch(
         `${API_URL}/resources/${resource._id}/preview`,
         {
@@ -367,10 +503,19 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          signal: abortControllerRef.current.signal,
         }
       );
 
-      clearLoadingTimeout();
+      // Check if component is still mounted and request wasn't aborted
+      if (!isPreviewMountedRef.current || abortControllerRef.current?.signal.aborted) {
+        return;
+      }
+
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -382,31 +527,50 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
       }
 
       const blob = await response.blob();
+      
+      // Check again if component is still mounted
+      if (!isPreviewMountedRef.current) {
+        return;
+      }
+      
       const url = URL.createObjectURL(blob);
+      previewDataUrlRef.current = url;
       setPreviewDataUrl(url);
+      setPreviewLoading(false);
+      
+      // Cache the preview data
+      setCachedPreview(resource._id, url);
+      
     } catch (error) {
+      // Check if error is due to abortion (user closed modal)
+      if (error.name === 'AbortError' || !isPreviewMountedRef.current) {
+        console.log("Preview request aborted");
+        return;
+      }
+      
       console.error("Preview failed:", error);
-      setPreviewError(
-        `Failed to load preview: ${error.message}. This file might not be directly viewable.`
-      );
-      setUseFallback(true);
-      setPreviewLoading(false);
-      showModal({
-        type: "error",
-        title: "Preview Failed",
-        message: `Could not load preview for this file: ${error.message}. It might be corrupted or an unsupported format. Please try downloading it instead.`,
-        confirmText: "OK",
-      });
-    } finally {
-      setPreviewLoading(false);
+      if (isPreviewMountedRef.current) {
+        setPreviewError(
+          `Failed to load preview: ${error.message}. This file might not be directly viewable.`
+        );
+        setUseFallback(true);
+        setPreviewLoading(false);
+        showModal({
+          type: "error",
+          title: "Preview Failed",
+          message: `Could not load preview for this file: ${error.message}. It might be corrupted or an unsupported format. Please try downloading it instead.`,
+          confirmText: "OK",
+        });
+      }
     }
   };
 
   const handleClosePreviewModal = useCallback(() => {
     console.log("Closing preview modal");
     setShowPreviewModal(false);
-    resetPreviewState();
-  }, [resetPreviewState]);
+    // Clean up all preview resources
+    cleanupPreviewResources();
+  }, [cleanupPreviewResources]);
 
   const changePage = useCallback(
     (offset) => {
@@ -649,7 +813,7 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
         WebkitUserSelect: 'none',
         msUserSelect: 'none',
         MozUserSelect: 'none',
-        zIndex: 2147483647, // Maximum z-index
+        zIndex: 2147483647,
         position: 'fixed',
         top: 0,
         left: 0,
@@ -826,18 +990,24 @@ const ResourceCard = React.memo(({ resource, onSave, onFlag, isSavedPage = false
                     msUserSelect: 'none',
                     MozUserSelect: 'none'
                   }}
-                  onLoad={() => setPreviewLoading(false)}
+                  onLoad={() => {
+                    if (isPreviewMountedRef.current) {
+                      setPreviewLoading(false);
+                    }
+                  }}
                   onError={() => {
-                    setPreviewError("Failed to load image preview.");
-                    setUseFallback(true);
-                    setPreviewLoading(false);
-                    showModal({
-                      type: "error",
-                      title: "Image Preview Failed",
-                      message:
-                        "Could not load image preview. The file might be corrupted or in an unsupported format.",
-                      confirmText: "OK",
-                    });
+                    if (isPreviewMountedRef.current) {
+                      setPreviewError("Failed to load image preview.");
+                      setUseFallback(true);
+                      setPreviewLoading(false);
+                      showModal({
+                        type: "error",
+                        title: "Image Preview Failed",
+                        message:
+                          "Could not load image preview. The file might be corrupted or in an unsupported format.",
+                        confirmText: "OK",
+                      });
+                    }
                   }}
                 />
               ) : (
