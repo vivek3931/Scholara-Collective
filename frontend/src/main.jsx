@@ -30,6 +30,8 @@ import Settings from './components/SettingPage/SettingPage.jsx';
 import AdminSettings from './components/AdminSetting/AdminSetting.jsx';
 import CustomWarningModal from './components/CustomWarningModal/CustomWarningModal.jsx';
 import ChatbotToggle from './components/ChatbotToggle/ChatbotToggle.jsx';
+import ContributorsPage from './components/ContributorsPage/ContributorsPage.jsx';
+import CommunityHubPage from './components/Community/Community.jsx';
 
 // Animation variants for route transitions
 const routeVariants = {
@@ -91,6 +93,12 @@ const router = createBrowserRouter(
           </AnimatedRoute>
         } 
       />
+      <Route
+      path='/contributors'
+      element={<AnimatedRoute>
+        <ContributorsPage/>
+          </AnimatedRoute>}
+          />
       <Route 
         path="/about" 
         element={
@@ -107,6 +115,13 @@ const router = createBrowserRouter(
           </AnimatedRoute>
         } 
       />
+      <Route
+      path='/community'
+      element={
+        <AnimatedRoute>
+          <CommunityHubPage/>
+        </AnimatedRoute>
+      }/>
       <Route 
         path="/setup/admin" 
         element={
