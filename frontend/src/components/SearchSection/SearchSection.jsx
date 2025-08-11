@@ -1,11 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Filter, BookOpen, FileText, FileQuestion, FileCheck2, GraduationCap, ChevronDown, RefreshCcw, X, Clock, Calculator, Atom, Bookmark, FlaskConical } from 'lucide-react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner } from '@fortawesome/free-solid-svg-icons';
-import { useDebounce } from 'use-debounce';
-import { motion } from 'framer-motion';
-import { useModal } from '../../context/ModalContext/ModalContext';
+import React, { useState, useEffect, useRef } from "react";
+import { useAsyncError, useNavigate } from "react-router-dom";
+import {
+  Search,
+  Filter,
+  BookOpen,
+  FileText,
+  FileQuestion,
+  FileCheck2,
+  GraduationCap,
+  ChevronDown,
+  RefreshCcw,
+  X,
+  Clock,
+  Calculator,
+  Atom,
+  Bookmark,
+  FlaskConical,
+  MoveRight,
+  MoveLeft,
+} from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSpinner } from "@fortawesome/free-solid-svg-icons";
+import { useDebounce } from "use-debounce";
+import { motion } from "framer-motion";
+import { useModal } from "../../context/ModalContext/ModalContext";
 
 const SearchSection = ({
   searchQuery,
@@ -23,84 +41,143 @@ const SearchSection = ({
   const [recentSearches, setRecentSearches] = useState([]);
   const [isFiltering, setIsFiltering] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const inputRef = useRef(null);
   const navigate = useNavigate();
   const { showModal } = useModal();
 
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
   useEffect(() => {
-    const savedSearches = JSON.parse(localStorage.getItem('recentSearches')) || [];
+    const savedSearches =
+      JSON.parse(localStorage.getItem("recentSearches")) || [];
     setRecentSearches(savedSearches);
   }, []);
 
+  // UPDATED: Use real API for suggestions
   useEffect(() => {
-    if (debouncedSearchQuery.length > 2) {
-      const mockSuggestions = [
-        { _id: '1', title: `${debouncedSearchQuery} notes` },
-        { _id: '2', title: `${debouncedSearchQuery} textbook` },
-        { _id: '3', title: `${debouncedSearchQuery} exam paper` },
-      ];
-      setSuggestions(mockSuggestions);
-    } else {
-      setSuggestions([]);
-    }
-  }, [debouncedSearchQuery]);
+    const getSuggestions = async () => {
+      if (debouncedSearchQuery.trim().length > 1) {
+        setIsLoadingSuggestions(true);
+        try {
+          const response = await fetch(
+            `${API_URL}/resources/suggestions?search=${encodeURIComponent(
+              debouncedSearchQuery
+            )}`
+          );
+
+          if (!response.ok) {
+            throw new Error("Failed to fetch suggestions");
+          }
+
+          const data = await response.json();
+          setSuggestions(data || []);
+        } catch (err) {
+          console.error("Error fetching suggestions:", err);
+          setSuggestions([]);
+        } finally {
+          setIsLoadingSuggestions(false);
+        }
+      } else {
+        setSuggestions([]);
+        setIsLoadingSuggestions(false);
+      }
+    };
+
+    getSuggestions();
+  }, [debouncedSearchQuery, API_URL]);
 
   const handleSearchSubmit = () => {
     if (searchQuery.trim()) {
       const updatedSearches = [
         searchQuery.trim(),
-        ...recentSearches.filter((item) => item !== searchQuery.trim()).slice(0, 4),
+        ...recentSearches
+          .filter((item) => item !== searchQuery.trim())
+          .slice(0, 4),
       ];
       setRecentSearches(updatedSearches);
-      localStorage.setItem('recentSearches', JSON.stringify(updatedSearches));
-      navigate('/resources', {
-        state: { searchQuery, filterType, filterCourse, filterSubject, focusInput: true },
+      localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
+      navigate("/resources", {
+        state: {
+          searchQuery,
+          filterType,
+          filterCourse,
+          filterSubject,
+          focusInput: true,
+        },
       });
     }
     setShowSuggestions(false);
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       handleSearchSubmit();
-    } else if (e.key === 'Escape') {
-      setSearchQuery('');
+    } else if (e.key === "Escape") {
+      setSearchQuery("");
       setShowSuggestions(false);
       inputRef.current.blur();
     }
   };
 
-  const handleInputClick = (e) => {
+  const handleFullViewClick = (e) => {
     e.preventDefault();
     setShowSuggestions(true);
-    navigate('/resources', {
-      state: { searchQuery, filterType, filterCourse, filterSubject, focusInput: true },
+    navigate("/resources", {
+      state: {
+        searchQuery,
+        filterType,
+        filterCourse,
+        filterSubject,
+        focusInput: true,
+      },
+    });
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    setSearchQuery(suggestion);
+    const updatedSearches = [
+      suggestion,
+      ...recentSearches.filter((item) => item !== suggestion).slice(0, 4),
+    ];
+    setRecentSearches(updatedSearches);
+    localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
+    inputRef.current.focus();
+    navigate("/resources", {
+      state: {
+        searchQuery: suggestion,
+        filterType,
+        filterCourse,
+        filterSubject,
+        focusInput: true,
+      },
     });
   };
 
   const typeOptions = [
-    { value: 'All', label: 'All Types', icon: BookOpen },
-    { value: 'Notes', label: 'Notes', icon: FileText },
-    { value: 'Question Paper', label: 'Question Papers', icon: FileQuestion },
-    { value: 'Model Answer', label: 'Model Answers', icon: FileCheck2 },
-    { value: 'Revision Sheet', label: 'Revision Sheets', icon: FileText },
+    { value: "All", label: "All Types", icon: BookOpen },
+    { value: "Notes", label: "Notes", icon: FileText },
+    { value: "Question Paper", label: "Question Papers", icon: FileQuestion },
+    { value: "Model Answer", label: "Model Answers", icon: FileCheck2 },
+    { value: "Revision Sheet", label: "Revision Sheets", icon: FileText },
   ];
 
   const courseOptions = [
-    { value: 'All', label: 'All Courses', icon: GraduationCap },
-    { value: 'B.Sc.', label: 'B.Sc.', icon: GraduationCap },
-    { value: 'B.Tech', label: 'B.Tech', icon: GraduationCap },
-    { value: 'B.A.', label: 'B.A.', icon: GraduationCap },
-    { value: 'M.Sc.', label: 'M.Sc.', icon: GraduationCap },
+    { value: "All", label: "All Courses", icon: GraduationCap },
+    { value: "B.Sc.", label: "B.Sc.", icon: GraduationCap },
+    { value: "B.Tech", label: "B.Tech", icon: GraduationCap },
+    { value: "B.A.", label: "B.A.", icon: GraduationCap },
+    { value: "M.Sc.", label: "M.Sc.", icon: GraduationCap },
   ];
 
   const subjectOptions = [
-    { value: 'All', label: 'All Subjects', icon: BookOpen },
-    { value: 'Mathematics', label: 'Math', icon: Calculator },
-    { value: 'Physics', label: 'Physics', icon: Atom },
-    { value: 'Chemistry', label: 'Chemistry', icon: FlaskConical },
-    { value: 'English', label: 'English', icon: Bookmark },
+    { value: "All", label: "All Subjects", icon: BookOpen },
+    { value: "Mathematics", label: "Math", icon: Calculator },
+    { value: "Physics", label: "Physics", icon: Atom },
+    { value: "Chemistry", label: "Chemistry", icon: FlaskConical },
+    { value: "English", label: "English", icon: Bookmark },
   ];
 
   const handleFilterSelect = (setter) => (value) => {
@@ -114,9 +191,9 @@ const SearchSection = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      transition={{ 
+      transition={{
         duration: 0.5,
-        ease: [0.16, 1, 0.3, 1]
+        ease: [0.16, 1, 0.3, 1],
       }}
       className="px-4 py-8 w-full flex justify-center"
     >
@@ -126,32 +203,64 @@ const SearchSection = ({
         transition={{ delay: 0.1 }}
         className="bg-white dark:bg-charcoal/95 rounded-2xl shadow-lg p-6 md:p-8 w-full max-w-[1150px]"
       >
-        <motion.h2 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="text-2xl font-bold mb-6 flex items-center gap-2 font-poppins"
-        >
-          <motion.div
-            animate={{ 
-              rotate: [0, 5, -5, 0],
-              transition: { duration: 1.5, repeat: Infinity }
-            }}
+        <div className="flex justify-between">
+          <motion.h2
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="lg:text-2xl text-lg font-bold mb-6 flex items-center gap-2 font-poppins"
           >
-            <Search size={24} className="text-amber-600 dark:text-amber-200" />
-          </motion.div>
-          <span>Find Academic Resources</span>
-        </motion.h2>
+            <motion.div
+              animate={{
+                rotate: [0, 5, -5, 0],
+                transition: { duration: 1.5, repeat: Infinity },
+              }}
+            >
+              <Search
+                size={24}
+                className="text-amber-600 dark:text-amber-200"
+              />
+            </motion.div>
+            <span>Find Academic Resources</span>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            onClick={handleFullViewClick}
+            className="text-sm font-bold mb-6 flex items-center gap-2 font-poppins cursor-pointer"
+            onHoverStart={() => setIsHovered(true)}
+            onHoverEnd={() => setIsHovered(false)}
+          >
+            <motion.div
+              animate={{
+                x: isHovered ? -5 : 0,
+                transition: { duration: 0.3 },
+              }}
+            >
+              <MoveLeft
+                size={24}
+                className="text-amber-600 dark:text-amber-200"
+              />
+            </motion.div>
+            <span className="dark:text-amber-200 text-amber-600">
+              Full View
+            </span>
+          </motion.p>
+        </div>
 
         <form className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="text-amber-600 dark:text-amber-200" size={20} />
+              <Search
+                className="text-amber-600 dark:text-amber-200"
+                size={20}
+              />
             </div>
             <motion.div
               whileFocus={{
                 boxShadow: "0 0 0 2px rgba(245, 158, 11, 0.5)",
-                scale: 1.01
+                scale: 1.01,
               }}
               transition={{ type: "spring", stiffness: 400, damping: 15 }}
             >
@@ -163,7 +272,6 @@ const SearchSection = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                onClick={handleInputClick}
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               />
@@ -173,74 +281,104 @@ const SearchSection = ({
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 type="button"
-                onClick={() => setSearchQuery('')}
+                onClick={() => setSearchQuery("")}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
               >
-                <X className="text-gray-400 hover:text-gray-600 dark:hover:text-amber-200" size={20} />
+                <X
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-amber-200"
+                  size={20}
+                />
               </motion.button>
             )}
 
-            {(showSuggestions && (suggestions.length > 0 || recentSearches.length > 0)) && (
+            {showSuggestions && (
               <motion.div
                 initial={{ opacity: 0, y: 5, scale: 0.98 }}
                 animate={{ opacity: 1, y: 10, scale: 1 }}
                 exit={{ opacity: 0, y: 5 }}
-                transition={{ 
+                transition={{
                   type: "spring",
                   stiffness: 500,
-                  damping: 30
+                  damping: 30,
                 }}
                 className="absolute z-50 mt-1 w-full bg-white dark:bg-onyx rounded-lg shadow-xl border border-gray-200 dark:border-onyx max-h-60 overflow-auto"
               >
-                {suggestions.length > 0 && (
+                {isLoadingSuggestions ? (
+                  <div className="px-4 py-2 flex items-center justify-center gap-2">
+                    <FontAwesomeIcon
+                      icon={faSpinner}
+                      spin
+                      className="text-amber-600 dark:text-amber-200"
+                    />
+                    <span className="text-sm dark:text-gray-200">
+                      Loading suggestions...
+                    </span>
+                  </div>
+                ) : (
                   <>
-                    <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-amber-200 border-b border-gray-100 dark:border-onyx">
-                      Suggestions
-                    </div>
-                    {suggestions.map((item) => (
-                      <motion.div
-                        key={item._id}
-                        whileHover={{ backgroundColor: 'rgba(249, 250, 251, 0.5)' }}
-                        whileTap={{ scale: 0.98 }}
-                        className="px-4 py-2 hover:bg-gray-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
-                        onMouseDown={() => {
-                          setSearchQuery(item.title);
-                          inputRef.current.focus();
-                          navigate('/resources', {
-                            state: { searchQuery: item.title, filterType, filterCourse, filterSubject, focusInput: true },
-                          });
-                        }}
-                      >
-                        <Search size={16} className="text-amber-600 dark:text-amber-200" />
-                        <span>{item.title}</span>
-                      </motion.div>
-                    ))}
-                  </>
-                )}
+                    {suggestions.length > 0 && (
+                      <>
+                        <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-amber-200 border-b border-gray-100 dark:border-onyx">
+                          Suggestions
+                        </div>
+                        {suggestions.map((item) => (
+                          <motion.div
+                            key={item._id}
+                            whileHover={{
+                              backgroundColor: "rgba(249, 250, 251, 0.5)",
+                            }}
+                            whileTap={{ scale: 0.98 }}
+                            className="px-4 py-2 hover:bg-gray-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
+                            onMouseDown={() =>
+                              handleSuggestionClick(item.title)
+                            }
+                          >
+                            <Search
+                              size={16}
+                              className="text-amber-600 dark:text-amber-200"
+                            />
+                            <span className="dark:text-gray-200">
+                              {item.title}
+                            </span>
+                          </motion.div>
+                        ))}
+                      </>
+                    )}
 
-                {recentSearches.length > 0 && (
-                  <>
-                    <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-amber-200 border-b border-gray-100 dark:border-onyx">
-                      Recent Searches
-                    </div>
-                    {recentSearches.map((search, index) => (
-                      <motion.div
-                        key={index}
-                        whileHover={{ backgroundColor: 'rgba(249, 250, 251, 0.5)' }}
-                        whileTap={{ scale: 0.98 }}
-                        className="px-4 py-2 hover:bg-gray-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
-                        onMouseDown={() => {
-                          setSearchQuery(search);
-                          inputRef.current.focus();
-                          navigate('/resources', {
-                            state: { searchQuery: search, filterType, filterCourse, filterSubject, focusInput: true },
-                          });
-                        }}
-                      >
-                        <Clock size={16} className="text-amber-600 dark:text-amber-200" />
-                        <span>{search}</span>
-                      </motion.div>
-                    ))}
+                    {recentSearches.length > 0 && (
+                      <>
+                        <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-amber-200 border-b border-gray-100 dark:border-onyx">
+                          Recent Searches
+                        </div>
+                        {recentSearches.map((search, index) => (
+                          <motion.div
+                            key={index}
+                            whileHover={{
+                              backgroundColor: "rgba(249, 250, 251, 0.5)",
+                            }}
+                            whileTap={{ scale: 0.98 }}
+                            className="px-4 py-2 hover:bg-gray-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
+                            onMouseDown={() => handleSuggestionClick(search)}
+                          >
+                            <Clock
+                              size={16}
+                              className="text-amber-600 dark:text-amber-200"
+                            />
+                            <span className="dark:text-gray-200">{search}</span>
+                          </motion.div>
+                        ))}
+                      </>
+                    )}
+
+                    {!isLoadingSuggestions &&
+                      suggestions.length === 0 &&
+                      recentSearches.length === 0 && (
+                        <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                          {searchQuery.trim().length > 0
+                            ? "No suggestions found"
+                            : "Type to search for resources"}
+                        </div>
+                      )}
                   </>
                 )}
               </motion.div>
@@ -277,13 +415,15 @@ const SearchSection = ({
 
         <div className="mt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           {recentSearches.length > 0 && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="flex items-center gap-2 flex-wrap max-w-full overflow-x-auto pb-2"
+              className="flex items-center gap-2 flex-wrap max-w-full lg:max-w-[85%] overflow-x-auto pb-2 scroll-container"
             >
-              <span className="text-sm text-gray-500 dark:text-amber-200 min-w-max">Recent:</span>
+              <span className="text-sm text-gray-500 dark:text-amber-200 min-w-max">
+                Recent:
+              </span>
               <div className="flex gap-2">
                 {recentSearches.map((search, index) => (
                   <motion.button
@@ -293,12 +433,7 @@ const SearchSection = ({
                     transition={{ delay: 0.1 * index }}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      setSearchQuery(search);
-                      navigate('/resources', {
-                        state: { searchQuery: search, filterType, filterCourse, filterSubject, focusInput: true },
-                      });
-                    }}
+                    onClick={() => handleSuggestionClick(search)}
                     className="text-xs px-3 py-1 bg-gray-100 dark:bg-amber-950/40 hover:bg-gray-200 dark:hover:bg-amber-950/60 rounded-full flex items-center gap-1 whitespace-nowrap"
                   >
                     {search}
@@ -313,9 +448,12 @@ const SearchSection = ({
             whileTap={{ scale: 0.98 }}
             type="button"
             onClick={resetFilters}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-onyx rounded-lg shadow-sm text-sm font-medium bg-white hover:bg-gray-50 dark:bg-onyx/90 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-amber-950/40 transition-colors duration-200 sm:ml-auto w-full sm:w-auto justify-center"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-onyx rounded-lg shadow-sm text-sm font-medium bg-white  dark:bg-onyx/90 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-amber-950/40 transition-colors duration-200 sm:ml-auto w-full sm:w-auto justify-center"
           >
-            <RefreshCcw size={16} className="text-amber-600 dark:text-amber-200" />
+            <RefreshCcw
+              size={16}
+              className="text-amber-600 dark:text-amber-200"
+            />
             Reset Filters
           </motion.button>
         </div>
@@ -324,12 +462,22 @@ const SearchSection = ({
   );
 };
 
-const Dropdown = ({ label, icon: Icon, options, selectedValue, onSelect, className, loading }) => {
+const Dropdown = ({
+  label,
+  icon: Icon,
+  options,
+  selectedValue,
+  onSelect,
+  className,
+  loading,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  const selectedOption = options.find((option) => option.value === selectedValue) || {
-    label: 'All',
+  const selectedOption = options.find(
+    (option) => option.value === selectedValue
+  ) || {
+    label: "All",
     icon: BookOpen,
   };
 
@@ -346,8 +494,8 @@ const Dropdown = ({ label, icon: Icon, options, selectedValue, onSelect, classNa
         setIsOpen(false);
       }
     };
-    window.addEventListener('mousedown', handleOutsideClick);
-    return () => window.removeEventListener('mousedown', handleOutsideClick);
+    window.addEventListener("mousedown", handleOutsideClick);
+    return () => window.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
   return (
@@ -357,23 +505,33 @@ const Dropdown = ({ label, icon: Icon, options, selectedValue, onSelect, classNa
         whileTap={{ scale: 0.98 }}
         type="button"
         className={`px-4 py-3 w-full rounded-xl border transition-all duration-200 flex items-center justify-between shadow-glow-sm
-          ${loading ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-amber-400 dark:hover:border-amber-200'}
+          ${
+            loading
+              ? "cursor-not-allowed opacity-70"
+              : "cursor-pointer hover:border-amber-400 dark:hover:border-amber-200"
+          }
           border-gray-300 dark:border-onyx bg-white hover:bg-gray-50 dark:bg-onyx/90 text-gray-700 dark:text-gray-200
-          focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-200`}
+          focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-200 scroll-container`}
         onClick={toggleDropdown}
         disabled={loading}
       >
         <span className="flex items-center gap-2">
           {loading ? (
-            <FontAwesomeIcon icon={faSpinner} spin className="text-amber-600 dark:text-amber-200" />
+            <FontAwesomeIcon
+              icon={faSpinner}
+              spin
+              className="text-amber-600 dark:text-amber-200"
+            />
           ) : (
-            Icon && <Icon className="text-amber-600 dark:text-amber-200" size={20} />
+            Icon && (
+              <Icon className="text-amber-600 dark:text-amber-200" size={20} />
+            )
           )}
           {selectedOption.label}
         </span>
         <ChevronDown
           className={`text-amber-600 dark:text-amber-200 transition-transform duration-200 ${
-            isOpen ? 'rotate-180' : ''
+            isOpen ? "rotate-180" : ""
           }`}
           size={20}
         />
@@ -384,37 +542,42 @@ const Dropdown = ({ label, icon: Icon, options, selectedValue, onSelect, classNa
           initial={{ opacity: 0, y: -5, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -5 }}
-          transition={{ 
+          transition={{
             type: "spring",
             stiffness: 500,
-            damping: 30
+            damping: 30,
           }}
-          className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-onyx/90 rounded-xl shadow-xl border border-gray-200 dark:border-onyx z-50 max-h-60 overflow-auto"
+          className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-onyx/90 rounded-xl shadow-xl border border-gray-200 dark:border-onyx z-50 max-h-60 overflow-auto scroll-container"
         >
           {options.map((option) => (
             <motion.li
               key={option.value}
-              whileHover={{ 
-                backgroundColor: option.value === selectedValue 
-                  ? 'rgba(253, 230, 138, 0.5)' 
-                  : 'rgba(249, 250, 251, 0.5)',
+              whileHover={{
+                backgroundColor:
+                  option.value === selectedValue
+                    ? "rgba(253, 230, 138, 0.5)"
+                    : "rgba(249, 250, 251, 0.5)",
                 dark: {
-                  backgroundColor: option.value === selectedValue
-                    ? 'rgba(120, 53, 15, 0.7)'
-                    : 'rgba(68, 64, 60, 0.4)'
-                }
+                  backgroundColor:
+                    option.value === selectedValue
+                      ? "rgba(120, 53, 15, 0.7)"
+                      : "rgba(68, 64, 60, 0.4)",
+                },
               }}
               whileTap={{ scale: 0.98 }}
               className={`flex items-center gap-2 px-4 py-3 cursor-pointer transition-colors font-poppins
                 ${
                   option.value === selectedValue
-                    ? 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-200'
-                    : 'hover:bg-gray-50 dark:hover:bg-amber-950/40 text-gray-700 dark:text-gray-200'
+                    ? "bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-200"
+                    : "hover:bg-gray-50 dark:hover:bg-amber-950/40 text-gray-700 dark:text-gray-200"
                 }`}
               onClick={() => handleSelect(option.value)}
             >
               {option.icon && (
-                <option.icon size={16} className="min-w-4 text-amber-600 dark:text-amber-200" />
+                <option.icon
+                  size={16}
+                  className="min-w-4 text-amber-600 dark:text-amber-200"
+                />
               )}
               {option.label}
             </motion.li>

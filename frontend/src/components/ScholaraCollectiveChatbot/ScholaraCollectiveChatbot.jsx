@@ -89,9 +89,7 @@ const handleEscKey = (event, setIsOpen) => {
   }
 };
 
-
-
-// Enhanced ResourceCard with better styling and hover effects
+// Enhanced ResourceCard with better styling, hover effects, and a clickable link
 const ResourceCard = ({ resource }) => {
   const getSubjectColor = (subject) => {
     const colors = {
@@ -114,8 +112,17 @@ const ResourceCard = ({ resource }) => {
     );
   }
 
+  // Determine the URL for the resource. Assuming 'downloadUrl' or '_id' for dynamic routing.
+  const resourceLink = resource.downloadUrl || `/resources/${resource._id}`; 
+
   return (
-    <div className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-3 hover:shadow-md transition-all duration-300 font-poppins animate-fade-in group hover:scale-[1.01] hover:border-amber-400/30 dark:hover:border-amber-500/30`}>
+    <a 
+      href={resourceLink} 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-3 hover:shadow-md transition-all duration-300 font-poppins animate-fade-in group hover:scale-[1.01] hover:border-amber-400/30 dark:hover:border-amber-500/30 block cursor-pointer`}
+      title={`Click to view/download: ${resource.title || resource.name || "Untitled Resource"}`}
+    >
       <div className="flex items-start justify-between mb-2">
         <h4 className={`font-semibold ${colors.text.primary.light} dark:${colors.text.primary.dark} flex items-center gap-2`}>
           <FileText className="w-4 h-4 text-amber-500 group-hover:text-amber-600 dark:text-amber-400 dark:group-hover:text-amber-300 transition-colors" />
@@ -160,7 +167,7 @@ const ResourceCard = ({ resource }) => {
           </span>
         </div>
       </div>
-    </div>
+    </a>
   );
 };
 
@@ -217,7 +224,7 @@ const ChatBubble = memo(({ message, isUser }) => {
         {message.resources && message.resources.length > 0 && (
           <div className="mt-3 space-y-2">
             {message.resources.map((resource, index) => (
-              <ResourceCard key={index} resource={resource} />
+              <ResourceCard key={resource._id || index} resource={resource} />
             ))}
           </div>
         )}
@@ -276,7 +283,7 @@ const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false , setI
   const [messages, setMessages] = useState([]);
   const [userInput, setUserInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [resources, setResources] = useState([]);
+  const [resources, setResources] = useState([]); // This state is not directly used for display, can be removed if not needed elsewhere
   const [isResourcesLoaded, setIsResourcesLoaded] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
@@ -314,13 +321,14 @@ const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false , setI
 
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (userInput.length > 2) {
+      // Only fetch suggestions if userInput is not empty and not just whitespace
+      if (userInput.trim().length > 2) {
         try {
           const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.resources}?search=${encodeURIComponent(userInput)}&limit=3`);
           if (!response.ok) throw new Error("Failed to fetch suggestions");
           const result = await response.json();
           const fetchedSuggestions = Array.isArray(result.resources)
-            ? result.resources.map((r) => ({ _id: r._id, title: r.title }))
+            ? result.resources.map((r) => ({ _id: r._id, title: r.title, subject: r.subject })) // Include subject for better context
             : [];
           setSuggestions(fetchedSuggestions);
         } catch (error) {
@@ -331,14 +339,20 @@ const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false , setI
         setSuggestions([]);
       }
     };
-    fetchSuggestions();
+    const handler = setTimeout(() => { // Debounce suggestions to prevent too many API calls
+      fetchSuggestions();
+    }, 300); // 300ms delay
+
+    return () => {
+      clearTimeout(handler); // Clear timeout if userInput changes before delay
+    };
   }, [userInput, API_CONFIG.baseUrl, API_CONFIG.endpoints.resources]);
 
   const KNOWLEDGE_BASE = {
     howToUpload: `**How to Upload Resources on Scholara Collective:**
 
 1. **Login/Register:** Create an account or log in to your existing account
-2. **Navigate to Upload:** Click the "Upload Resource" button on the dashboard
+2. **Navigate to Upload:** Click the "Upload Resource" button on the dashboard or go to the [Upload Page](/upload).
 3. **Fill Details:**
    • Resource Title (clear and descriptive)
    • Subject (Physics, Chemistry, Mathematics, etc.)
@@ -355,8 +369,8 @@ Your resource will be reviewed within 24 hours before going live!`,
     howToDownload: `**How to Download Resources:**
 
 1. **Browse or Search:** Use the search bar or browse by category
-2. **Preview:** Click on any resource to preview it
-3. **Download:** Click the download button (no login required for downloading)
+2. **Preview:** Click on any resource to preview it (by clicking the resource card in chat).
+3. **Download:** Click the download button on the resource page (no login required for downloading)
 4. **Rate & Review:** After downloading, please rate the resource to help others
 
 **Pro Tips:**
@@ -408,22 +422,16 @@ Your resource will be reviewed within 24 hours before going live!`,
 
 **Q: Is Scholara Collective free to use?**
 A: Yes! Our platform is completely free for both uploading and downloading resources.
-
-**Q: Do I need to create an account?**
+Q: Do I need to create an account?**
 A: You can download resources without an account, but you'll need to register to upload, rate, comment, or save resources to your library.
-
 **Q: What file formats are supported?**
 A: We support PDF, JPG, PNG, and common document formats. Maximum file size is 10MB.
-
 **Q: How do I report inappropriate content?**
 A: Click the "Flag" button on any resource, or contact our moderation team directly.
-
 **Q: Can I edit or delete my uploaded resources?**
 A: Yes, you can manage your uploads from your profile dashboard.
-
 **Q: How can I contact support?**
 A: Use this chat for instant help, or email us at support@scholaracollective.com
-
 **Q: Is my data safe?**
 A: Yes, we use industry-standard encryption and follow strict privacy policies to protect your information.`,
   };
@@ -434,7 +442,7 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
       if (!response.ok) throw new Error("Failed to fetch resources");
       const result = await response.json();
       const fetchedResources = Array.isArray(result.resources) ? result.resources : [];
-      setResources(fetchedResources);
+      // setResources(fetchedResources); // This state isn't explicitly used for display in the current chat logic
       return fetchedResources;
     } catch (error) {
       console.error("Error fetching resources:", error);
@@ -462,6 +470,7 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
     if (params.resource_type) queryParams.append('type', params.resource_type);
     if (params.keywords) queryParams.append('search', params.keywords);
 
+    // If no specific parameters, fetch top 5 by downloads as suggestions
     const hasSpecificParams = Object.values(params).some(value => value !== null && value !== undefined && value !== '');
     if (!hasSpecificParams) {
         queryParams.append('limit', 5);
@@ -484,22 +493,25 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
       if (!API_CONFIG.geminiApi.key) {
         throw new Error("Gemini API key is missing. Please configure it in the environment variables.");
       }
-      const response = await fetch(`${API_CONFIG.geminiApi.url}?key=${API_CONFIG.geminiApi.key}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `You are Scholara, an academic assistant for the Scholara Collective platform, a hub for students to share and access educational resources. Answer the following user query in a concise, friendly, and professional manner, aligning with the platform's features (searching resources, uploading/downloading, analytics, community guidelines, etc.). If the query is academic or resource-related, provide a helpful response. If unclear, suggest relevant actions like searching for resources or viewing FAQs. Query: "${query}"`,
-                },
-              ],
-            },
-          ],
-        }),
+      const chatHistory = [];
+      chatHistory.push({ role: "user", parts: [{ text: query }] });
+
+      const payload = { contents: chatHistory };
+      const apiKey = API_CONFIG.geminiApi.key; // Use the key from config
+      const apiUrl = `${API_CONFIG.geminiApi.url}?key=${apiKey}`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
-      if (!response.ok) throw new Error("Gemini API request failed");
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Gemini API request failed:", errorData);
+        throw new Error(`Gemini API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+      }
+
       const result = await response.json();
       return result.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't process that request. Please try again.";
     } catch (error) {
@@ -510,6 +522,7 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
 
   const getChatbotIntent = async (message) => {
     const prompt = `You are an intelligent intent and entity extraction system for a platform called Scholara Collective. Your task is to analyze user queries and determine their primary intent and any relevant parameters (entities).
+Focus on accurately extracting academic subjects, resource types, courses, and institutions.
 
 **Instructions:**
 - Respond ONLY with a JSON object. Do NOT include any other text, prose, or markdown outside the JSON.
@@ -520,11 +533,11 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
 **Possible Intents and their Entities:**
 
 1.  **"SEARCH_RESOURCE"**: User wants to find educational resources.
-    * \`subject\`: (e.g., "Physics", "Mathematics", "Biology", "Computer Science", "English", "Chemistry", "Engineering")
-    * \`course\`: (e.g., "B.Tech", "NEET", "JEE", "Class 12", "Graduation")
-    * \`institution\`: (e.g., "IIT Bombay", "Delhi University")
-    * \`resource_type\`: (e.g., "notes", "papers", "model answers", "study materials", "revision sheets")
-    * \`keywords\`: (any other specific terms in the query relevant to the search)
+    * \`subject\`: (e.g., "Physics", "Mathematics", "Biology", "Computer Science", "English", "Chemistry", "Engineering", "History", "Economics", "Art")
+    * \`course\`: (e.g., "B.Tech", "NEET", "JEE", "Class 10", "Class 12", "Graduation", "Post-Graduation", "Undergraduate")
+    * \`institution\`: (e.g., "IIT Bombay", "Delhi University", "Stanford", "Harvard")
+    * \`resource_type\`: (e.g., "notes", "papers", "model answers", "study materials", "revision sheets", "question banks", "solutions", "books", "lectures")
+    * \`keywords\`: (any other specific terms in the query relevant to the search, e.g., "organic chemistry", "thermodynamics", "calculus", "machine learning")
 
 2.  **"GET_ANALYTICS"**: User wants to view platform statistics.
 
@@ -540,53 +553,39 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
 
 8.  **"GREETING"**: User is saying hello or a general salutation.
 
-9.  **"GENERAL_CHAT"**: Default for queries not matching specific intents.
+9.  **"SUGGEST_RESOURCES"**: User explicitly asks for suggestions or recommendations (e.g., "suggest good notes", "what are popular resources?").
+
+10. **"GENERAL_CHAT"**: Default for queries not matching specific intents, or casual conversation.
 
 **Example Query and Expected JSON Output:**
 
-Query: "Where do I find notes for organic chemistry from IIT Bombay for second-year students?"
+Query: "Where can I find advanced physics notes for B.Tech students from IIT Delhi?"
 Output:
 \`\`\`json
 {
   "intent": "SEARCH_RESOURCE",
   "entities": {
-    "subject": "Chemistry",
-    "course": "second-year",
-    "institution": "IIT Bombay",
+    "subject": "Physics",
+    "course": "B.Tech",
+    "institution": "IIT Delhi",
     "resource_type": "notes",
-    "keywords": "organic"
+    "keywords": "advanced"
   }
 }
 \`\`\`
 
-Query: "What are the active users on Scholara?"
+Query: "Show me some popular study materials."
 Output:
 \`\`\`json
 {
-  "intent": "GET_ANALYTICS",
-  "entities": null
+  "intent": "SUGGEST_RESOURCES",
+  "entities": {
+    "resource_type": "study materials"
+  }
 }
 \`\`\`
 
-Query: "Tell me how to contribute"
-Output:
-\`\`\`json
-{
-  "intent": "UPLOAD_GUIDE",
-  "entities": null
-}
-\`\`\`
-
-Query: "Hi there, assistant"
-Output:
-\`\`\`json
-{
-  "intent": "GREETING",
-  "entities": null
-}
-\`\`\`
-
-Query: "Tell me a joke"
+Query: "What's the best way to prepare for JEE Chemistry?"
 Output:
 \`\`\`json
 {
@@ -605,27 +604,32 @@ Output:
       if (!API_CONFIG.geminiApi.key) {
         throw new Error("Gemini API key is missing. Please configure it in the environment variables.");
       }
-      const response = await fetch(`${API_CONFIG.geminiApi.url}?key=${API_CONFIG.geminiApi.key}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-              ],
-            },
-          ],
-        }),
+      const chatHistory = [];
+      chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+      const payload = { contents: chatHistory };
+      const apiKey = API_CONFIG.geminiApi.key; // Use the key from config
+      const apiUrl = `${API_CONFIG.geminiApi.url}?key=${apiKey}`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
-      if (!response.ok) throw new Error("Gemini intent API request failed");
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Gemini Intent API request failed:", errorData);
+        throw new Error(`Gemini Intent API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+      }
+      
       const result = await response.json();
       const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
       const cleanedText = rawText.replace(/```json\n|\n```/g, '').trim();
       return JSON.parse(cleanedText);
     } catch (error) {
       console.error("Gemini Intent/Entity extraction error:", error);
-      return { intent: "GENERAL_CHAT", entities: null };
+      return { intent: "GENERAL_CHAT", entities: null }; // Fallback to general chat
     }
   };
 
@@ -635,10 +639,13 @@ Output:
         parsedIntent = await getChatbotIntent(message);
     } catch (error) {
         console.error("Error getting chatbot intent:", error);
-        parsedIntent = { intent: "GENERAL_CHAT", entities: null };
+        parsedIntent = { intent: "GENERAL_CHAT", entities: null }; // Fallback if intent extraction fails
     }
 
     const { intent, entities } = parsedIntent;
+    let responseText = "";
+    let resourcesData = null;
+    let analyticsData = null;
 
     switch (intent) {
         case "SEARCH_RESOURCE":
@@ -649,55 +656,79 @@ Output:
                 resource_type: entities?.resource_type,
                 keywords: entities?.keywords
             };
-            if (!searchParams.keywords && !searchParams.subject && !searchParams.course && !searchParams.institution && !searchParams.resource_type) {
-                searchParams.keywords = message;
+            
+            // If no specific parameters from intent, use the raw message as keywords
+            const hasSpecificIntentParams = Object.values(searchParams).some(value => value !== null && value !== undefined && value !== '');
+            if (!hasSpecificIntentParams) {
+                searchParams.keywords = message; 
             }
 
             const searchResults = await searchResources(searchParams);
 
             if (searchResults.length > 0) {
-                return {
-                    text: `🔍 **Found ${searchResults.length} resources matching your request!**\n\nHere are some of the top matches. Click download to access them instantly!`,
-                    resources: searchResults.slice(0, 5),
-                };
+                const resourceType = entities?.resource_type ? `${entities.resource_type} ` : '';
+                const subject = entities?.subject ? ` in ${entities.subject}` : '';
+                responseText = `🔍 **Found ${searchResults.length} ${resourceType}resources${subject} matching your request!**\n\nHere are some of the top matches. Click on a card to view/download!`;
+                resourcesData = searchResults.slice(0, 5); // Display top 5 results
             } else {
-                return {
-                    text: `No resources directly matching your specific request were found. However, I can still help you!\n\nTry these tips for better results:\n• Use more precise subjects (e.g., "Quantum Physics" instead of "Physics")\n• Specify the course or year (e.g., "B.Sc. Chemistry" or "Class 12")\n• Check for typos\n\nWould you like me to show you some **popular ${entities?.resource_type || 'academic'} resources** instead?`,
-                };
+                // If no direct results, try suggesting popular resources
+                const popularResources = await searchResources({ limit: 5, sort: 'downloads' });
+                responseText = `No resources directly matching your specific request were found. However, I can still help you!\n\nTry these tips for better results:\n• Use more precise subjects (e.g., "Quantum Physics" instead of "Physics")\n• Specify the course or year (e.g., "B.Sc. Chemistry" or "Class 12")\n• Check for typos\n\nAlternatively, here are some **popular academic resources** you might find helpful:`;
+                resourcesData = popularResources;
             }
+            break;
 
         case "GET_ANALYTICS":
-            const analyticsData = await fetchAnalyticsData();
-            return {
-                text: `📊 **Platform Analytics Dashboard**\n\nHere's a quick overview of our platform's current statistics:`,
-                analytics: analyticsData,
-            };
+            analyticsData = await fetchAnalyticsData();
+            responseText = `📊 **Platform Analytics Dashboard**\n\nHere's a quick overview of our platform's current statistics:`;
+            break;
 
         case "UPLOAD_GUIDE":
-            return { text: KNOWLEDGE_BASE.howToUpload };
+            responseText = KNOWLEDGE_BASE.howToUpload;
+            break;
 
         case "DOWNLOAD_GUIDE":
-            return { text: KNOWLEDGE_BASE.howToDownload };
+            responseText = KNOWLEDGE_BASE.howToDownload;
+            break;
 
         case "COMMUNITY_GUIDELINES":
-            return { text: KNOWLEDGE_BASE.communityGuidelines };
+            responseText = KNOWLEDGE_BASE.communityGuidelines;
+            break;
 
         case "PLATFORM_FEATURES":
-            return { text: KNOWLEDGE_BASE.platformFeatures };
+            responseText = KNOWLEDGE_BASE.platformFeatures;
+            break;
 
         case "FAQ":
-            return { text: KNOWLEDGE_BASE.faq };
+            responseText = KNOWLEDGE_BASE.faq;
+            break;
 
         case "GREETING":
-            return {
-                text: `👋 **Hello! Welcome to Scholara Collective!**\n\nI'm Scholara, your personal academic assistant. I can help you with:\n\n• 🔍 **Finding Study Resources** - Notes, papers, and materials\n• 📊 **Platform Insights** - View analytics and statistics  \n• 📤 **Upload Resources** - Learn how to contribute and share\n• ❓ **Get Support** - FAQs and community guidelines\n\nWhat would you like to explore today?`,
-            };
+            responseText = `👋 **Hello! Welcome to Scholara Collective!**\n\nI'm Scholara, your personal academic assistant. I can help you with:\n\n• 🔍 **Finding Study Resources** - Notes, papers, and materials\n• 📊 **Platform Insights** - View analytics and statistics  \n• 📤 **Upload Resources** - Learn how to contribute and share\n• ❓ **Get Support** - FAQs and community guidelines\n\nWhat would you like to explore today?`;
+            break;
+        
+        case "SUGGEST_RESOURCES":
+            // Fetch popular/highly-rated resources for suggestions
+            const suggestedResources = await searchResources({ 
+                limit: 5, 
+                sort: entities?.resource_type ? null : 'downloads', // Prioritize specific type if requested, otherwise by downloads
+                resource_type: entities?.resource_type 
+            });
+            if (suggestedResources.length > 0) {
+                const typeText = entities?.resource_type ? `${entities.resource_type} ` : 'academic ';
+                responseText = `Here are some highly rated and popular ${typeText}resources that might interest you:`;
+                resourcesData = suggestedResources;
+            } else {
+                responseText = "I'm sorry, I couldn't find specific suggestions at this moment. You can try searching for something more specific!";
+            }
+            break;
 
         case "GENERAL_CHAT":
         default:
-            const geminiResponse = await callGeminiAPI(message);
-            return { text: geminiResponse };
+            responseText = await callGeminiAPI(message);
+            break;
     }
+    return { text: responseText, resources: resourcesData, analytics: analyticsData };
   }, [getChatbotIntent, searchResources, fetchAnalyticsData, callGeminiAPI, KNOWLEDGE_BASE]);
 
   useEffect(() => {
@@ -706,7 +737,7 @@ Output:
     const initializeChatbot = async () => {
       setIsLoading(true);
       try {
-        await fetchResourcesData();
+        await fetchResourcesData(); // Keep this if you need to pre-load ALL resources or for some other background task
         if (isMounted) {
           setIsResourcesLoaded(true);
           setMessages([
@@ -801,7 +832,7 @@ Output:
   ];
 
   return (
-    <div className={`flex h-screen flex-col custom-scrollbar overflow-hidden ${colors.background.light} dark:${colors.background.dark} font-poppins transition-colors duration-300`} onKeyDown={(e) => handleEscKey(e, setIsOpen)}>
+    <div className={`flex h-screen flex-col scroll-container overflow-hidden ${colors.background.light} dark:${colors.background.dark} font-poppins transition-colors duration-300`} onKeyDown={(e) => handleEscKey(e, setIsOpen)}>
       {!isInToggle && (
         <div className={`${colors.primary.light} dark:${colors.primary.dark} p-4 sm:p-5 border-b ${colors.border.light} dark:${colors.border.dark} shadow-lg`}>
           <div className="relative flex items-center justify-center space-x-3">
@@ -827,7 +858,7 @@ Output:
 
       <div
         ref={chatMessagesRef}
-        className={`flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar ${colors.background.light} dark:${colors.background.dark} space-y-4`}
+        className={`flex-1 p-4 sm:p-6 overflow-y-auto  ${colors.background.light} dark:${colors.background.dark} space-y-4`}
       >
         {!isResourcesLoaded && (
           <div className="flex justify-start animate-fade-in">
@@ -872,7 +903,7 @@ Output:
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               placeholder="Ask about resources, platform features, or upload help..."
-              className={`flex-1 pl-10 pr-10 py-3 rounded-lg ${colors.card.light} placeholder:text-xs custom-scrollbar dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} border ${colors.border.light} dark:${colors.border.dark} focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 placeholder:${colors.text.secondary.light} dark:placeholder:${colors.text.secondary.dark} shadow-inner resize-none ${expandedInput ? 'min-h-[100px]' : 'min-h-[48px] max-h-[200px]'}`}
+              className={`flex-1 pl-10 pr-10 py-3 rounded-lg ${colors.card.light} placeholder:text-xs custom-scrollbar dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} border ${colors.border.light} dark:${colors.border.dark} focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 placeholder:${colors.text.secondary.light} dark:placeholder:${colors.text.secondary.dark} shadow-inner resize-none scroll-container-none ${expandedInput ? 'min-h-[100px]' : 'min-h-[48px] max-h-[200px]'}`}
               disabled={isLoading}
               rows={1}
             />
@@ -920,12 +951,13 @@ Output:
                       key={item._id}
                       className={`px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-2 ${colors.text.primary.light} dark:${colors.text.primary.dark} transition-colors`}
                       onMouseDown={() => {
-                        setUserInput(item.title);
+                        setUserInput(item.title); // Set input to the title for better search
                         inputRef.current.focus();
                       }}
                     >
                       <FileText size={16} className="text-amber-500 flex-shrink-0" />
                       <span className="truncate">{item.title}</span>
+                      {item.subject && <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 ml-auto">{item.subject}</span>}
                     </div>
                   ))}
                 </>

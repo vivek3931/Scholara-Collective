@@ -1,5 +1,11 @@
-// ResourcesSection.jsx - Optimized version with caching and performance improvements
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+// ResourcesSection.jsx - Fixed version with working suggestions
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ResourceCard from "../ResourceCard/ResourceCard";
@@ -47,7 +53,7 @@ const ResourcesSection = ({
   addRecentSearch,
 }) => {
   const [resources, setResources] = useState([]);
-  const [loading, setLoading] = useState(false); // Start with false, set to true only when needed
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -65,7 +71,10 @@ const ResourcesSection = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const dropdownRef = useRef(null);
-  
+
+  // Add recent searches state - get from localStorage
+  const [localRecentSearches, setLocalRecentSearches] = useState([]);
+
   // Add ref to track if initial load is done
   const initialLoadDone = useRef(false);
   const lastFetchParams = useRef(null);
@@ -78,6 +87,12 @@ const ResourcesSection = ({
     sortBy = propSortBy || "recent",
     focusInput = false,
   } = location.state || {};
+
+  // Load recent searches from localStorage on mount
+  useEffect(() => {
+    const savedSearches = JSON.parse(localStorage.getItem('recentSearches')) || [];
+    setLocalRecentSearches(savedSearches);
+  }, []);
 
   useEffect(() => {
     setLocalSearchQuery(searchQuery);
@@ -106,9 +121,12 @@ const ResourcesSection = ({
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   // Create cache key for current query
-  const createCacheKey = useCallback((searchQuery, filterType, filterCourse, filterSubject, sortBy) => {
-    return `${searchQuery}-${filterType}-${filterCourse}-${filterSubject}-${sortBy}`;
-  }, []);
+  const createCacheKey = useCallback(
+    (searchQuery, filterType, filterCourse, filterSubject, sortBy) => {
+      return `${searchQuery}-${filterType}-${filterCourse}-${filterSubject}-${sortBy}`;
+    },
+    []
+  );
 
   // Check if we should skip fetch (same params as last fetch)
   const shouldSkipFetch = useMemo(() => {
@@ -117,49 +135,65 @@ const ResourcesSection = ({
       type: localFilterType,
       course: localFilterCourse,
       subject: localFilterSubject,
-      sort: localSortBy
+      sort: localSortBy,
     };
-    
+
     const paramsString = JSON.stringify(currentParams);
     const lastParamsString = JSON.stringify(lastFetchParams.current);
-    
-    return paramsString === lastParamsString && initialLoadDone.current;
-  }, [debouncedSearchQuery, localFilterType, localFilterCourse, localFilterSubject, localSortBy]);
 
-  // Add suggestions fetching logic with caching
+    return paramsString === lastParamsString && initialLoadDone.current;
+  }, [
+    debouncedSearchQuery,
+    localFilterType,
+    localFilterCourse,
+    localFilterSubject,
+    localSortBy,
+  ]);
+
+  // FIXED: Real API suggestions fetching
   useEffect(() => {
     const getSuggestions = async () => {
-      if (localSearchQuery.trim().length > 1 && fetchSuggestions) {
+      if (localSearchQuery.trim().length > 1) {
         const suggestionsCacheKey = `suggestions-${localSearchQuery}`;
         const cached = resourcesCache.get(suggestionsCacheKey);
-        
+
         if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
           setSuggestions(cached.data);
           return;
         }
-        
+
         setIsLoadingSuggestions(true);
         try {
-          const data = await fetchSuggestions(localSearchQuery);
-          setSuggestions(data);
+          // Use the real API endpoint for suggestions
+          const response = await fetch(`${API_URL}/resources/suggestions?search=${encodeURIComponent(localSearchQuery)}`);
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch suggestions');
+          }
+          
+          const data = await response.json();
+          setSuggestions(data || []);
+          
           // Cache suggestions
           resourcesCache.set(suggestionsCacheKey, {
-            data,
-            timestamp: Date.now()
+            data: data || [],
+            timestamp: Date.now(),
           });
         } catch (err) {
-          console.error('Error fetching suggestions:', err);
+          console.error("Error fetching suggestions:", err);
+          // Don't show mock suggestions on API error, just show empty
           setSuggestions([]);
         } finally {
           setIsLoadingSuggestions(false);
         }
       } else {
         setSuggestions([]);
+        setIsLoadingSuggestions(false);
       }
     };
 
     getSuggestions();
-  }, [localSearchQuery, fetchSuggestions]);
+  }, [localSearchQuery, API_URL]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -168,107 +202,111 @@ const ResourcesSection = ({
         setShowSuggestions(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Optimized fetch function with caching
-  const fetchResources = useCallback(async (isRefresh = false) => {
-    // Skip if same parameters and not a refresh
-    if (shouldSkipFetch && !isRefresh) {
-      return;
-    }
+  const fetchResources = useCallback(
+    async (isRefresh = false) => {
+      // Skip if same parameters and not a refresh
+      if (shouldSkipFetch && !isRefresh) {
+        return;
+      }
 
-    const cacheKey = createCacheKey(
+      const cacheKey = createCacheKey(
+        debouncedSearchQuery,
+        localFilterType,
+        localFilterCourse,
+        localFilterSubject,
+        localSortBy
+      );
+
+      // Check cache first (unless it's a refresh)
+      if (!isRefresh) {
+        const cached = resourcesCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+          setResources(cached.data);
+          initialLoadDone.current = true;
+          return;
+        }
+      }
+
+      // Update last fetch params
+      lastFetchParams.current = {
+        search: debouncedSearchQuery,
+        type: localFilterType,
+        course: localFilterCourse,
+        subject: localFilterSubject,
+        sort: localSortBy,
+      };
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const queryParams = new URLSearchParams();
+        if (debouncedSearchQuery)
+          queryParams.append("search", debouncedSearchQuery);
+        if (localFilterType && localFilterType !== "All")
+          queryParams.append("type", localFilterType);
+        if (localFilterCourse && localFilterCourse !== "All")
+          queryParams.append("course", localFilterCourse);
+        if (localFilterSubject && localFilterSubject !== "All")
+          queryParams.append("subject", localFilterSubject);
+        if (localSortBy === "popular")
+          queryParams.append("sortBy", "downloads");
+        if (localSortBy === "rating")
+          queryParams.append("sortBy", "averageRating");
+        if (localSortBy === "recent") queryParams.append("sortBy", "createdAt");
+
+        const url = `${API_URL}/resources?${queryParams.toString()}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        let resourcesData = [];
+
+        if (Array.isArray(data)) {
+          resourcesData = data;
+        } else if (data && Array.isArray(data.resources)) {
+          resourcesData = data.resources;
+        } else {
+          console.error("API response format is not as expected:", data);
+          resourcesData = [];
+        }
+
+        setResources(resourcesData);
+
+        // Cache the results
+        resourcesCache.set(cacheKey, {
+          data: resourcesData,
+          timestamp: Date.now(),
+        });
+
+        initialLoadDone.current = true;
+      } catch (err) {
+        console.error("Failed to fetch resources:", err);
+        setError("Failed to load resources. Please try again.");
+        setResources([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
       debouncedSearchQuery,
       localFilterType,
       localFilterCourse,
       localFilterSubject,
-      localSortBy
-    );
-
-    // Check cache first (unless it's a refresh)
-    if (!isRefresh) {
-      const cached = resourcesCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        setResources(cached.data);
-        initialLoadDone.current = true;
-        return;
-      }
-    }
-
-    // Update last fetch params
-    lastFetchParams.current = {
-      search: debouncedSearchQuery,
-      type: localFilterType,
-      course: localFilterCourse,
-      subject: localFilterSubject,
-      sort: localSortBy
-    };
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const queryParams = new URLSearchParams();
-      if (debouncedSearchQuery) queryParams.append("search", debouncedSearchQuery);
-      if (localFilterType && localFilterType !== "All")
-        queryParams.append("type", localFilterType);
-      if (localFilterCourse && localFilterCourse !== "All")
-        queryParams.append("course", localFilterCourse);
-      if (localFilterSubject && localFilterSubject !== "All")
-        queryParams.append("subject", localFilterSubject);
-      if (localSortBy === "popular")
-        queryParams.append("sortBy", "downloads");
-      if (localSortBy === "rating")
-        queryParams.append("sortBy", "averageRating");
-      if (localSortBy === "recent") queryParams.append("sortBy", "createdAt");
-
-      const url = `${API_URL}/resources?${queryParams.toString()}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      let resourcesData = [];
-
-      if (Array.isArray(data)) {
-        resourcesData = data;
-      } else if (data && Array.isArray(data.resources)) {
-        resourcesData = data.resources;
-      } else {
-        console.error("API response format is not as expected:", data);
-        resourcesData = [];
-      }
-
-      setResources(resourcesData);
-      
-      // Cache the results
-      resourcesCache.set(cacheKey, {
-        data: resourcesData,
-        timestamp: Date.now()
-      });
-
-      initialLoadDone.current = true;
-    } catch (err) {
-      console.error("Failed to fetch resources:", err);
-      setError("Failed to load resources. Please try again.");
-      setResources([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    debouncedSearchQuery,
-    localFilterType,
-    localFilterCourse,
-    localFilterSubject,
-    localSortBy,
-    API_URL,
-    createCacheKey,
-    shouldSkipFetch,
-  ]);
+      localSortBy,
+      API_URL,
+      createCacheKey,
+      shouldSkipFetch,
+    ]
+  );
 
   // Initial load effect
   useEffect(() => {
@@ -297,7 +335,7 @@ const ResourcesSection = ({
     { value: "Model Answer", label: "Model Answers", icon: FileCheck2 },
     { value: "Revision Sheet", label: "Revision Sheets", icon: FileText },
   ];
-  
+
   const courseOptions = [
     { value: "All", label: "All Courses", icon: GraduationCap },
     { value: "B.Sc.", label: "B.Sc.", icon: GraduationCap },
@@ -305,7 +343,7 @@ const ResourcesSection = ({
     { value: "B.A.", label: "B.A.", icon: GraduationCap },
     { value: "M.Sc.", label: "M.Sc.", icon: GraduationCap },
   ];
-  
+
   const subjectOptions = [
     { value: "All", label: "All Subjects", icon: BookOpen },
     { value: "Mathematics", label: "Math", icon: Calculator },
@@ -326,11 +364,11 @@ const ResourcesSection = ({
     setLocalFilterCourse("All");
     setLocalFilterSubject("All");
     setLocalSortBy("recent");
-    
+
     // Clear cache for reset
     resourcesCache.clear();
     initialLoadDone.current = false;
-    
+
     showModal({
       type: "success",
       title: "Filters Reset",
@@ -345,8 +383,20 @@ const ResourcesSection = ({
 
   const handleSearchSubmit = () => {
     const trimmedQuery = localSearchQuery.trim();
-    if (trimmedQuery && addRecentSearch) {
-      addRecentSearch(trimmedQuery);
+    if (trimmedQuery) {
+      // Add to recent searches
+      const updatedSearches = [
+        trimmedQuery,
+        ...localRecentSearches.filter((item) => item !== trimmedQuery).slice(0, 4),
+      ];
+      setLocalRecentSearches(updatedSearches);
+      localStorage.setItem('recentSearches', JSON.stringify(updatedSearches));
+      
+      // Call addRecentSearch if provided
+      if (addRecentSearch) {
+        addRecentSearch(trimmedQuery);
+      }
+      
       setShowSuggestions(false);
     }
   };
@@ -365,6 +415,15 @@ const ResourcesSection = ({
   const handleSuggestionClick = (suggestion) => {
     setLocalSearchQuery(suggestion);
     setShowSuggestions(false);
+    
+    // Add to recent searches
+    const updatedSearches = [
+      suggestion,
+      ...localRecentSearches.filter((item) => item !== suggestion).slice(0, 4),
+    ];
+    setLocalRecentSearches(updatedSearches);
+    localStorage.setItem('recentSearches', JSON.stringify(updatedSearches));
+    
     if (addRecentSearch) {
       addRecentSearch(suggestion);
     }
@@ -378,7 +437,8 @@ const ResourcesSection = ({
   const displayedResources = useMemo(() => resources, [resources]);
 
   // Show loading only on initial load or when explicitly refreshing
-  const showLoadingState = loading && (!initialLoadDone.current || resources.length === 0);
+  const showLoadingState =
+    loading && (!initialLoadDone.current || resources.length === 0);
 
   return (
     <motion.section
@@ -426,7 +486,10 @@ const ResourcesSection = ({
               Find Academic Resources
             </span>
           </h2>
-          <form className="grid grid-cols-1 md:grid-cols-3 gap-5" ref={dropdownRef}>
+          <form
+            className="grid grid-cols-1 md:grid-cols-3 gap-5"
+            ref={dropdownRef}
+          >
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search
@@ -471,9 +534,9 @@ const ResourcesSection = ({
                 </motion.button>
               )}
 
-              {/* Suggestions dropdown */}
+              {/* FIXED: Suggestions dropdown with proper blur handling */}
               <AnimatePresence>
-                {showSuggestions && (
+                {showSuggestions && (suggestions.length > 0 || localRecentSearches.length > 0) && (
                   <motion.div
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 10 }}
@@ -488,7 +551,9 @@ const ResourcesSection = ({
                           spin
                           className="text-amber-600 dark:text-amber-200"
                         />
-                        <span className="text-sm dark:text-gray-200">Loading suggestions...</span>
+                        <span className="text-sm dark:text-gray-200">
+                          Loading suggestions...
+                        </span>
                       </div>
                     ) : (
                       <>
@@ -500,50 +565,70 @@ const ResourcesSection = ({
                             {suggestions.map((item) => (
                               <motion.div
                                 key={item._id}
-                                whileHover={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}
+                                whileHover={{
+                                  backgroundColor: "rgba(245, 158, 11, 0.1)",
+                                }}
                                 className="px-4 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
-                                onMouseDown={() => handleSuggestionClick(item.title)}
+                                onMouseDown={() =>
+                                  handleSuggestionClick(item.title)
+                                }
                               >
-                                <Search size={16} className="text-amber-600 dark:text-amber-200" />
-                                <span className="dark:text-gray-200">{item.title}</span>
+                                <Search
+                                  size={16}
+                                  className="text-amber-600 dark:text-amber-200"
+                                />
+                                <span className="dark:text-gray-200">
+                                  {item.title}
+                                </span>
                               </motion.div>
                             ))}
                           </>
                         )}
 
-                        {recentSearches.length > 0 && (
+                        {localRecentSearches.length > 0 && (
                           <>
                             <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-charcoal">
                               Recent Searches
                             </div>
-                            {recentSearches.map((search, index) => (
+                            {localRecentSearches.map((search, index) => (
                               <motion.div
                                 key={index}
-                                whileHover={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}
+                                whileHover={{
+                                  backgroundColor: "rgba(245, 158, 11, 0.1)",
+                                }}
                                 className="px-4 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
-                                onMouseDown={() => handleSuggestionClick(search)}
+                                onMouseDown={() =>
+                                  handleSuggestionClick(search)
+                                }
                               >
-                                <Clock size={16} className="text-amber-600 dark:text-amber-200" />
-                                <span className="dark:text-gray-200">{search}</span>
+                                <Clock
+                                  size={16}
+                                  className="text-amber-600 dark:text-amber-200"
+                                />
+                                <span className="dark:text-gray-200">
+                                  {search}
+                                </span>
                               </motion.div>
                             ))}
                           </>
                         )}
 
-                        {!isLoadingSuggestions && suggestions.length === 0 && recentSearches.length === 0 && (
-                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                            {localSearchQuery.trim().length > 0 
-                              ? "No suggestions found" 
-                              : "Type to search for resources"}
-                          </div>
-                        )}
+                        {!isLoadingSuggestions &&
+                          suggestions.length === 0 &&
+                          localRecentSearches.length === 0 && (
+                            <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                              {localSearchQuery.trim().length > 0
+                                ? "No suggestions found"
+                                : "Type to search for resources"}
+                            </div>
+                          )}
                       </>
                     )}
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
-            
+
             <Dropdown
               label="Filter by type"
               icon={Filter}
@@ -569,7 +654,7 @@ const ResourcesSection = ({
               loading={isFiltering}
             />
           </form>
-          
+
           <div className="mt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex gap-2">
               <motion.button
@@ -585,7 +670,7 @@ const ResourcesSection = ({
                 />
                 Reset Filters
               </motion.button>
-              
+
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -596,7 +681,9 @@ const ResourcesSection = ({
               >
                 <RefreshCcw
                   size={16}
-                  className={`text-amber-600 dark:text-amber-200 ${loading ? 'animate-spin' : ''}`}
+                  className={`text-amber-600 dark:text-amber-200 ${
+                    loading ? "animate-spin" : ""
+                  }`}
                 />
                 Refresh
               </motion.button>
@@ -612,7 +699,8 @@ const ResourcesSection = ({
         className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 max-w-6xl mx-auto"
       >
         <h2 className="text-2xl font-semibold dark:text-white font-poppins">
-          Popular Resources {loading && initialLoadDone.current && (
+          Popular Resources{" "}
+          {loading && initialLoadDone.current && (
             <FontAwesomeIcon
               icon={faSpinner}
               spin
