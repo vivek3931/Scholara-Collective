@@ -150,7 +150,6 @@ body {
 
 /* Ensure root elements have your dark theme colors */
 html, body, #root {
-  color: rgb(255, 255, 255); /* Your platinum text color */
   min-height: 100vh;
   margin: 0;
   padding: 0;
