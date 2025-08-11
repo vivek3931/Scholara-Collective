@@ -11,10 +11,15 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 router.get('/public-stats', async (req, res) => {
     try {
         const totalResources = await Resource.countDocuments({ visibility: 'public' });
-        const totalStudents = await User.countDocuments(); // Adjust if you track active students differently
-        const totalCourses = await Resource.distinct('course').length; // Unique courses
-        const totalUniversities = await Resource.distinct('institution').length; // Unique institutions
-
+        const totalStudents = await User.countDocuments(); 
+        
+        // Corrected lines
+        const courses = await Resource.distinct('course');
+        const totalCourses = courses.length;
+        
+        const universities = await Resource.distinct('institution');
+        const totalUniversities = universities.length;
+        
         res.json({
             resources: totalResources,
             students: totalStudents,
@@ -23,6 +28,57 @@ router.get('/public-stats', async (req, res) => {
         });
     } catch (err) {
         console.error('Public stats route error:', err.message);
+        res.status(500).json({ msg: 'Server error' });
+    }
+});
+
+
+router.get('/contributors', async (req, res) => {
+    try {
+        const frequentContributors = await Resource.aggregate([
+            {
+                // Group resources by the user who uploaded them, using 'uploadedBy'
+                $group: {
+                    _id: '$uploadedBy', // <-- CORRECTED: Use 'uploadedBy' from your Resource schema
+                    contributionCount: { $sum: 1 } // Count how many resources each user has
+                }
+            },
+            {
+                // Filter for users who have contributed more than once
+                $match: {
+                    contributionCount: { $gt: 1 } // Only include users with more than 1 contribution
+                }
+            },
+            {
+                // Join with the User collection to get the full user details
+                $lookup: {
+                    from: 'users', // The name of your users collection in MongoDB (typically 'users')
+                    localField: '_id', // The _id from the $group stage (which is the uploadedBy ID)
+                    foreignField: '_id', // The _id from the users collection
+                    as: 'userDetails'
+                }
+            },
+            {
+                // Unwind the userDetails array (since $lookup returns an array)
+                // This ensures we get a single user object per result
+                $unwind: '$userDetails'
+            },
+            {
+                // Project to shape the output data with relevant user and contribution info
+                $project: {
+                    _id: 0, // Exclude the original _id from the grouped stage
+                    userId: '$_id', // Rename _id to userId for consistent frontend prop names
+                    contributionCount: 1,
+                    name: '$userDetails.username', // Assuming User model has a 'name' field
+                    email: '$userDetails.email', // Assuming User model has an 'email' field
+                    profilePicture: '$userDetails.profilePicture' // If you have a profile picture field
+                }
+            }
+        ]);
+
+        res.json(frequentContributors);
+    } catch (err) {
+        console.error('Error fetching frequent contributors:', err.message);
         res.status(500).json({ msg: 'Server error' });
     }
 });
