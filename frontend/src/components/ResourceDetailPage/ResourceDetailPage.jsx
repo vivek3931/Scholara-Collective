@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen, FileText, FileQuestion, FileCheck2, GraduationCap,
   Calculator, Atom, Bookmark, FlaskConical, Download, Star, ExternalLink, ArrowLeft,
-  Search, Send , Eye , X , ZoomOut , ZoomIn
+  Search, Send , Eye , X , ZoomOut , ZoomIn ,  ChevronLeft , ChevronRight
 } from 'lucide-react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner, faStar as faSolidStar } from "@fortawesome/free-solid-svg-icons";
