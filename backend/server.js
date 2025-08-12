@@ -85,14 +85,10 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- Serve Static React Files in Production (after all API routes) ---
-// This is the correct placement to avoid routing conflicts.
-if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, 'client', 'build')));
-    app.get('*', (req, res) => {
-        res.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'));
-    });
-}
+app.get(/.*/, (req, res) => {
+    res.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'));
+});
+
 
 
 // --- Error Handling Middleware ---
