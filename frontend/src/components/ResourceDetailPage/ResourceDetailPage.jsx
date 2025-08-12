@@ -369,7 +369,7 @@ const ResourceCommentsSection = ({ resourceId, currentUserId, userName }) => {
         <div className="mb-8">
           <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-3">Leave a Comment</h3>
           <textarea
-            className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-onyx/80 text-gray-800 dark:text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-200 transition-all duration-200 resize-none"
+            className="w-full p-3 rounded-lg border border-gray-300 dark:border-charcoal bg-white dark:bg-onyx/80 text-gray-800 dark:text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-200 transition-all duration-200 resize-none"
             rows="4"
             placeholder="Share your thoughts about this resource..."
             value={newCommentText}
@@ -398,7 +398,7 @@ const ResourceCommentsSection = ({ resourceId, currentUserId, userName }) => {
           </div>
         </div>
       ) : (
-        <div className="mb-8 p-4 bg-gray-50 dark:bg-onyx/50 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="mb-8 p-4 bg-gray-50 dark:bg-onyx/50 rounded-lg border border-gray-200 dark:border-charcoal">
           <p className="text-gray-600 dark:text-gray-400">
             Please log in to post comments and engage with the community.
           </p>
@@ -454,7 +454,7 @@ const ResourceDetailPage = () => {
   const [isRatingLoading, setIsRatingLoading] = useState(false);
   const pollIntervalRef = useRef(null);
 
-   // PDF Preview states
+  // PDF Preview states
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
@@ -503,15 +503,15 @@ const ResourceDetailPage = () => {
   // Fetch and poll ratings
   const refreshRatings = useCallback(async () => {
     if (!resourceId) return;
-    
+
     setIsRatingLoading(true);
     try {
       const url = `${API_BASE_URL}/resources/${resourceId}/ratings${userId ? `?userId=${userId}` : ''}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Failed to fetch ratings: ${response.status}`);
-      
+
       const data = await response.json();
-      
+
       setOverallRating(prev => data.overallRating !== undefined ? data.overallRating : prev);
       if (userId) {
         setUserRating(prev => data.userRating !== undefined ? data.userRating : prev);
@@ -540,7 +540,7 @@ const ResourceDetailPage = () => {
 
     const previousRating = userRating;
     setUserRating(value);
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/rate`, {
         method: 'POST',
@@ -601,9 +601,9 @@ const ResourceDetailPage = () => {
           Authorization: `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) throw new Error('Failed to fetch preview');
-      
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setPreviewDataUrl(url);
@@ -667,20 +667,20 @@ const ResourceDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-amber-600" />
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-onyx">
+        <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-blue-500" />
       </div>
     );
   }
 
   if (error || !resource) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-        <h2 className="text-3xl font-bold mb-4">Error</h2>
-        <p className="text-lg mb-6">{error || "Resource not found"}</p>
-        <button 
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center bg-gray-50 dark:bg-onyx">
+        <h2 className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">Error</h2>
+        <p className="text-lg mb-6 text-gray-700 dark:text-gray-300">{error || "Resource not found"}</p>
+        <button
           onClick={() => navigate('/')}
-          className="px-6 py-3 bg-amber-600 text-white rounded-lg shadow-md hover:bg-amber-700"
+          className="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600"
         >
           Go to Home
         </button>
@@ -695,19 +695,19 @@ const ResourceDetailPage = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gray-100 dark:bg-gray-900 py-16 px-4 sm:px-6 lg:px-8"
+      className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx py-20 px-4 sm:px-6 lg:px-8"
     >
-      <button 
+      <button
         onClick={() => navigate(-1)}
-        className="fixed top-4 left-4 z-50 flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 shadow-md rounded-md"
+        className="fixed top-4 left-4 z-50 flex items-center gap-2 px-3 py-2 bg-white dark:bg-charcoal/50 duration-200 hover:scale-105 rounded-md hover:bg-gray-200 dark:hover:bg-charcoal/80 text-gray-700 shadow-glow-sm dark:text-gray-300"
       >
         <ArrowLeft size={16} />
         <span>Back</span>
       </button>
 
-      <div className="max-w-6xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden md:flex">
+      <div className="max-w-6xl mx-auto bg-white dark:bg-onyx/60 rounded-2xl  shadow-xl overflow-hidden md:flex">
         {/* Left Section - PDF Preview */}
-        <div className="md:w-1/2 p-6 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-700 min-h-[500px]">
+        <div className="md:w-1/2 p-6 flex flex-col items-center justify-center bg-gray-50 dark:bg-charcoal min-h-[500px]">
           {isPDF ? (
             <div className="w-full h-full flex flex-col items-center">
               <Document
@@ -716,14 +716,14 @@ const ResourceDetailPage = () => {
                 onLoadError={onDocumentLoadError}
                 loading={
                   <div className="flex items-center justify-center h-full">
-                    <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-amber-600" />
+                    <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-blue-500" />
                   </div>
                 }
                 className="w-full h-full border border-gray-200 dark:border-gray-600 rounded-lg"
               >
-                <Page 
-                  pageNumber={pageNumber} 
-                  width={500} 
+                <Page
+                  pageNumber={pageNumber}
+                  width={500}
                   className="shadow-lg"
                 />
               </Document>
@@ -732,7 +732,7 @@ const ResourceDetailPage = () => {
                   <button
                     onClick={() => changePage(-1)}
                     disabled={pageNumber <= 1}
-                    className="p-2 rounded-full bg-gray-200 dark:bg-gray-600 disabled:opacity-50"
+                    className="p-2 rounded-full bg-gray-200 dark:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-gray-300"
                   >
                     <ChevronLeft size={20} />
                   </button>
@@ -742,7 +742,7 @@ const ResourceDetailPage = () => {
                   <button
                     onClick={() => changePage(1)}
                     disabled={pageNumber >= numPages}
-                    className="p-2 rounded-full bg-gray-200 dark:bg-gray-600 disabled:opacity-50"
+                    className="p-2 rounded-full bg-gray-200 dark:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-gray-300"
                   >
                     <ChevronRight size={20} />
                   </button>
@@ -751,13 +751,13 @@ const ResourceDetailPage = () => {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="w-32 h-32 flex items-center justify-center text-amber-600 dark:text-amber-400 mb-4">
+              <div className="w-32 h-32 flex items-center justify-center text-blue-500 dark:text-blue-400 mb-4">
                 {getIconForType(type, 64)}
               </div>
               <p className="text-gray-600 dark:text-gray-400">Preview not available for this file type</p>
               <button
                 onClick={handlePreview}
-                className="mt-4 px-4 py-2 bg-amber-600 text-white rounded-md flex items-center gap-2 hover:bg-amber-700"
+                className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md flex items-center gap-2 hover:bg-blue-600"
               >
                 <Eye size={16} />
                 Try Preview
@@ -777,15 +777,15 @@ const ResourceDetailPage = () => {
           </motion.h1>
 
           <div className="flex items-center gap-4 mb-6">
-            <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 px-3 py-1 rounded-full">
+            <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full">
               <GraduationCap size={16} />
               <span>{course}</span>
             </div>
-            <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full">
+            <div className="flex items-center gap-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1 rounded-full">
               {getIconForSubject(subject, 16)}
               <span>{subject}</span>
             </div>
-            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full">
+            <div className="flex items-center gap-1 bg-gray-100 dark:bg-charcoal text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full">
               <span>{type}</span>
             </div>
           </div>
@@ -802,7 +802,7 @@ const ResourceDetailPage = () => {
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              className="flex items-center gap-3 bg-white dark:bg-gray-700 p-4 rounded-xl shadow-inner"
+              className="flex items-center gap-3 bg-white dark:bg-charcoal p-4 rounded-xl shadow-inner"
             >
               <Star size={24} className="text-yellow-500" />
               <div>
@@ -812,7 +812,7 @@ const ResourceDetailPage = () => {
                     {overallRating.toFixed(1)} / 5
                   </p>
                   {isRatingLoading && (
-                    <FontAwesomeIcon icon={faSpinner} spin size="sm" className="text-amber-600" />
+                    <FontAwesomeIcon icon={faSpinner} spin size="sm" className="text-blue-500" />
                   )}
                 </div>
               </div>
@@ -820,9 +820,9 @@ const ResourceDetailPage = () => {
             <motion.div
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              className="flex items-center gap-3 bg-white dark:bg-gray-700 p-4 rounded-xl shadow-inner"
+              className="flex items-center gap-3 bg-white dark:bg-charcoal p-4 rounded-xl shadow-inner"
             >
-              <Download size={24} className="text-teal-500" />
+              <Download size={24} className="text-green-500" />
               <div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">Downloads</p>
                 <p className="text-lg font-bold text-gray-900 dark:text-white">
@@ -838,7 +838,7 @@ const ResourceDetailPage = () => {
                 onClick={handlePreview}
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
-                className="flex-1 bg-amber-600 text-white py-3 px-6 rounded-xl shadow-lg hover:bg-amber-700 flex items-center justify-center gap-2"
+                className="flex-1 bg-blue-500 text-white py-3 px-6 rounded-xl shadow-lg hover:bg-blue-600 flex items-center justify-center gap-2"
               >
                 <Eye size={20} />
                 Preview Resource
@@ -849,7 +849,7 @@ const ResourceDetailPage = () => {
                 onClick={handleDownload}
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
-                className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-xl shadow-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                className="flex-1 bg-green-500 text-white py-3 px-6 rounded-xl shadow-lg hover:bg-green-600 flex items-center justify-center gap-2"
               >
                 <Download size={20} />
                 Download
@@ -866,16 +866,16 @@ const ResourceDetailPage = () => {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Rate This Resource</h2>
             {isAuthenticated ? (
               <div className="space-y-4">
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="p-4 bg-gray-50 dark:bg-charcoal rounded-lg">
                   <p className="text-gray-700 dark:text-gray-300 mb-2">
-                    Logged in as: <span className="font-semibold text-amber-600 dark:text-amber-400">{userName}</span>
+                    Logged in as: <span className="font-semibold text-blue-500 dark:text-blue-400">{userName}</span>
                   </p>
                   <div className="flex items-center gap-4">
-                    <StarRating 
-                      rating={userRating} 
-                      onRate={handleRate} 
-                      editable={true} 
-                      starSize={32}
+                    <StarRating
+                      rating={userRating}
+                      onRate={handleRate}
+                      editable={true}
+                      starSize={20}
                       showValue={true}
                       isLoading={isRatingLoading}
                     />
@@ -898,18 +898,18 @@ const ResourceDetailPage = () => {
 
       {/* Fullscreen PDF Preview Modal */}
       {showPreviewModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 backdrop-blur-sm bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-onyx/60 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold">PDF Preview</h3>
-              <button onClick={handleClosePreviewModal} className="p-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">PDF Preview</h3>
+              <button onClick={handleClosePreviewModal} className="p-2 text-gray-700 dark:text-gray-300">
                 <X size={20} />
               </button>
             </div>
             <div className="flex-1 overflow-auto scroll-container backdrop-blur-sm p-4">
               {previewLoading ? (
                 <div className="flex items-center justify-center h-full">
-                  <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-amber-600" />
+                  <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-blue-500" />
                 </div>
               ) : previewError ? (
                 <div className="text-center text-red-600 dark:text-red-400 p-4">
@@ -922,8 +922,8 @@ const ResourceDetailPage = () => {
                   onLoadError={onDocumentLoadError}
                   className="w-full"
                 >
-                  <Page 
-                    pageNumber={pageNumber} 
+                  <Page
+                    pageNumber={pageNumber}
                     scale={zoom}
                     className="shadow-lg mx-auto"
                   />
@@ -935,15 +935,15 @@ const ResourceDetailPage = () => {
                 <button
                   onClick={handleZoomOut}
                   disabled={zoom <= 0.5}
-                  className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50"
+                  className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50 text-gray-700 dark:text-gray-300"
                 >
                   <ZoomOut size={20} />
                 </button>
-                <span className="mx-2">{Math.round(zoom * 100)}%</span>
+                <span className="mx-2 text-gray-900 dark:text-white">{Math.round(zoom * 100)}%</span>
                 <button
                   onClick={handleZoomIn}
                   disabled={zoom >= 3}
-                  className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50"
+                  className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50 text-gray-700 dark:text-gray-300"
                 >
                   <ZoomIn size={20} />
                 </button>
@@ -953,17 +953,17 @@ const ResourceDetailPage = () => {
                   <button
                     onClick={() => changePage(-1)}
                     disabled={pageNumber <= 1}
-                    className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50"
+                    className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50 text-gray-700 dark:text-gray-300"
                   >
                     <ChevronLeft size={20} />
                   </button>
-                  <span>
+                  <span className="text-gray-900 dark:text-white">
                     Page {pageNumber} of {numPages}
                   </span>
                   <button
                     onClick={() => changePage(1)}
                     disabled={pageNumber >= numPages}
-                    className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50"
+                    className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50 text-gray-700 dark:text-gray-300"
                   >
                     <ChevronRight size={20} />
                   </button>
@@ -971,7 +971,7 @@ const ResourceDetailPage = () => {
               )}
               <button
                 onClick={handleDownload}
-                className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 flex items-center gap-2"
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center gap-2"
               >
                 <Download size={16} />
                 Download
@@ -982,7 +982,7 @@ const ResourceDetailPage = () => {
       )}
 
       {/* Resource Comments Section */}
-      <div className="max-w-6xl p-4 lg:p-12 mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden mt-8">
+      <div className="max-w-6xl p-4 lg:p-12 mx-auto bg-white dark:bg-onyx/60 rounded-2xl shadow-xl overflow-hidden mt-8">
         <ResourceCommentsSection
           resourceId={resourceId}
           currentUserId={userId}
