@@ -13,7 +13,7 @@ import { useAuth } from '../../context/AuthContext/AuthContext';
 import { debounce } from 'lodash';
 import { Document, Page } from 'react-pdf';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // Utility functions remain unchanged
 const getIconForType = (type, size = 20) => {
