@@ -4,35 +4,34 @@
     const router = express.Router();
     const cloudinary = require('cloudinary').v2;
     const Resource = require('../models/Resource');
-    // CRITICAL: Import both the 'protect' and 'authorize' middleware for security
     const { protect, authorize } = require('../middleware/authMiddleware');
-    const User = require('../models/User');
+    const User = require('../models/User'); 
     const axios = require('axios');
     const mongoose = require('mongoose');
     require('dotenv').config();
 
-    // Configure Cloudinary using environment variables
+    // Configure Cloudinary
     cloudinary.config({
         cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
         api_key: process.env.CLOUDINARY_API_KEY,
         api_secret: process.env.CLOUDINARY_API_SECRET,
-        timeout: 60000 // Set a timeout of 60 seconds
+        timeout: 60000 
     });
 
     const multer = require('multer');
     const storage = multer.memoryStorage();
     const upload = multer({
         storage: storage,
-        limits: { fileSize: 10 * 1024 * 1024 }, // Max 10MB file size
+        limits: { fileSize: 10 * 1024 * 1024 }, 
         fileFilter: (req, file, cb) => {
             if (file.mimetype === 'application/pdf' ||
                 file.mimetype.startsWith('image/') ||
-                file.mimetype === 'application/msword' || // .doc
-                file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || // .docx
-                file.mimetype === 'application/vnd.ms-excel' || // .xls
-                file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || // .xlsx
-                file.mimetype === 'application/vnd.ms-powerpoint' || // .ppt
-                file.mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' // .pptx
+                file.mimetype === 'application/msword' || 
+                file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                file.mimetype === 'application/vnd.ms-excel' || 
+                file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                file.mimetype === 'application/vnd.ms-powerpoint' || 
+                file.mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
             ) {
                 cb(null, true);
             } else {
@@ -41,7 +40,7 @@
         }
     });
 
-    // --- Helper Functions (Consolidated and Refined) ---
+    // --- Helper Functions ---
     const getCloudinaryResourceType = (mimetype) => {
         if (mimetype.startsWith('image/')) {
             return 'image';
@@ -97,80 +96,218 @@
     };
 
     // --- API Routes ---
-    // The following routes are organized by access level for clarity.
 
-    // === Public Routes ===
-    // Anyone can access these endpoints without a token.
-router.get('/', async (req, res) => {
-    try {
-        const { search, subject, year, tags, sort, page = 1, limit = 10 } = req.query;
-        const query = { visibility: 'public' };
-        let sortOptions = {};
+    // === Public Routes - IMPORTANT: Specific routes first, then general dynamic routes ===
 
-        // NEW: Use the $text operator for smart, score-based searching
-        if (search) {
-            query.$text = { $search: search };
-            sortOptions.score = { $meta: 'textScore' }; // Sort by relevance score
-        }
-
-        // Existing filters (they will now work with the text search)
-        if (subject) query.subject = subject;
-        if (year) query.year = year;
-        if (tags) {
-            const tagArray = tags.split(',').map(tag => tag.trim());
-            query.tags = { $in: tagArray };
-        }
-
-        // Override default sort only if no text search is active
-        if (!search && sort) {
-            switch (sort) {
-                case 'newest': sortOptions.createdAt = -1; break;
-                case 'downloads': sortOptions.downloads = -1; break;
-                case 'rating': sortOptions.averageRating = -1; break;
-                default: sortOptions.createdAt = -1;
+    // GET /api/resources/suggestions (Specific)
+    router.get('/suggestions', async (req, res) => {
+        try {
+            const { search } = req.query;
+            if (!search || search.trim().length < 2) {
+                return res.status(400).json({ msg: 'Search query must be at least 2 characters long' });
             }
-        } else if (Object.keys(sortOptions).length === 0) {
-            // Default sort if no search or other sort option is given
-            sortOptions.createdAt = -1;
+            const textResults = await Resource.aggregate([
+                { $match: { $text: { $search: search }, visibility: 'public' } },
+                { $project: { _id: 1, title: 1, score: { $meta: "textScore" } } },
+                { $sort: { score: { $meta: "textScore" } } },
+                { $limit: 5 }
+            ]);
+            if (textResults.length < 5) {
+                const regexResults = await Resource.find({
+                    title: { $regex: search, $options: 'i' },
+                    visibility: 'public'
+                })
+                .select('_id title')
+                .limit(5 - textResults.length)
+                .lean();
+                const combined = [...textResults, ...regexResults]
+                    .filter((v, i, a) => a.findIndex(t => t._id.toString() === v._id.toString()) === i)
+                    .slice(0, 5);
+                return res.json(combined);
+            }
+            res.json(textResults);
+        } catch (err) {
+            console.error('Suggestions route error:', err.message);
+            res.status(500).json({ 
+                msg: 'Failed to fetch suggestions',
+                error: process.env.NODE_ENV === 'development' ? err.message : undefined
+            });
         }
+    });
 
-        // If using a text search, add a projection for the score
-        const projection = search ? { score: { $meta: 'textScore' } } : {};
-
-        const resources = await Resource.find(query, projection)
-            .sort(sortOptions)
-            .limit(parseInt(limit))
-            .skip((page - 1) * parseInt(limit))
-            .populate('uploadedBy', 'username')
-            .populate('comments.postedBy', 'username');
-
-        const total = await Resource.countDocuments(query);
-
-        res.json({
-            resources,
-            totalPages: Math.ceil(total / limit),
-            currentPage: parseInt(page),
-            total
-        });
-    } catch (err) {
-        console.error('Get all resources route error:', err.message);
-        res.status(500).json({ msg: 'Server error' });
-    }
-});
-
+    // GET /api/resources/analytics/stats (Specific)
     router.get('/analytics/stats', async (req, res) => {
-    try {
-        const resources = await Resource.countDocuments({ visibility: 'public' });
-        // Placeholder logic for other stats (implement based on your data model)
-        const students = await User.countDocuments(); // Assuming a User model
-        const courses = await Resource.distinct('course').length; // Unique courses
-        const universities = await Resource.distinct('institution').length; // Unique institutions
-        res.json({ resources, students, courses, universities });
-    } catch (err) {
-        console.error('Analytics stats error:', err.message);
-        res.status(500).json({ msg: 'Server error' });
-    }
-    }); 
+        try {
+            const resources = await Resource.countDocuments({ visibility: 'public' });
+            const students = await User.countDocuments();
+            const courses = await Resource.distinct('course').length;
+            const universities = await Resource.distinct('institution').length;
+            res.json({ resources, students, courses, universities });
+        } catch (err) {
+            console.error('Analytics stats error:', err.message);
+            res.status(500).json({ msg: 'Server error' });
+        }
+    });
+
+    // GET /api/resources/trending (Specific)
+    router.get('/trending', async (req, res) => { 
+        try {
+            const trendingResources = await Resource.find({ visibility: 'public' })
+                .sort({ averageRating: -1, downloads: -1, createdAt: -1 }) 
+                .limit(9) 
+                .populate('uploadedBy', 'username'); 
+
+            res.json(trendingResources);
+        } catch (err) {
+            console.error('Error fetching trending resources:', err.message);
+            res.status(500).json({ msg: 'Server error fetching trending resources' });
+        }
+    });
+
+    // GET /api/resources/community/feed (Specific, and protected)
+    router.get('/community/feed', protect, async (req, res) => { 
+        try {
+            const recentComments = await Resource.aggregate([
+                { $unwind: '$comments' },
+                { $sort: { 'comments.createdAt': -1 } },
+                { $limit: 10 },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'comments.postedBy',
+                        foreignField: '_id',
+                        as: 'comments.user'
+                    }
+                },
+                { $unwind: '$comments.user' },
+                {
+                    $project: {
+                        _id: '$comments._id',
+                        type: 'comment',
+                        action: 'commented on',
+                        user: {
+                            _id: '$comments.user._id',
+                            username: '$comments.user.username'
+                        },
+                        resource: {
+                            _id: '$_id',
+                            title: '$title'
+                        },
+                        createdAt: '$comments.createdAt'
+                    }
+                }
+            ]);
+
+            const recentRatings = await Resource.aggregate([
+                { $unwind: '$ratings' },
+                { $sort: { 'ratings.createdAt': -1 } },
+                { $limit: 10 }, 
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'ratings.postedBy',
+                        foreignField: '_id',
+                        as: 'ratings.user'
+                    }
+                },
+                { $unwind: '$ratings.user' },
+                {
+                    $project: {
+                        _id: '$ratings._id',
+                        type: 'rating',
+                        action: 'rated',
+                        rating: '$ratings.rating',
+                        user: {
+                            _id: '$ratings.user._id',
+                            username: '$ratings.user.username'
+                        },
+                        resource: {
+                            _id: '$_id',
+                            title: '$title'
+                        },
+                        createdAt: '$ratings.createdAt'
+                    }
+                }
+            ]);
+
+            const allActivity = [...recentComments, ...recentRatings].sort((a, b) => 
+                new Date(b.createdAt) - new Date(a.createdAt)
+            ).slice(0, 15);
+
+            res.json(allActivity);
+        } catch (err) {
+            console.error('Error fetching community activity feed:', err.message);
+            res.status(500).json({ msg: 'Server error fetching community feed' });
+        }
+    });
+
+
+    // Get resources uploaded by the current user
+    router.get('/my-uploaded', protect, async (req, res) => {
+        try {
+            const resources = await Resource.find({ uploadedBy: req.user.id })
+                .populate('uploadedBy', 'username')
+                .populate('comments.postedBy', 'username')
+                .sort({ createdAt: -1 });
+            res.json({ resources });
+        } catch (err) {
+            console.error('My uploaded resources route error:', err.message);
+            res.status(500).json({ msg: 'Server error while fetching uploaded resources' });
+        }
+    });
+    // Get all resources (main browse page - more general)
+    router.get('/', async (req, res) => {
+        try {
+            const { search, subject, year, tags, sort, page = 1, limit = 10 } = req.query;
+            const query = { visibility: 'public' };
+            let sortOptions = {};
+
+            if (search) {
+                query.$text = { $search: search };
+                sortOptions.score = { $meta: 'textScore' };
+            }
+
+            if (subject) query.subject = subject;
+            if (year) query.year = year;
+            if (tags) {
+                const tagArray = tags.split(',').map(tag => tag.trim());
+                query.tags = { $in: tagArray };
+            }
+
+            if (!search && sort) {
+                switch (sort) {
+                    case 'newest': sortOptions.createdAt = -1; break;
+                    case 'downloads': sortOptions.downloads = -1; break;
+                    case 'rating': sortOptions.averageRating = -1; break;
+                    default: sortOptions.createdAt = -1;
+                }
+            } else if (Object.keys(sortOptions).length === 0) {
+                sortOptions.createdAt = -1;
+            }
+
+            const projection = search ? { score: { $meta: 'textScore' } } : {};
+
+            const resources = await Resource.find(query, projection)
+                .sort(sortOptions)
+                .limit(parseInt(limit))
+                .skip((page - 1) * parseInt(limit))
+                .populate('uploadedBy', 'username')
+                .populate('comments.postedBy', 'username'); 
+
+            const total = await Resource.countDocuments(query);
+
+            res.json({
+                resources,
+                totalPages: Math.ceil(total / limit),
+                currentPage: parseInt(page),
+                total
+            });
+        } catch (err) {
+            console.error('Get all resources route error:', err.message);
+            res.status(500).json({ msg: 'Server error' });
+        }
+    });
+
 
     router.get('/my-library', protect, async (req, res) => {
         try {
@@ -190,41 +327,28 @@ router.get('/', async (req, res) => {
             res.status(500).json({ msg: 'Server error' });
         }
     });
-
-
- // In resourceRoutes.js (append to existing routes)
-router.get('/my-uploaded', protect, async (req, res) => {
-  try {
-    const resources = await Resource.find({ uploadedBy: req.user.id })
-      .populate('uploadedBy', 'username')
-      .populate('comments.postedBy', 'username')
-      .sort({ createdAt: -1 }); // Sort by most recent
-    res.json({ resources });
-  } catch (err) {
-    console.error('My uploaded resources route error:', err.message);
-    res.status(500).json({ msg: 'Server error while fetching uploaded resources' });
-  }
-});
-
+    // GET a single resource by ID (Dynamic - should come AFTER all more specific public routes)
     router.get('/:id', async (req, res) => {
         try {
             const resource = await Resource.findById(req.params.id)
-            .populate('uploadedBy', 'username')
-            .populate('comments.user', 'username');
-            
+                .populate('uploadedBy', 'username')
+                .populate('comments.postedBy', 'username'); 
+
             if (!resource) {
                 return res.status(404).json({ msg: 'Resource not found' });
             }
-            res.json(resource);
+            
+            res.json({ resource, comments: resource.comments }); 
         } catch (err) {
             console.error('Get resource by ID route error:', err.message);
             if (err.kind === 'ObjectId') {
-                return res.status(404).json({ msg: 'Resource not found' });
+                return res.status(404).json({ msg: 'Resource not found or invalid ID' });
             }
-            res.status(500).json({ msg: 'Server error' });
+            res.status(500).json({ msg: 'Server error fetching resource details' });
         }
     });
 
+    // Download a resource (Dynamic)
     router.get('/:id/download', async (req, res) => {
         try {
             const resource = await Resource.findById(req.params.id);
@@ -248,54 +372,14 @@ router.get('/my-uploaded', protect, async (req, res) => {
             });
         } catch (err) {
             console.error('Download route error:', err.message);
-            if (!res.headersSent) {
-                res.status(500).json({ msg: 'Download failed. Please try again later.' });
+            if (err.kind === 'ObjectId') {
+                return res.status(404).json({ msg: 'Resource not found' });
             }
+            res.status(500).json({ msg: 'Download failed. Please try again later.' });
         }
     });
 
-    router.delete('/:id/delete-my-resource', protect, async (req, res) => {
-    try {
-        const resource = await Resource.findById(req.params.id);
-        if (!resource) {
-            return res.status(404).json({ msg: 'Resource not found' });
-        }
-
-        if (resource.uploadedBy.toString() !== req.user.id) {
-            return res.status(403).json({ msg: 'Not authorized to delete this resource' });
-        }
-
-        console.log("Attempting to delete Cloudinary file:", {
-            publicId: resource.cloudinaryPublicId,
-            resourceType: getCloudinaryResourceType(resource.fileType)
-        });
-
-        try {
-            const cloudinaryResult = await cloudinary.uploader.destroy(resource.cloudinaryPublicId, {
-                resource_type: getCloudinaryResourceType(resource.fileType)
-            });
-            if (!cloudinaryResult || cloudinaryResult.result !== 'ok') {
-                throw new Error(`Cloudinary deletion failed: ${cloudinaryResult?.error?.message || 'Unknown error'}`);
-            }
-            console.log("Cloudinary deletion successful:", cloudinaryResult);
-        } catch (cloudinaryErr) {
-            console.error(`Failed to delete Cloudinary file for resource ${resource._id}:`, cloudinaryErr);
-            return res.status(500).json({
-                msg: `Failed to delete file from Cloudinary: ${cloudinaryErr.message}`,
-                details: cloudinaryErr
-            });
-        }
-
-        await resource.deleteOne();
-        res.json({ msg: 'Resource deleted successfully' });
-    } catch (err) {
-        console.error('Delete resource route error:', err.message);
-        if (err.kind === 'ObjectId') {
-            return res.status(404).json({ msg: 'Resource not found' });
-        }
-        res.status(500).json({ msg: 'Server error during resource deletion.' });
-    }
-});
+    // Preview a resource (Dynamic)
     router.get('/:id/preview', async (req, res) => {
         try {
             const resource = await Resource.findById(req.params.id);
@@ -320,17 +404,20 @@ router.get('/my-uploaded', protect, async (req, res) => {
             });
         } catch (err) {
             console.error('Preview route error:', err.message);
-            if (!res.headersSent) {
-                res.status(500).json({ msg: 'Failed to generate preview. The file might be unavailable or of an unsupported type.' });
+            if (err.kind === 'ObjectId') {
+                return res.status(404).json({ msg: 'Resource not found' });
             }
+            res.status(500).json({ msg: 'Failed to generate preview. The file might be unavailable or of an unsupported type.' });
         }
     });
 
 
-    // === Private Routes ===
-    // These routes require an authentication token.
-    // The `protect` middleware ensures the user is logged in.
-    // backend/routes/resourceRoutes.js
+    // === Private Routes (require 'protect' middleware) ===
+
+    // Get resources saved by the current user to their library
+
+
+    // Upload a new resource
     router.post('/upload', protect, upload.single('file'), async (req, res) => {
         try {
             if (!req.file) {
@@ -375,7 +462,7 @@ router.get('/my-uploaded', protect, async (req, res) => {
                 cloudinaryUrl: result.secure_url,
                 cloudinaryPublicId: result.public_id,
                 fileType: req.file.mimetype.split('/')[0] === 'image' ? 'image' : (fileExtension.substring(1) || 'document'),
-                visibility: 'public' // Ensure visibility is set
+                visibility: 'public' 
             });
             const resource = await newResource.save();
 
@@ -404,56 +491,239 @@ router.get('/my-uploaded', protect, async (req, res) => {
         }
     });
 
-
-    router.post('/:id/rate', protect, async (req, res) => {
-        try {
-            const { rating } = req.body;
-            if (rating < 1 || rating > 5) {
-                return res.status(400).json({ msg: 'Rating must be between 1 and 5' });
-            }
-            const resource = await Resource.findById(req.params.id);
-            if (!resource) {
-                return res.status(404).json({ msg: 'Resource not found' });
-            }
-            const hasRated = resource.ratings.some(r => r.postedBy.toString() === req.user.id);
-            if (hasRated) {
-                return res.status(400).json({ msg: 'You have already rated this resource' });
-            }
-            resource.ratings.unshift({ postedBy: req.user.id, rating });
-            const totalRating = resource.ratings.reduce((acc, item) => item.rating + acc, 0);
-            resource.averageRating = totalRating / resource.ratings.length;
-            await resource.save();
-            res.json(resource);
-        } catch (err) {
-            console.error('Rate route error:', err.message);
-            res.status(500).json({ msg: 'Server error' });
+    // Get comments for a resource
+router.get('/:id/comments', async (req, res) => {
+    try {
+        const resource = await Resource.findById(req.params.id).populate('comments.postedBy', 'username');
+        if (!resource) {
+            return res.status(404).json({ msg: 'Resource not found' });
         }
-    });
+        res.json(resource.comments);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: 'Server error' });
+    }
+});
+// Get ratings for a resource
+router.get('/:id/ratings', async (req, res) => {
+  try {
+    const resourceId = req.params.id;
+    const userId = req.query.userId;
 
-    router.post('/:id/comment', protect, async (req, res) => {
-        try {
-            const { text } = req.body;
-            if (!text) {
-                return res.status(400).json({ msg: 'Comment text is required' });
-            }
-            const resource = await Resource.findById(req.params.id);
-            if (!resource) {
-                return res.status(404).json({ msg: 'Resource not found' });
-            }
-            const newComment = {
-                text,
-                postedBy: req.user.id,
-            };
-            resource.comments.unshift(newComment);
-            await resource.save();
-            await resource.populate('comments.user', 'username');
-            res.json(resource.comments);
-        } catch (err) {
-            console.error('Comment route error:', err.message);
-            res.status(500).json({ msg: 'Server error' });
+    const resource = await Resource.findById(resourceId)
+      .select('ratings averageRating')
+      .populate('ratings.postedBy', 'username');
+
+    if (!resource) {
+      return res.status(404).json({
+        success: false,
+        message: 'Resource not found'
+      });
+    }
+
+    // Calculate average rating
+    const totalRatings = resource.ratings.length;
+    const sumRatings = resource.ratings.reduce((sum, rating) => sum + rating.value, 0);
+    const averageRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
+
+    // Find user's rating if userId provided
+    let userRating = 0;
+    if (userId) {
+      const userRatingObj = resource.ratings.find(
+        r => r.postedBy._id.toString() === userId.toString()
+      );
+      userRating = userRatingObj ? userRatingObj.value : 0;
+    }
+
+    const response = {
+      success: true,
+      userRating,
+      overallRating: parseFloat(averageRating.toFixed(1)),
+      ratingsCount: totalRatings,
+      ratings: resource.ratings.map(r => ({
+        value: r.value,
+        postedBy: {
+          _id: r.postedBy._id,
+          username: r.postedBy.username
+        },
+        createdAt: r.createdAt
+      }))
+    };
+
+    res.status(200).json(response);
+
+  } catch (err) {
+    console.error('Error getting ratings:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: err.message
+    });
+  }
+});
+router.post('/:id/rate', protect, async (req, res) => {
+  try {
+    const resourceId = req.params.id;
+    const { value } = req.body;
+    const userId = req.user._id;
+
+    // Validation
+    if (!value || !Number.isInteger(value) || value < 1 || value > 5) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Rating must be an integer between 1 and 5'
+      });
+    }
+
+    // Find the resource
+    let resource = await Resource.findById(resourceId);
+    if (!resource) {
+      return res.status(404).json({
+        success: false,
+        message: 'Resource not found'
+      });
+    }
+
+    // Check for existing rating by this user
+    const existingRatingIndex = resource.ratings.findIndex(
+      r => r.postedBy.toString() === userId.toString()
+    );
+
+    // Update or add rating
+    if (existingRatingIndex !== -1) {
+      resource.ratings[existingRatingIndex].value = value;
+    } else {
+      resource.ratings.push({ 
+        postedBy: userId, 
+        value 
+      });
+    }
+
+    // Calculate new average rating
+    const totalRatings = resource.ratings.length;
+    const sumRatings = resource.ratings.reduce((sum, rating) => sum + rating.value, 0);
+    const averageRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
+
+    // Save the resource
+    await resource.save();
+
+    // Prepare response
+    const response = {
+      success: true,
+      message: 'Rating saved successfully',
+      userRating: value,
+      overallRating: parseFloat(averageRating.toFixed(1)),
+      ratingsCount: totalRatings,
+      resource: {
+        _id: resource._id,
+        title: resource.title,
+        averageRating: parseFloat(averageRating.toFixed(1)),
+        ratingsCount: totalRatings
+      }
+    };
+
+    res.status(200).json(response);
+
+  } catch (err) {
+    console.error('Error rating resource:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: err.message
+    });
+  }
+});
+
+router.post('/:id/comment', protect, async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text) {
+            return res.status(400).json({ msg: 'Comment text is required' });
         }
-    });
+        
+        let resource = await Resource.findById(req.params.id);
+        if (!resource) {
+            return res.status(404).json({ msg: 'Resource not found' });
+        }
+        
+        // ** FIX: Filter out any invalid rating objects before saving **
+        resource.ratings = resource.ratings.filter(rating => rating.value !== undefined && rating.value !== null);
 
+        const newComment = {
+            text,
+            postedBy: req.user.id,
+        };
+        
+        resource.comments.unshift(newComment);
+        await resource.save();
+        
+        // After saving, find the resource again and populate the comments
+        const updatedResource = await Resource.findById(req.params.id).populate({
+            path: 'comments.postedBy',
+            select: 'username',
+        });
+
+        const populatedComment = updatedResource.comments[0];
+
+        res.json(populatedComment); 
+    } catch (err) {
+        console.error('Comment route error:', err.message);
+        res.status(500).json({ msg: 'Server error' });
+    }
+});
+
+router.post('/:id/comments/:commentId/replies', protect, async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text) {
+            return res.status(400).json({ msg: 'Reply text is required' });
+        }
+
+        const resource = await Resource.findById(req.params.id);
+        if (!resource) {
+            return res.status(404).json({ msg: 'Resource not found' });
+        }
+
+        // Find the specific comment by its _id within the resource's comments array
+        const comment = resource.comments.id(req.params.commentId);
+        if (!comment) {
+            return res.status(404).json({ msg: 'Comment not found' });
+        }
+
+        const newReply = {
+            text,
+            postedBy: req.user.id, // User ID from the protect middleware
+            createdAt: new Date(),
+        };
+
+        // Add the new reply to the comment's replies array
+        // Ensure your commentSchema has a 'replies' array of objects with 'postedBy' and 'text'
+        comment.replies.push(newReply);
+
+        // Save the parent resource to persist the changes to the embedded comment and its replies
+        await resource.save();
+
+        // Fetch the user's username for the reply to send back in the response
+        const user = await User.findById(req.user.id).select('username -_id');
+        const populatedReply = {
+            ...newReply,
+            postedBy: {
+                _id: req.user.id,
+                username: user ? user.username : 'Anonymous' // Use fetched username
+            }
+        };
+
+        res.status(201).json(populatedReply);
+    } catch (err) {
+        console.error('Reply to comment route error:', err.message);
+        res.status(500).json({ msg: 'Server error when adding reply' });
+    }
+});
+
+
+
+
+    // Save a resource to user's library
     router.put('/:id/save', protect, async (req, res) => {
         try {
             const user = await User.findById(req.user.id);
@@ -473,6 +743,7 @@ router.get('/my-uploaded', protect, async (req, res) => {
         }
     });
 
+    // Unsave a resource from user's library
     router.put('/:id/unsave', protect, async (req, res) => {
         try {
             const user = await User.findById(req.user.id);
@@ -489,6 +760,7 @@ router.get('/my-uploaded', protect, async (req, res) => {
         }
     });
 
+    // Upvote a comment
     router.put('/:id/upvote', protect, async (req, res) => {
         try {
             const { commentId } = req.body;
@@ -509,13 +781,16 @@ router.get('/my-uploaded', protect, async (req, res) => {
                 comment.upvotes.unshift(req.user.id);
             }
             await resource.save();
-            res.json(resource.comments);
+            const updatedResource = await Resource.findById(req.params.id)
+                .populate('comments.postedBy', 'username');
+            res.json(updatedResource.comments);
         } catch (err) {
             console.error('Upvote route error:', err.message);
             res.status(500).json({ msg: 'Server error' });
         }
     });
 
+    // Flag a resource
     router.post('/:id/flag', protect, async (req, res) => {
         try {
             const { reason } = req.body;
@@ -538,6 +813,7 @@ router.get('/my-uploaded', protect, async (req, res) => {
         }
     });
 
+    // Increment download count
     router.put('/:id/increment-download', async (req, res) => {
         try {
             const resource = await Resource.findById(req.params.id);
@@ -556,15 +832,8 @@ router.get('/my-uploaded', protect, async (req, res) => {
         }
     });
 
-    // In resourceRoutes.js
-
-
     // === Admin-only Routes ===
-    // These routes require both a token and the user to have an 'admin' or 'superadmin' role.
-    // The `protect` middleware is used first to authenticate, and `authorize` is used second to check roles.
     router.put('/:id', protect, authorize('admin', 'superadmin'), async (req, res) => {
-        // This is the implementation of the update logic.
-        // It should be moved here from the controller.
         try {
             const { title, description, subject, course, year, tags, institution, visibility } = req.body;
             const resource = await Resource.findById(req.params.id);
@@ -587,7 +856,7 @@ router.get('/my-uploaded', protect, async (req, res) => {
             const updatedResource = await Resource.findByIdAndUpdate(
                 req.params.id,
                 { $set: updateFields },
-                { new: true, runValidators: true } // Return the updated document and run schema validators
+                { new: true, runValidators: true }
             );
 
             res.json({ msg: 'Resource updated successfully', resource: updatedResource });
@@ -596,19 +865,43 @@ router.get('/my-uploaded', protect, async (req, res) => {
             if (err.kind === 'ObjectId') {
                 return res.status(404).json({ msg: 'Resource not found' });
             }
-            res.status(500).json({ msg: 'Server error during resource update.' });
+            res.status(500).json({ msg: 'Server error during resource deletion.' });
         }
     });
 
-    router.delete('/:id', protect, authorize('admin', 'superadmin'), async (req, res) => {
+    router.delete('/:id/delete-my-resource', protect, async (req, res) => {
         try {
             const resource = await Resource.findById(req.params.id);
-
             if (!resource) {
                 return res.status(404).json({ msg: 'Resource not found' });
             }
 
-            await resource.remove();
+            if (resource.uploadedBy.toString() !== req.user.id) {
+                return res.status(403).json({ msg: 'Not authorized to delete this resource' });
+            }
+
+            console.log("Attempting to delete Cloudinary file:", {
+                publicId: resource.cloudinaryPublicId,
+                resourceType: getCloudinaryResourceType(resource.fileType)
+            });
+
+            try {
+                const cloudinaryResult = await cloudinary.uploader.destroy(resource.cloudinaryPublicId, {
+                    resource_type: getCloudinaryResourceType(resource.fileType)
+                });
+                if (!cloudinaryResult || cloudinaryResult.result !== 'ok') {
+                    throw new Error(`Cloudinary deletion failed: ${cloudinaryResult?.error?.message || 'Unknown error'}`);
+                }
+                console.log("Cloudinary deletion successful:", cloudinaryResult);
+            } catch (cloudinaryErr) {
+                console.error(`Failed to delete Cloudinary file for resource ${resource._id}:`, cloudinaryErr);
+                return res.status(500).json({
+                    msg: `Failed to delete file from Cloudinary: ${cloudinaryErr.message}`,
+                    details: cloudinaryErr
+                });
+            }
+
+            await resource.deleteOne();
             res.json({ msg: 'Resource deleted successfully' });
         } catch (err) {
             console.error('Delete resource route error:', err.message);
