@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { useModal } from "../../context/ModalContext/ModalContext";
+import { Link } from "react-router-dom";
 
 // Create a simple cache outside component to persist across re-renders
 const resourcesCache = new Map();
@@ -90,7 +91,8 @@ const ResourcesSection = ({
 
   // Load recent searches from localStorage on mount
   useEffect(() => {
-    const savedSearches = JSON.parse(localStorage.getItem('recentSearches')) || [];
+    const savedSearches =
+      JSON.parse(localStorage.getItem("recentSearches")) || [];
     setLocalRecentSearches(savedSearches);
   }, []);
 
@@ -165,15 +167,19 @@ const ResourcesSection = ({
         setIsLoadingSuggestions(true);
         try {
           // Use the real API endpoint for suggestions
-          const response = await fetch(`${API_URL}/resources/suggestions?search=${encodeURIComponent(localSearchQuery)}`);
-          
+          const response = await fetch(
+            `${API_URL}/resources/suggestions?search=${encodeURIComponent(
+              localSearchQuery
+            )}`
+          );
+
           if (!response.ok) {
-            throw new Error('Failed to fetch suggestions');
+            throw new Error("Failed to fetch suggestions");
           }
-          
+
           const data = await response.json();
           setSuggestions(data || []);
-          
+
           // Cache suggestions
           resourcesCache.set(suggestionsCacheKey, {
             data: data || [],
@@ -387,16 +393,18 @@ const ResourcesSection = ({
       // Add to recent searches
       const updatedSearches = [
         trimmedQuery,
-        ...localRecentSearches.filter((item) => item !== trimmedQuery).slice(0, 4),
+        ...localRecentSearches
+          .filter((item) => item !== trimmedQuery)
+          .slice(0, 4),
       ];
       setLocalRecentSearches(updatedSearches);
-      localStorage.setItem('recentSearches', JSON.stringify(updatedSearches));
-      
+      localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
+
       // Call addRecentSearch if provided
       if (addRecentSearch) {
         addRecentSearch(trimmedQuery);
       }
-      
+
       setShowSuggestions(false);
     }
   };
@@ -415,15 +423,15 @@ const ResourcesSection = ({
   const handleSuggestionClick = (suggestion) => {
     setLocalSearchQuery(suggestion);
     setShowSuggestions(false);
-    
+
     // Add to recent searches
     const updatedSearches = [
       suggestion,
       ...localRecentSearches.filter((item) => item !== suggestion).slice(0, 4),
     ];
     setLocalRecentSearches(updatedSearches);
-    localStorage.setItem('recentSearches', JSON.stringify(updatedSearches));
-    
+    localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
+
     if (addRecentSearch) {
       addRecentSearch(suggestion);
     }
@@ -536,96 +544,98 @@ const ResourcesSection = ({
 
               {/* FIXED: Suggestions dropdown with proper blur handling */}
               <AnimatePresence>
-                {showSuggestions && (suggestions.length > 0 || localRecentSearches.length > 0) && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 10 }}
-                    exit={{ opacity: 0, y: 5 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute z-50 mt-1 w-full bg-white dark:bg-onyx/95 rounded-lg shadow-xl border border-gray-200 dark:border-charcoal max-h-60 overflow-auto"
-                  >
-                    {isLoadingSuggestions ? (
-                      <div className="px-4 py-2 flex items-center justify-center gap-2">
-                        <FontAwesomeIcon
-                          icon={faSpinner}
-                          spin
-                          className="text-amber-600 dark:text-amber-200"
-                        />
-                        <span className="text-sm dark:text-gray-200">
-                          Loading suggestions...
-                        </span>
-                      </div>
-                    ) : (
-                      <>
-                        {suggestions.length > 0 && (
-                          <>
-                            <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-charcoal">
-                              Suggestions
-                            </div>
-                            {suggestions.map((item) => (
-                              <motion.div
-                                key={item._id}
-                                whileHover={{
-                                  backgroundColor: "rgba(245, 158, 11, 0.1)",
-                                }}
-                                className="px-4 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
-                                onMouseDown={() =>
-                                  handleSuggestionClick(item.title)
-                                }
-                              >
-                                <Search
-                                  size={16}
-                                  className="text-amber-600 dark:text-amber-200"
-                                />
-                                <span className="dark:text-gray-200">
-                                  {item.title}
-                                </span>
-                              </motion.div>
-                            ))}
-                          </>
-                        )}
-
-                        {localRecentSearches.length > 0 && (
-                          <>
-                            <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-charcoal">
-                              Recent Searches
-                            </div>
-                            {localRecentSearches.map((search, index) => (
-                              <motion.div
-                                key={index}
-                                whileHover={{
-                                  backgroundColor: "rgba(245, 158, 11, 0.1)",
-                                }}
-                                className="px-4 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
-                                onMouseDown={() =>
-                                  handleSuggestionClick(search)
-                                }
-                              >
-                                <Clock
-                                  size={16}
-                                  className="text-amber-600 dark:text-amber-200"
-                                />
-                                <span className="dark:text-gray-200">
-                                  {search}
-                                </span>
-                              </motion.div>
-                            ))}
-                          </>
-                        )}
-
-                        {!isLoadingSuggestions &&
-                          suggestions.length === 0 &&
-                          localRecentSearches.length === 0 && (
-                            <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                              {localSearchQuery.trim().length > 0
-                                ? "No suggestions found"
-                                : "Type to search for resources"}
-                            </div>
+                {showSuggestions &&
+                  (suggestions.length > 0 ||
+                    localRecentSearches.length > 0) && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 10 }}
+                      exit={{ opacity: 0, y: 5 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute z-50 mt-1 w-full bg-white dark:bg-onyx/95 rounded-lg shadow-xl border border-gray-200 dark:border-charcoal max-h-60 overflow-auto"
+                    >
+                      {isLoadingSuggestions ? (
+                        <div className="px-4 py-2 flex items-center justify-center gap-2">
+                          <FontAwesomeIcon
+                            icon={faSpinner}
+                            spin
+                            className="text-amber-600 dark:text-amber-200"
+                          />
+                          <span className="text-sm dark:text-gray-200">
+                            Loading suggestions...
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          {suggestions.length > 0 && (
+                            <>
+                              <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-charcoal">
+                                Suggestions
+                              </div>
+                              {suggestions.map((item) => (
+                                <motion.div
+                                  key={item._id}
+                                  whileHover={{
+                                    backgroundColor: "rgba(245, 158, 11, 0.1)",
+                                  }}
+                                  className="px-4 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
+                                  onMouseDown={() =>
+                                    handleSuggestionClick(item.title)
+                                  }
+                                >
+                                  <Search
+                                    size={16}
+                                    className="text-amber-600 dark:text-amber-200"
+                                  />
+                                  <span className="dark:text-gray-200">
+                                    {item.title}
+                                  </span>
+                                </motion.div>
+                              ))}
+                            </>
                           )}
-                      </>
-                    )}
-                  </motion.div>
-                )}
+
+                          {localRecentSearches.length > 0 && (
+                            <>
+                              <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-charcoal">
+                                Recent Searches
+                              </div>
+                              {localRecentSearches.map((search, index) => (
+                                <motion.div
+                                  key={index}
+                                  whileHover={{
+                                    backgroundColor: "rgba(245, 158, 11, 0.1)",
+                                  }}
+                                  className="px-4 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
+                                  onMouseDown={() =>
+                                    handleSuggestionClick(search)
+                                  }
+                                >
+                                  <Clock
+                                    size={16}
+                                    className="text-amber-600 dark:text-amber-200"
+                                  />
+                                  <span className="dark:text-gray-200">
+                                    {search}
+                                  </span>
+                                </motion.div>
+                              ))}
+                            </>
+                          )}
+
+                          {!isLoadingSuggestions &&
+                            suggestions.length === 0 &&
+                            localRecentSearches.length === 0 && (
+                              <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                                {localSearchQuery.trim().length > 0
+                                  ? "No suggestions found"
+                                  : "Type to search for resources"}
+                              </div>
+                            )}
+                        </>
+                      )}
+                    </motion.div>
+                  )}
               </AnimatePresence>
             </div>
 
@@ -857,7 +867,12 @@ const ResourcesSection = ({
               },
             }}
           >
-            <ResourceCard resource={resource} />
+            <Link
+              to={`/resources/${resource._id}`}
+              state={{ resource: resource }}
+            >
+              <ResourceCard resource={resource} />
+            </Link>
           </motion.div>
         ))}
       </motion.div>
@@ -911,7 +926,7 @@ const Dropdown = ({
               : "cursor-pointer hover:border-amber-400 dark:hover:border-amber-200"
           }
           border-gray-300 dark:border-onyx bg-white hover:bg-gray-50 dark:bg-onyx/90 text-gray-700 dark:text-gray-200
-          focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-200`}
+          focus:outline-none focus:ring-2 custom-scrollbar focus:ring-amber-500 dark:focus:ring-amber-200`}
         onClick={toggleDropdown}
         disabled={loading}
       >
