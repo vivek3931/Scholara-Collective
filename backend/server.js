@@ -1,41 +1,33 @@
 // server.js
-require('dotenv').config(); // Load environment variables from .env file
+require('dotenv').config();
 
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); // Import CORS
-const http = require('http'); // For WebSocket setup
-const { Server } = require('socket.io'); // For WebSocket setup
+const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 const path = require('path');
 
-const authRoutes = require('./routes/authRoutes'); // Your auth routes
-const resourceRoutes = require('./routes/resourceRoutes'); // Example: Your resource routes
-const analyticsRoutes = require('./routes/analyticsRoutes'); // Example: Your analytics routes
-const adminRoutes = require('./routes/adminRoutes'); // Example: Your admin routes
+const authRoutes = require('./routes/authRoutes');
+const resourceRoutes = require('./routes/resourceRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
-const { errorHandler } = require('./middleware/errorMiddleware'); // Custom error handler
+const { errorHandler } = require('./middleware/errorMiddleware');
 
 const app = express();
 
 // --- CORS Configuration ---
 app.use(cors({
     origin: [
-        process.env.FRONTEND_URL || 'http://localhost:3000', // Primary frontend URL
-        'http://localhost:5173', // Your Vite dev server
-        'https://scholara-collective.onrender.com' // Production URL
+        process.env.FRONTEND_URL || 'http://localhost:3000',
+        'http://localhost:5173',
+        'https://scholara-collective.onrender.com'
     ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], // Added PATCH for consistency
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
-
-if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, 'client', 'build')));
-
-    app.get('*', (req, res) => {
-        res.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'));
-    });
-}
 
 // --- Security Headers ---
 app.use((req, res, next) => {
@@ -45,7 +37,7 @@ app.use((req, res, next) => {
 });
 
 // --- Middleware ---
-app.use(express.json()); // Body parser for JSON
+app.use(express.json());
 
 // --- Connect to MongoDB ---
 const connectDB = async () => {
@@ -57,12 +49,12 @@ const connectDB = async () => {
         console.log('MongoDB Connected...');
     } catch (err) {
         console.error('MongoDB Connection Error:', err.message);
-        process.exit(1); // Exit process with failure
+        process.exit(1);
     }
 };
 connectDB();
 
-// --- Define Routes ---
+// --- Define API Routes ---
 app.use('/api/auth', authRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/analytics', analyticsRoutes);
@@ -93,8 +85,17 @@ app.use((req, res, next) => {
     next();
 });
 
+// --- Serve Static React Files in Production (after all API routes) ---
+// This is the correct placement to avoid routing conflicts.
+if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, 'client', 'build')));
+    app.get('*', (req, res) => {
+        res.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'));
+    });
+}
+
+
 // --- Error Handling Middleware ---
-// This should be the last middleware added, after all routes
 app.use(errorHandler);
 
 // --- Start Server ---
