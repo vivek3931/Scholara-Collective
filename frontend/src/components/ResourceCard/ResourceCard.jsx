@@ -260,35 +260,35 @@ const ResourceCard = React.memo(
     const genericBgColor = "#F59E0B";
 
     const renderStars = (rating) => {
-  const fullStars = Math.floor(rating);
-  const hasHalfStar = rating % 1 >= 0.5;
-  const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+      const fullStars = Math.floor(rating);
+      const hasHalfStar = rating % 1 >= 0.5;
+      const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
 
-  return (
-    <div className="flex items-center gap-1">
-      {[...Array(fullStars)].map((_, i) => (
-        <FontAwesomeIcon
-          key={`full-${i}`}
-          icon={faStar}
-          className="text-yellow-500 dark:text-amber-400"
-        />
-      ))}
-      {hasHalfStar && (
-        <FontAwesomeIcon
-          icon={faStar}
-          className="text-yellow-500 dark:text-amber-400 opacity-50"
-        />
-      )}
-      {[...Array(emptyStars)].map((_, i) => (
-        <FontAwesomeIcon
-          key={`empty-${i}`}
-          icon={faStar}
-          className="text-gray-300 dark:text-gray-600"
-        />
-      ))}
-    </div>
-  );
-};
+      return (
+        <div className="flex items-center gap-1">
+          {[...Array(fullStars)].map((_, i) => (
+            <FontAwesomeIcon
+              key={`full-${i}`}
+              icon={faStar}
+              className="text-yellow-500 dark:text-amber-400"
+            />
+          ))}
+          {hasHalfStar && (
+            <FontAwesomeIcon
+              icon={faStar}
+              className="text-yellow-500 dark:text-amber-400 opacity-50"
+            />
+          )}
+          {[...Array(emptyStars)].map((_, i) => (
+            <FontAwesomeIcon
+              key={`empty-${i}`}
+              icon={faStar}
+              className="text-gray-300 dark:text-gray-600"
+            />
+          ))}
+        </div>
+      );
+    };
     const getFileExtension = (url) => {
       if (!url) return "";
       try {
@@ -826,7 +826,7 @@ const ResourceCard = React.memo(
     // Create the modal component
     const modalContent = showPreviewModal && (
       <div
-        className="modal-backdrop fixed inset-0 flex items-center pt-20 scroll-container justify-center bg-black bg-opacity-75 p-4 overflow-hidden"
+        className="modal-backdrop backdrop-blur-sm fixed inset-0 flex items-center pt-20  justify-center bg-black bg-opacity-75 p-4 overflow-hidden"
         style={{
           cursor: "default",
           userSelect: "none",
@@ -843,7 +843,7 @@ const ResourceCard = React.memo(
         onClick={handleModalBackgroundClick}
       >
         <div
-          className="modal-content relative bg-white dark:bg-onyx/90 rounded-lg shadow-xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col font-poppins pointer-events-auto"
+          className="modal-content relative scroll-container bg-white dark:bg-onyx/90 rounded-lg shadow-xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col font-poppins pointer-events-auto"
           style={{
             cursor: "default",
             userSelect: "none",
@@ -855,7 +855,7 @@ const ResourceCard = React.memo(
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-onyx flex-shrink-0">
+          <div className="flex justify-between scroll-container items-center p-4 border-b border-gray-200 dark:border-onyx flex-shrink-0">
             <h2 className="text-xl font-semibold text-gray-900 dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:bg-clip-text dark:text-transparent font-poppins">
               Preview: {resource.title}
             </h2>
@@ -1115,16 +1115,20 @@ const ResourceCard = React.memo(
             {resource.description || "No description available"}
           </p>
           <div className="flex items-center justify-between mb-4">
-  <div className="flex items-center gap-1">
-    {renderStars(resource.averageRating || 0)}
-    <span className="text-xs text-gray-600 dark:text-platinum ml-1">
-      ({resource.averageRating ? resource.averageRating.toFixed(1) : "0.0"})
-    </span>
-  </div>
-  <div className="text-xs text-gray-600 dark:text-platinum">
-    {resource.downloads || 0} downloads
-  </div>
-</div>
+            <div className="flex items-center gap-1">
+              {renderStars(resource.averageRating || 0)}
+              <span className="text-xs text-gray-600 dark:text-platinum ml-1">
+                (
+                {resource.averageRating
+                  ? resource.averageRating.toFixed(1)
+                  : "0.0"}
+                )
+              </span>
+            </div>
+            <div className="text-xs text-gray-600 dark:text-platinum">
+              {resource.downloads || 0} downloads
+            </div>
+          </div>
           {resource.tags?.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-4">
               {resource.tags.map((tag, index) => (

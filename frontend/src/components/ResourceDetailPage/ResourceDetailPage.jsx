@@ -4,13 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen, FileText, FileQuestion, FileCheck2, GraduationCap,
   Calculator, Atom, Bookmark, FlaskConical, Download, Star, ExternalLink, ArrowLeft,
-  Search, Send
+  Search, Send , Eye , X , ZoomOut , ZoomIn
 } from 'lucide-react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner, faStar as faSolidStar } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faRegularStar } from "@fortawesome/free-regular-svg-icons";
 import { useAuth } from '../../context/AuthContext/AuthContext';
 import { debounce } from 'lodash';
+import { Document, Page } from 'react-pdf';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -453,6 +454,17 @@ const ResourceDetailPage = () => {
   const [isRatingLoading, setIsRatingLoading] = useState(false);
   const pollIntervalRef = useRef(null);
 
+   // PDF Preview states
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [numPages, setNumPages] = useState(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [zoom, setZoom] = useState(1);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showModal , setSetModal] = useState(false);
+  const [previewError, setPreviewError] = useState(null);
+  const [previewDataUrl, setPreviewDataUrl] = useState(null);
+  const previewContainerRef = useRef(null);
+
   const userId = user?._id;
   const userName = user?.username || 'Anonymous User';
 
@@ -488,7 +500,7 @@ const ResourceDetailPage = () => {
     loadResource();
   }, [resourceId, initialResourceFromState]);
 
-  // Fetch and poll ratings with proper synchronization
+  // Fetch and poll ratings
   const refreshRatings = useCallback(async () => {
     if (!resourceId) return;
     
@@ -519,14 +531,13 @@ const ResourceDetailPage = () => {
     }
   }, [resourceId, refreshRatings]);
 
-  // Handle rating submission with optimistic updates
+  // Handle rating submission
   const handleRate = async (value) => {
     if (!isAuthenticated || !resourceId) {
       setError("Please login to rate");
       return;
     }
 
-    // Optimistic update
     const previousRating = userRating;
     setUserRating(value);
     
@@ -546,105 +557,242 @@ const ResourceDetailPage = () => {
       }
 
       const data = await response.json();
-      // Update with server response
       setUserRating(data.userRating);
       setOverallRating(data.overallRating);
     } catch (e) {
       console.error("Rating error:", e);
       setError(e.message);
-      // Revert on error
       setUserRating(previousRating);
+    }
+  };
+
+  // PDF Preview functions
+  const onDocumentLoadSuccess = useCallback(({ numPages }) => {
+    setNumPages(numPages);
+    setPreviewLoading(false);
+  }, []);
+
+  const onDocumentLoadError = useCallback((error) => {
+    console.error("Error loading PDF document:", error);
+    setPreviewError("Failed to load PDF preview. Please try downloading the file.");
+    setPreviewLoading(false);
+  }, []);
+
+  const handlePreview = async () => {
+    if (!isAuthenticated) {
+      showModal({
+        type: "warning",
+        title: "Authentication Required",
+        message: "You need to be logged in to preview resources.",
+        confirmText: "Go to Login",
+        onConfirm: () => navigate('/login'),
+        cancelText: "Cancel"
+      });
+      return;
+    }
+
+    setShowPreviewModal(true);
+    setPreviewLoading(true);
+    setPreviewError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/preview`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch preview');
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setPreviewDataUrl(url);
+    } catch (err) {
+      console.error("Preview failed:", err);
+      setPreviewError(err.message);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleClosePreviewModal = useCallback(() => {
+    setShowPreviewModal(false);
+    if (previewDataUrl) {
+      URL.revokeObjectURL(previewDataUrl);
+      setPreviewDataUrl(null);
+    }
+  }, [previewDataUrl]);
+
+  const changePage = useCallback((offset) => {
+    setPageNumber(prev => Math.max(1, Math.min(prev + offset, numPages)));
+  }, [numPages]);
+
+  const handleZoomIn = useCallback(() => setZoom(prev => Math.min(prev + 0.1, 3)), []);
+  const handleZoomOut = useCallback(() => setZoom(prev => Math.max(prev - 0.1, 0.5)), []);
+
+  const handleDownload = async () => {
+    if (!isAuthenticated) {
+      showModal({
+        type: "warning",
+        title: "Authentication Required",
+        message: "You need to be logged in to download resources.",
+        confirmText: "Go to Login",
+        onConfirm: () => navigate('/login'),
+        cancelText: "Cancel"
+      });
+      return;
+    }
+
+    try {
+      // Track download
+      await fetch(`${API_BASE_URL}/resources/${resourceId}/increment-download`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      // Initiate download
+      const link = document.createElement('a');
+      link.href = resource.fileUrl;
+      link.download = resource.title.replace(/[^a-z0-9]/gi, '_') + '.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Download failed:", err);
+      setError("Failed to initiate download. Please try again.");
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx">
-        <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-amber-600 dark:text-amber-200" />
+      <div className="flex items-center justify-center min-h-screen">
+        <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-amber-600" />
       </div>
     );
   }
 
   if (error || !resource) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx p-4 text-center">
-        <h2 className="text-3xl font-bold mb-4 text-red-600 dark:text-amber-300">Error</h2>
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+        <h2 className="text-3xl font-bold mb-4">Error</h2>
         <p className="text-lg mb-6">{error || "Resource not found"}</p>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <button 
           onClick={() => navigate('/')}
           className="px-6 py-3 bg-amber-600 text-white rounded-lg shadow-md hover:bg-amber-700"
         >
           Go to Home
-        </motion.button>
+        </button>
       </div>
     );
   }
 
   const { title, description, type, course, subject, fileUrl, previewUrl, downloads = 0 } = resource;
+  const isPDF = previewUrl && previewUrl.toLowerCase().endsWith('.pdf');
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx py-16 px-4 sm:px-6 lg:px-8"
+      className="min-h-screen bg-gray-100 dark:bg-gray-900 py-16 px-4 sm:px-6 lg:px-8"
     >
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+      <button 
         onClick={() => navigate(-1)}
-        className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal"
+        className="fixed top-4 left-4 z-50 flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 shadow-md rounded-md"
       >
-        <ArrowLeft className="text-sm" />
+        <ArrowLeft size={16} />
         <span>Back</span>
-      </motion.button>
+      </button>
 
-      <div className="max-w-4xl mx-auto bg-white dark:bg-charcoal/95 rounded-2xl shadow-xl overflow-hidden md:flex">
-        {/* Left Section */}
-        <div className="md:w-1/3 p-6 flex flex-col items-center justify-center bg-gray-50 dark:bg-onyx/70">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 10, delay: 0.2 }}
-            className="w-32 h-32 md:w-48 md:h-48 rounded-lg flex items-center justify-center border-4 border-amber-400 dark:border-amber-600 text-amber-600 dark:text-amber-200 text-6xl shadow-inner-glow"
-          >
-            {getIconForType(type)}
-          </motion.div>
-          <p className="mt-4 text-center text-lg font-semibold text-gray-700 dark:text-gray-200">{type}</p>
+      <div className="max-w-6xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden md:flex">
+        {/* Left Section - PDF Preview */}
+        <div className="md:w-1/2 p-6 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-700 min-h-[500px]">
+          {isPDF ? (
+            <div className="w-full h-full flex flex-col items-center">
+              <Document
+                file={previewUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
+                loading={
+                  <div className="flex items-center justify-center h-full">
+                    <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-amber-600" />
+                  </div>
+                }
+                className="w-full h-full border border-gray-200 dark:border-gray-600 rounded-lg"
+              >
+                <Page 
+                  pageNumber={pageNumber} 
+                  width={500} 
+                  className="shadow-lg"
+                />
+              </Document>
+              {numPages > 1 && (
+                <div className="flex items-center gap-4 mt-4">
+                  <button
+                    onClick={() => changePage(-1)}
+                    disabled={pageNumber <= 1}
+                    className="p-2 rounded-full bg-gray-200 dark:bg-gray-600 disabled:opacity-50"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <span className="text-gray-700 dark:text-gray-300">
+                    Page {pageNumber} of {numPages}
+                  </span>
+                  <button
+                    onClick={() => changePage(1)}
+                    disabled={pageNumber >= numPages}
+                    className="p-2 rounded-full bg-gray-200 dark:bg-gray-600 disabled:opacity-50"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="w-32 h-32 flex items-center justify-center text-amber-600 dark:text-amber-400 mb-4">
+                {getIconForType(type, 64)}
+              </div>
+              <p className="text-gray-600 dark:text-gray-400">Preview not available for this file type</p>
+              <button
+                onClick={handlePreview}
+                className="mt-4 px-4 py-2 bg-amber-600 text-white rounded-md flex items-center gap-2 hover:bg-amber-700"
+              >
+                <Eye size={16} />
+                Try Preview
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Right Section */}
-        <div className="md:w-2/3 p-6 md:p-10">
+        {/* Right Section - Details */}
+        <div className="md:w-1/2 p-6 md:p-8">
           <motion.h1
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white mb-4 leading-tight"
+            className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white mb-4"
           >
             {title}
           </motion.h1>
 
-          <motion.div
-            initial={{ y: -10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-6 flex-wrap"
-          >
-            <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-200 px-3 py-1 rounded-full">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 px-3 py-1 rounded-full">
               <GraduationCap size={16} />
               <span>{course}</span>
             </div>
-            <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full">
-              {getIconForSubject(subject)}
+            <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full">
+              {getIconForSubject(subject, 16)}
               <span>{subject}</span>
             </div>
-          </motion.div>
+            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full">
+              <span>{type}</span>
+            </div>
+          </div>
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
             className="text-gray-700 dark:text-gray-300 mb-6 leading-relaxed"
           >
             {description || "No description provided for this resource."}
@@ -654,10 +802,9 @@ const ResourceDetailPage = () => {
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="flex items-center gap-3 bg-white dark:bg-onyx/80 p-4 rounded-xl shadow-inner border border-gray-200 dark:border-charcoal"
+              className="flex items-center gap-3 bg-white dark:bg-gray-700 p-4 rounded-xl shadow-inner"
             >
-              <Star size={24} className="text-yellow-500 dark:text-yellow-300" />
+              <Star size={24} className="text-yellow-500" />
               <div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">Overall Rating</p>
                 <div className="flex items-center gap-2">
@@ -673,42 +820,40 @@ const ResourceDetailPage = () => {
             <motion.div
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="flex items-center gap-3 bg-white dark:bg-onyx/80 p-4 rounded-xl shadow-inner border border-gray-200 dark:border-charcoal"
+              className="flex items-center gap-3 bg-white dark:bg-gray-700 p-4 rounded-xl shadow-inner"
             >
-              <Download size={24} className="text-teal-500 dark:text-teal-300" />
+              <Download size={24} className="text-teal-500" />
               <div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">Downloads</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-white">{downloads.toLocaleString()}</p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  {downloads.toLocaleString()}
+                </p>
               </div>
             </motion.div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 mb-8">
             {previewUrl && (
-              <motion.a
-                href={previewUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                whileHover={{ scale: 1.03, boxShadow: "0 8px 15px rgba(245, 158, 11, 0.3)" }}
+              <motion.button
+                onClick={handlePreview}
+                whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
-                className="flex-1 bg-amber-600 text-white py-3 px-6 rounded-xl shadow-lg hover:bg-amber-700 transition-all duration-300 flex items-center justify-center gap-2 font-semibold text-lg"
+                className="flex-1 bg-amber-600 text-white py-3 px-6 rounded-xl shadow-lg hover:bg-amber-700 flex items-center justify-center gap-2"
               >
-                <ExternalLink size={20} />
-                View Resource
-              </motion.a>
+                <Eye size={20} />
+                Preview Resource
+              </motion.button>
             )}
             {fileUrl && (
-              <motion.a
-                href={fileUrl}
-                download
-                whileHover={{ scale: 1.03, boxShadow: "0 8px 15px rgba(59, 130, 246, 0.3)" }}
+              <motion.button
+                onClick={handleDownload}
+                whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
-                className={`flex-1 ${previewUrl ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-600 hover:bg-amber-700'} text-white py-3 px-6 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold text-lg`}
+                className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-xl shadow-lg hover:bg-blue-700 flex items-center justify-center gap-2"
               >
                 <Download size={20} />
                 Download
-              </motion.a>
+              </motion.button>
             )}
           </div>
 
@@ -716,13 +861,12 @@ const ResourceDetailPage = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="mt-8 pt-6 border-t border-gray-200 dark:border-charcoal"
+            className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700"
           >
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Rate This Resource</h2>
             {isAuthenticated ? (
               <div className="space-y-4">
-                <div className="p-4 bg-gray-50 dark:bg-onyx/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <p className="text-gray-700 dark:text-gray-300 mb-2">
                     Logged in as: <span className="font-semibold text-amber-600 dark:text-amber-400">{userName}</span>
                   </p>
@@ -742,7 +886,7 @@ const ResourceDetailPage = () => {
                 </div>
               </div>
             ) : (
-              <div className="p-4 bg-gray-50 dark:bg-onyx/50 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <p className="text-gray-600 dark:text-gray-400 text-center">
                   Please log in to rate this resource and share your feedback.
                 </p>
@@ -752,8 +896,93 @@ const ResourceDetailPage = () => {
         </div>
       </div>
 
+      {/* Fullscreen PDF Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold">PDF Preview</h3>
+              <button onClick={handleClosePreviewModal} className="p-2">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto scroll-container backdrop-blur-sm p-4">
+              {previewLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-amber-600" />
+                </div>
+              ) : previewError ? (
+                <div className="text-center text-red-600 dark:text-red-400 p-4">
+                  {previewError}
+                </div>
+              ) : (
+                <Document
+                  file={previewDataUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={onDocumentLoadError}
+                  className="w-full"
+                >
+                  <Page 
+                    pageNumber={pageNumber} 
+                    scale={zoom}
+                    className="shadow-lg mx-auto"
+                  />
+                </Document>
+              )}
+            </div>
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleZoomOut}
+                  disabled={zoom <= 0.5}
+                  className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50"
+                >
+                  <ZoomOut size={20} />
+                </button>
+                <span className="mx-2">{Math.round(zoom * 100)}%</span>
+                <button
+                  onClick={handleZoomIn}
+                  disabled={zoom >= 3}
+                  className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50"
+                >
+                  <ZoomIn size={20} />
+                </button>
+              </div>
+              {numPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => changePage(-1)}
+                    disabled={pageNumber <= 1}
+                    className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <span>
+                    Page {pageNumber} of {numPages}
+                  </span>
+                  <button
+                    onClick={() => changePage(1)}
+                    disabled={pageNumber >= numPages}
+                    className="p-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={handleDownload}
+                className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 flex items-center gap-2"
+              >
+                <Download size={16} />
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Resource Comments Section */}
-      <div className="max-w-4xl mx-auto bg-white dark:bg-charcoal/95 rounded-2xl shadow-xl overflow-hidden mt-8 p-6 md:p-10">
+      <div className="max-w-6xl p-4 lg:p-12 mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden mt-8">
         <ResourceCommentsSection
           resourceId={resourceId}
           currentUserId={userId}
