@@ -32,6 +32,7 @@ import CustomWarningModal from './components/CustomWarningModal/CustomWarningMod
 import ChatbotToggle from './components/ChatbotToggle/ChatbotToggle.jsx';
 import ContributorsPage from './components/ContributorsPage/ContributorsPage.jsx';
 // import CommunityHubPage from './components/Community/Community.jsx';
+import ResourceDetailPage from './components/ResourceDetailPage/ResourceDetailPage.jsx';
 
 // Animation variants for route transitions
 const routeVariants = {
@@ -122,6 +123,13 @@ const router = createBrowserRouter(
           <CommunityHubPage/>
         </AnimatedRoute>
       }/> */}
+      <Route 
+      path='/resources/:resourceId'
+      element={
+        <AnimatePresence>
+          <ResourceDetailPage/>
+        </AnimatePresence>
+      }/>
       <Route 
         path="/setup/admin" 
         element={

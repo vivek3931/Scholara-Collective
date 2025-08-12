@@ -20,12 +20,11 @@
   --color-amber-500: 217 119 6; /* amber-500 */
   --color-amber-600: 180 83 9; /* amber-600 */
   --color-amber-950: 69 26 3; /* amber-950 */
-  --color-yellow-500: 234 179 8; 
+  --color-yellow-500: 234 179 8;
   scroll-behavior: smooth;
+  /* Set a default scrollbar color for light mode */
   scrollbar-color: rgb(var(--color-amber-400)) transparent;
   scrollbar-width: thin;
-  
-
 }
 
 .dark {
@@ -43,6 +42,9 @@
   --color-amber-600: 180 83 9; /* amber-600 */
   --color-amber-950: 69 26 3; /* amber-950 */
   --color-yellow-500: 234 179 8; /* yellow-500 */
+  
+  /* Overwrite the scrollbar track color for dark mode */
+  scrollbar-color: rgb(var(--color-amber-400)) rgb(var(--color-bg-primary));
 }
 
 /* Base styles */
@@ -50,27 +52,38 @@ body {
   font-family: 'Poppins', sans-serif;
   min-height: 100vh;
   scroll-behavior: smooth;
- 
+  /* Removed duplicate scrollbar-color here */
 }
 
-
+/* Scrollbar styles for WebKit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
 .scroll-container {
-  
   scrollbar-color: rgb(var(--color-amber-400)) transparent;
   scrollbar-width: thin;
   scroll-behavior: smooth;
 }
-.scroll-container-none{
+
+
+.scroll-container-none {
   scrollbar-width: none;
 }
+
 ::-webkit-scrollbar {
-  width: 8px; /* Thin scrollbar width */
-  height: 8px; /* For horizontal scrollbars */
+  width: 4px; /* Thin scrollbar width */
+  height: 5px; /* For horizontal scrollbars */
 }
 
+/* This is the key fix. We set the track to be transparent by default, but it will be overridden by the dark mode rule below. */
 ::-webkit-scrollbar-track {
-  background: transparent; /* Transparent track */
+  background: transparent;
+}
+
+/* This rule will make the track dark when the dark class is active */
+body.dark ::-webkit-scrollbar-track {
+  background-color: rgb(var(--color-bg-primary));
 }
 
 ::-webkit-scrollbar-thumb {
@@ -89,7 +102,7 @@ body {
 /* Animation utilities */
 @layer utilities {
   .shadow-glow-sm {
-    box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.1), 
+    box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.1),
                 0 2px 4px -1px rgba(245, 158, 11, 0.06);
   }
 
@@ -127,8 +140,6 @@ body {
   }
 }
 
-
-
 /* Font faces */
 @font-face {
   font-family: 'Playfair Display';
@@ -152,6 +163,7 @@ body {
     font-size: 16px; /* Prevent iOS zoom */
   }
 }
+
 .modal-backdrop {
   z-index: 9999 !important;
 }
@@ -159,7 +171,6 @@ body {
 .modal-content {
   z-index: 10000 !important;
 }
-
 
 /* Add this to your existing index.css file to prevent white flash */
 
@@ -172,12 +183,13 @@ html, body, #root {
 
 /* Ensure the dark class is applied immediately */
 html.dark, body.dark, #root.dark {
- background: linear-gradient(
+  background: linear-gradient(
     to bottom right,
     #1a1a1d, /* onyx */
     #333333, /* charcoal */
     #1a1a1d  /* onyx */
-  );   color: rgb(var(--color-text-primary));
+  );
+  color: rgb(var(--color-text-primary));
 }
 
 /* Prevent any transition delays on background colors during route changes */
@@ -193,7 +205,6 @@ html.loaded, body.loaded, #root.loaded {
 /* Your existing scroll styles with theme integration */
 .scroll-container::-webkit-scrollbar-thumb {
   background-color: rgb(var(--color-amber-400));
-
 }
 
 /* Dark scrollbar for route transition containers */
@@ -211,8 +222,6 @@ html.loaded, body.loaded, #root.loaded {
 * {
   box-sizing: border-box;
 }
-
-
 
 /* Animation performance optimizations */
 .route-animation {
