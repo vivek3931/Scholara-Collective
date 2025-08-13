@@ -73,7 +73,7 @@ const TypingIndicator = memo(() => (
       <div
         key={i}
         className="w-2 h-2 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full animate-bounce"
-        style={{ 
+        style={{
           animationDelay: `${i * 0.2}s`,
           animationDuration: "1s",
           transformOrigin: "bottom"
@@ -90,7 +90,7 @@ const handleEscKey = (event, setIsOpen) => {
 };
 
 // Enhanced ResourceCard with better styling, hover effects, and a clickable link
-const ResourceCard = ({ resource }) => {
+const ResourceCard = ({ resource, isExternal = false }) => {
   const getSubjectColor = (subject) => {
     const colors = {
       Physics: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-100 dark:border-blue-800/30",
@@ -112,58 +112,53 @@ const ResourceCard = ({ resource }) => {
     );
   }
 
-  // Determine the URL for the resource. Assuming 'downloadUrl' or '_id' for dynamic routing.
-  const resourceLink = resource.downloadUrl || `/resources/${resource._id}`; 
+  const resourceLink = isExternal ? resource.url : (resource.downloadUrl || `/resources/${resource._id}`);
+  const title = resource.title || resource.name || resource.source_title || "Untitled Resource";
+  const snippet = resource.snippet || (resource.course ? `Course: ${resource.course}` : "Click to view more details.");
 
   return (
-    <a 
-      href={resourceLink} 
-      target="_blank" 
-      rel="noopener noreferrer" 
+    <a
+      href={resourceLink}
+      target="_blank"
+      rel="noopener noreferrer"
       className={`${colors.card.light} dark:${colors.card.dark} rounded-xl border ${colors.border.light} dark:${colors.border.dark} p-4 my-3 hover:shadow-md transition-all duration-300 font-poppins animate-fade-in group hover:scale-[1.01] hover:border-amber-400/30 dark:hover:border-amber-500/30 block cursor-pointer`}
-      title={`Click to view/download: ${resource.title || resource.name || "Untitled Resource"}`}
+      title={`Click to view/download: ${title}`}
     >
       <div className="flex items-start justify-between mb-2">
         <h4 className={`font-semibold ${colors.text.primary.light} dark:${colors.text.primary.dark} flex items-center gap-2`}>
           <FileText className="w-4 h-4 text-amber-500 group-hover:text-amber-600 dark:text-amber-400 dark:group-hover:text-amber-300 transition-colors" />
-          {resource.title || resource.name || "Untitled Resource"}
+          {title}
         </h4>
-        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getSubjectColor(resource.subject)} transition-colors`}>
-          {resource.subject || "General"}
-        </span>
+        {resource.subject && (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getSubjectColor(resource.subject)} transition-colors`}>
+                {resource.subject}
+            </span>
+        )}
       </div>
       <div className={`space-y-2 text-sm ${colors.text.secondary.light} dark:${colors.text.secondary.dark}`}>
-        {resource.course && (
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-3 h-3 text-amber-500 flex-shrink-0" />
-            <span>Course: {resource.course}</span>
-          </div>
-        )}
-        {resource.year && (
-          <div className="flex items-center gap-2">
-            <Calendar className="w-3 h-3 text-amber-500 flex-shrink-0" />
-            <span>Year: {resource.year}</span>
-          </div>
-        )}
-        {resource.institution && (
-          <div className="flex items-center gap-2">
-            <School className="w-3 h-3 text-amber-500 flex-shrink-0" />
-            <span>{resource.institution}</span>
-          </div>
-        )}
+        <p className="line-clamp-2">{snippet}</p>
         <div className="flex items-center justify-between pt-2 border-t ${colors.border.light} dark:${colors.border.dark}">
           <div className="flex items-center gap-3 text-xs">
-            <span className="flex items-center gap-1">
-              <Download className="w-3 h-3 text-amber-500 flex-shrink-0" />
-              {resource.downloads || 0}
-            </span>
-            <span className="flex items-center gap-1">
-              <Award className="w-3 h-3 text-amber-500 flex-shrink-0" />
-              {resource.averageRating || 0}/5
-            </span>
+            {isExternal ? (
+              <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                <Search className="w-3 h-3 flex-shrink-0" />
+                <span>Web Result</span>
+              </span>
+            ) : (
+              <>
+                <span className="flex items-center gap-1">
+                  <Download className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                  {resource.downloads || 0}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Award className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                  {resource.averageRating || 0}/5
+                </span>
+              </>
+            )}
           </div>
           <span className="text-xs text-gray-400 dark:text-gray-500">
-            {resource.createdAt ? new Date(resource.createdAt).toLocaleDateString() : "Recent"}
+            {isExternal ? (resource.source_title || new URL(resource.url).hostname) : (resource.createdAt ? new Date(resource.createdAt).toLocaleDateString() : "Recent")}
           </span>
         </div>
       </div>
@@ -199,7 +194,7 @@ const ChatBubble = memo(({ message, isUser }) => {
           </div>
         </div>
       )}
-      
+
       <div
         className={`max-w-[90%] sm:max-w-lg p-4 rounded-2xl transition-all duration-300 font-poppins ${
           isUser
@@ -224,7 +219,7 @@ const ChatBubble = memo(({ message, isUser }) => {
         {message.resources && message.resources.length > 0 && (
           <div className="mt-3 space-y-2">
             {message.resources.map((resource, index) => (
-              <ResourceCard key={resource._id || index} resource={resource} />
+              <ResourceCard key={resource.id || index} resource={resource} isExternal={resource.isExternal} />
             ))}
           </div>
         )}
@@ -250,7 +245,7 @@ const ChatBubble = memo(({ message, isUser }) => {
           </div>
         )}
       </div>
-      
+
       {isUser && (
         <div className="flex-shrink-0 mt-1.5">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
@@ -317,6 +312,10 @@ const ScholaraCollectiveChatbot = ({ isInToggle = false, isMobile = false , setI
       url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
       key: import.meta.env.VITE_GEMINI_API_KEY,
     },
+    googleSearch: {
+    key: import.meta.env.VITE_GOOGLE_SEARCH_API_KEY,
+    cseId: import.meta.env.VITE_GOOGLE_CSE_ID,
+  },
   };
 
   useEffect(() => {
@@ -488,15 +487,36 @@ A: Yes, we use industry-standard encryption and follow strict privacy policies t
     }
   };
 
-  const callGeminiAPI = async (query) => {
+  // NEW: Function to perform a Google Search via a backend proxy
+  const googleSearch = async (query) => {
+    try {
+        // This is a proxy endpoint that handles the Google Search API call
+        const response = await fetch(`${API_CONFIG.baseUrl}/search-proxy?query=${encodeURIComponent(query)}`);
+        if (!response.ok) throw new Error("Google search failed");
+        const result = await response.json();
+        // Assuming the backend returns an array of results with 'title', 'url', 'snippet'
+        return result.results || [];
+    } catch (error) {
+        console.error("Google search proxy error:", error);
+        return [];
+    }
+};
+
+
+  // UPDATED: Function to accept and use chat history
+  const callGeminiAPI = async (chatHistory) => {
     try {
       if (!API_CONFIG.geminiApi.key) {
         throw new Error("Gemini API key is missing. Please configure it in the environment variables.");
       }
-      const chatHistory = [];
-      chatHistory.push({ role: "user", parts: [{ text: query }] });
 
-      const payload = { contents: chatHistory };
+      // Format the chat history into Gemini's required format
+      const formattedHistory = chatHistory.map(msg => ({
+        role: msg.sender === "user" ? "user" : "model",
+        parts: [{ text: msg.text }]
+      }));
+
+      const payload = { contents: formattedHistory };
       const apiKey = API_CONFIG.geminiApi.key; // Use the key from config
       const apiUrl = `${API_CONFIG.geminiApi.url}?key=${apiKey}`;
 
@@ -538,24 +558,27 @@ Focus on accurately extracting academic subjects, resource types, courses, and i
     * \`institution\`: (e.g., "IIT Bombay", "Delhi University", "Stanford", "Harvard")
     * \`resource_type\`: (e.g., "notes", "papers", "model answers", "study materials", "revision sheets", "question banks", "solutions", "books", "lectures")
     * \`keywords\`: (any other specific terms in the query relevant to the search, e.g., "organic chemistry", "thermodynamics", "calculus", "machine learning")
+2.  **"GET_STUDY_PLAN"**: User wants a study plan or roadmap for an exam or subject.
+    * \`subject\`: (e.g., "Physics", "Mathematics")
+    * \`exam\`: (e.g., "JEE Mains", "NEET")
 
-2.  **"GET_ANALYTICS"**: User wants to view platform statistics.
+3.  **"GET_ANALYTICS"**: User wants to view platform statistics.
 
-3.  **"UPLOAD_GUIDE"**: User wants to know how to upload resources.
+4.  **"UPLOAD_GUIDE"**: User wants to know how to upload resources.
 
-4.  **"DOWNLOAD_GUIDE"**: User wants to know how to download resources.
+5.  **"DOWNLOAD_GUIDE"**: User wants to know how to download resources.
 
-5.  **"COMMUNITY_GUIDELINES"**: User wants information about community rules, ratings, or reviews.
+6.  **"COMMUNITY_GUIDELINES"**: User wants information about community rules, ratings, or reviews.
 
-6.  **"PLATFORM_FEATURES"**: User wants to know about the platform's overall functionalities.
+7.  **"PLATFORM_FEATURES"**: User wants to know about the platform's overall functionalities.
 
-7.  **"FAQ"**: User is asking a frequently asked question or seeking general help/support.
+8.  **"FAQ"**: User is asking a frequently asked question or seeking general help/support.
 
-8.  **"GREETING"**: User is saying hello or a general salutation.
+9.  **"GREETING"**: User is saying hello or a general salutation.
 
-9.  **"SUGGEST_RESOURCES"**: User explicitly asks for suggestions or recommendations (e.g., "suggest good notes", "what are popular resources?").
+10. **"SUGGEST_RESOURCES"**: User explicitly asks for suggestions or recommendations (e.g., "suggest good notes", "what are popular resources?").
 
-10. **"GENERAL_CHAT"**: Default for queries not matching specific intents, or casual conversation.
+11. **"GENERAL_CHAT"**: Default for queries not matching specific intents, or casual conversation.
 
 **Example Query and Expected JSON Output:**
 
@@ -589,8 +612,11 @@ Query: "What's the best way to prepare for JEE Chemistry?"
 Output:
 \`\`\`json
 {
-  "intent": "GENERAL_CHAT",
-  "entities": null
+  "intent": "GET_STUDY_PLAN",
+  "entities": {
+    "subject": "Chemistry",
+    "exam": "JEE"
+  }
 }
 \`\`\`
 
@@ -622,7 +648,7 @@ Output:
         console.error("Gemini Intent API request failed:", errorData);
         throw new Error(`Gemini Intent API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
       }
-      
+
       const result = await response.json();
       const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
       const cleanedText = rawText.replace(/```json\n|\n```/g, '').trim();
@@ -633,9 +659,11 @@ Output:
     }
   };
 
-  const processUserQuery = useCallback(async (message) => {
+  // UPDATED: processUserQuery with the new logic
+  const processUserQuery = useCallback(async (message, chatHistory) => {
     let parsedIntent;
     try {
+        // Assuming getChatbotIntent is defined and working correctly
         parsedIntent = await getChatbotIntent(message);
     } catch (error) {
         console.error("Error getting chatbot intent:", error);
@@ -649,35 +677,53 @@ Output:
 
     switch (intent) {
         case "SEARCH_RESOURCE":
+            // Step 1: Search the internal database first
             const searchParams = {
                 subject: entities?.subject,
                 course: entities?.course,
                 institution: entities?.institution,
                 resource_type: entities?.resource_type,
-                keywords: entities?.keywords
+                keywords: entities?.keywords || message
             };
-            
-            // If no specific parameters from intent, use the raw message as keywords
-            const hasSpecificIntentParams = Object.values(searchParams).some(value => value !== null && value !== undefined && value !== '');
-            if (!hasSpecificIntentParams) {
-                searchParams.keywords = message; 
-            }
 
-            const searchResults = await searchResources(searchParams);
+            const internalResults = await searchResources(searchParams);
+            let combinedResources = [];
 
-            if (searchResults.length > 0) {
+            if (internalResults.length > 0) {
+                // Add internal resources to the combined list
+                combinedResources = internalResults.map(res => ({ ...res, isExternal: false }));
                 const resourceType = entities?.resource_type ? `${entities.resource_type} ` : '';
                 const subject = entities?.subject ? ` in ${entities.subject}` : '';
-                responseText = `🔍 **Found ${searchResults.length} ${resourceType}resources${subject} matching your request!**\n\nHere are some of the top matches. Click on a card to view/download!`;
-                resourcesData = searchResults.slice(0, 5); // Display top 5 results
-            } else {
-                // If no direct results, try suggesting popular resources
-                const popularResources = await searchResources({ limit: 5, sort: 'downloads' });
-                responseText = `No resources directly matching your specific request were found. However, I can still help you!\n\nTry these tips for better results:\n• Use more precise subjects (e.g., "Quantum Physics" instead of "Physics")\n• Specify the course or year (e.g., "B.Sc. Chemistry" or "Class 12")\n• Check for typos\n\nAlternatively, here are some **popular academic resources** you might find helpful:`;
-                resourcesData = popularResources;
+                responseText += `📚 **From Our Scholara Collective Database**\n\nFound ${internalResults.length} ${resourceType}resources${subject} matching your request!\n\n`;
             }
-            break;
 
+            // Step 2: Fallback to Google Search if needed
+            const subjectsInQuery = entities?.subject ? [entities.subject] : ["Physics", "Chemistry", "Mathematics", "Java concepts"]; // Default subjects for a general search
+            const resourcesFoundSubjects = internalResults.map(res => res.subject);
+            const subjectsToSearchOnWeb = subjectsInQuery.filter(sub => !resourcesFoundSubjects.includes(sub));
+
+            if (subjectsToSearchOnWeb.length > 0) {
+                const googleResultsPromises = subjectsToSearchOnWeb.map(subject =>
+                    googleSearch(`${subject} notes for ${entities?.course || message}`)
+                );
+                const googleResultsArrays = await Promise.all(googleResultsPromises);
+                const googleResults = googleResultsArrays.flat();
+
+                if (googleResults.length > 0) {
+                    const externalResults = googleResults.slice(0, 5).map(res => ({ ...res, isExternal: true }));
+                    combinedResources = [...combinedResources, ...externalResults];
+                    responseText += `\n\n🌐 **From the Web**\n\nTo ensure you have comprehensive coverage, here are some top resources from the web for the remaining subjects.\n\n`;
+                }
+            }
+
+            if (combinedResources.length === 0) {
+                responseText = `No resources were found on our platform or the web for your request. Try a different search!`;
+            } else {
+                 resourcesData = combinedResources;
+            }
+
+            break;
+            
         case "GET_ANALYTICS":
             analyticsData = await fetchAnalyticsData();
             responseText = `📊 **Platform Analytics Dashboard**\n\nHere's a quick overview of our platform's current statistics:`;
@@ -706,13 +752,13 @@ Output:
         case "GREETING":
             responseText = `👋 **Hello! Welcome to Scholara Collective!**\n\nI'm Scholara, your personal academic assistant. I can help you with:\n\n• 🔍 **Finding Study Resources** - Notes, papers, and materials\n• 📊 **Platform Insights** - View analytics and statistics  \n• 📤 **Upload Resources** - Learn how to contribute and share\n• ❓ **Get Support** - FAQs and community guidelines\n\nWhat would you like to explore today?`;
             break;
-        
+
         case "SUGGEST_RESOURCES":
             // Fetch popular/highly-rated resources for suggestions
-            const suggestedResources = await searchResources({ 
-                limit: 5, 
+            const suggestedResources = await searchResources({
+                limit: 5,
                 sort: entities?.resource_type ? null : 'downloads', // Prioritize specific type if requested, otherwise by downloads
-                resource_type: entities?.resource_type 
+                resource_type: entities?.resource_type
             });
             if (suggestedResources.length > 0) {
                 const typeText = entities?.resource_type ? `${entities.resource_type} ` : 'academic ';
@@ -725,11 +771,15 @@ Output:
 
         case "GENERAL_CHAT":
         default:
-            responseText = await callGeminiAPI(message);
+            // Pass the entire chat history for a contextual response
+            responseText = await callGeminiAPI(chatHistory);
             break;
     }
     return { text: responseText, resources: resourcesData, analytics: analyticsData };
-  }, [getChatbotIntent, searchResources, fetchAnalyticsData, callGeminiAPI, KNOWLEDGE_BASE]);
+}, [getChatbotIntent, searchResources, fetchAnalyticsData, callGeminiAPI, googleSearch, KNOWLEDGE_BASE]);
+
+
+
 
   useEffect(() => {
     let isMounted = true;
@@ -771,12 +821,14 @@ Output:
     };
   }, []);
 
+  // UPDATED: The sendMessage function now passes the entire `messages` state
   const sendMessage = useCallback(async () => {
     const message = userInput.trim();
     if (!message || isLoading) return;
 
     const userMessage = { text: message, sender: "user" };
-    setMessages((prev) => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setUserInput("");
     setIsLoading(true);
     setExpandedInput(false);
@@ -786,7 +838,8 @@ Output:
     localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
 
     try {
-      const response = await processUserQuery(message);
+      // Pass the updated conversation history to processUserQuery
+      const response = await processUserQuery(message, newMessages);
       setMessages((prev) => [...prev, { ...response, sender: "bot" }]);
     } catch (error) {
       console.error("Error processing query:", error);
@@ -800,7 +853,7 @@ Output:
     } finally {
       setIsLoading(false);
     }
-  }, [userInput, isLoading, recentSearches, processUserQuery]);
+  }, [userInput, isLoading, recentSearches, messages, processUserQuery]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
