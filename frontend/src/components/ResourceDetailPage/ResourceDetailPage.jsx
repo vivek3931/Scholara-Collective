@@ -888,7 +888,7 @@ return (
   >
     {/* Back button remains the same */}
     <button
-            onClick={navigate(-1)}
+            onClick={() => navigate(-1)}
             className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal"
           >
             <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
