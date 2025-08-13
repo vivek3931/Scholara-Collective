@@ -12,6 +12,7 @@ const authRoutes = require('./routes/authRoutes');
 const resourceRoutes = require('./routes/resourceRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 
 const { errorHandler } = require('./middleware/errorMiddleware');
 
@@ -59,6 +60,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api', searchRoutes);
+
+
 
 // --- WebSocket Setup ---
 const server = http.createServer(app);
