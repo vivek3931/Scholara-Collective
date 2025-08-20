@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import React, { StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.jsx';
@@ -7,244 +7,170 @@ import {
   createRoutesFromElements,
   Route,
   RouterProvider,
-  useLocation,
 } from 'react-router-dom';
-import { AnimatePresence , motion} from 'framer-motion';
-import LoginPage from './pages/Login/LoginPage.jsx';
-import RegisterPage from './pages/Register/RegisterPage.jsx';
-import ResourcesSection from './components/ResourcesSection/ResourcesSection.jsx';
-import AboutPage from './components/About/About.jsx';
+
+import { AnimatePresence, motion } from 'framer-motion';
+
+// Context Providers
 import { AuthProvider } from './context/AuthContext/AuthContext.jsx';
 import { ThemeProvider } from './context/ThemeProvider/ThemeProvider.jsx';
 import { ModalProvider } from './context/ModalContext/ModalContext.jsx';
-import ProtectedRoute from './components/ProtectedRoute/ProtectedRoutes.jsx';
-import UploadPage from './pages/UploadPage/UploadPage.jsx';
-import SavedResourcesPage from './components/SavedResources/SavedResources.jsx';
-import AdminDashboard from './components/AdminDashboard/AdminDashboard.jsx';
-import AdminUsers from './components/AdminUsers/AdminUsers.jsx';
-import AdminResources from './components/AdminResources/AdminResources.jsx';
-import AdminSetup from './components/AdminSetup/AdminSetup.jsx';
-import AdminLayout from './AdminLayout.jsx';
-import Profile from './components/UserProfile/UserProfile.jsx';
-import Settings from './components/SettingPage/SettingPage.jsx';
-import AdminSettings from './components/AdminSetting/AdminSetting.jsx';
+import { HelmetProvider } from 'react-helmet-async'; // <<<<<<< IMPORT HELMETPROVIDER HERE
+
+// Component Imports
 import CustomWarningModal from './components/CustomWarningModal/CustomWarningModal.jsx';
 import ChatbotToggle from './components/ChatbotToggle/ChatbotToggle.jsx';
-import ContributorsPage from './components/ContributorsPage/ContributorsPage.jsx';
-// import CommunityHubPage from './components/Community/Community.jsx';
-import ResourceDetailPage from './components/ResourceDetailPage/ResourceDetailPage.jsx';
+import Loader from './components/Loader/Loader.jsx'; // Make sure you have a simple Loader component
+import Contact from './components/Contact/Contact.jsx';
 
-// Animation variants for route transitions
-const routeVariants = {
-  initial: {
-    opacity: 0,
-    y: 20,
-  },
-  animate: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.5,
-      ease: [0.16, 1, 0.3, 1],
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: -20,
-    transition: {
-      duration: 0.3,
-      ease: 'easeInOut',
-    },
-  },
-};
+// Use React.lazy() for all page components to enable code splitting
+const LoginPage = React.lazy(() => import('./pages/Login/LoginPage.jsx'));
+const RegisterPage = React.lazy(() => import('./pages/Register/RegisterPage.jsx'));
+const ProtectedRoute = React.lazy(() => import('./components/ProtectedRoute/ProtectedRoutes.jsx'));
+const UploadPage = React.lazy(() => import('./pages/UploadPage/UploadPage.jsx'));
+const SavedResourcesPage = React.lazy(() => import('./components/SavedResources/SavedResources.jsx'));
+const AdminDashboard = React.lazy(() => import('./components/AdminDashboard/AdminDashboard.jsx'));
+const AdminUsers = React.lazy(() => import('./components/AdminUsers/AdminUsers.jsx'));
+const AdminResources = React.lazy(() => import('./components/AdminResources/AdminResources.jsx'));
+const AdminSetup = React.lazy(() => import('./components/AdminSetup/AdminSetup.jsx'));
+const AdminLayout = React.lazy(() => import('./AdminLayout.jsx'));
+const Profile = React.lazy(() => import('./components/UserProfile/UserProfile.jsx'));
+const Settings = React.lazy(() => import('./components/SettingPage/SettingPage.jsx'));
+const AdminSettings = React.lazy(() => import('./components/AdminSetting/AdminSetting.jsx'));
+const ContributorsPage = React.lazy(() => import('./components/ContributorsPage/ContributorsPage.jsx'));
+const ResourceDetailPage = React.lazy(() => import('./components/ResourceDetailPage/ResourceDetailPage.jsx'));
+const FullPageResources = React.lazy(() => import('./components/ResourcesSection/ResourcesSection.jsx'));
+const AboutPage = React.lazy(() => import('./components/About/About.jsx'));
+const ReferralPage = React.lazy(() => import('./components/ReferralPage/ReferralPage.jsx'));
 
-// Wrapper component for animated routes
-const AnimatedRoute = ({ children }) => {
-  return (
-    <motion.div
-      variants={routeVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="flex-1"
-    >
-      {children}
-    </motion.div>
-  );
-};
-
-// Define routes
+// The main router with Suspense wrappers
 const router = createBrowserRouter(
   createRoutesFromElements(
     <>
+      {/* The root route remains static for fastest initial load */}
       <Route path="/" element={<App />} />
-      <Route 
-        path="/login" 
-        element={
-          <AnimatedRoute>
-            <LoginPage />
-          </AnimatedRoute>
-        } 
-      />
-      <Route 
-        path="/register" 
-        element={
-          <AnimatedRoute>
-            <RegisterPage />
-          </AnimatedRoute>
-        } 
+
+      {/* Public routes wrapped in Suspense */}
+      <Route
+        path="/login"
+        element={<Suspense fallback={<Loader message="Loading Login..." />}><LoginPage /></Suspense>}
       />
       <Route
-      path='/contributors'
-      element={<AnimatedRoute>
-        <ContributorsPage/>
-          </AnimatedRoute>}
-          />
-      <Route 
-        path="/about" 
-        element={
-          <AnimatedRoute>
-            <AboutPage />
-          </AnimatedRoute>
-        } 
+        path="/register"
+        element={<Suspense fallback={<Loader message="Loading Register..." />}><RegisterPage /></Suspense>}
       />
-      <Route 
-        path="/settings" 
-        element={
-          <AnimatedRoute>
-            <Settings />
-          </AnimatedRoute>
-        } 
+
+      <Route
+        path='/contributors'
+        element={<Suspense fallback={<Loader message="Loading Contributors..." />}><ContributorsPage/></Suspense>}
       />
-      {/* <Route
-      path='/community'
-      element={
-        <AnimatedRoute>
-          <CommunityHubPage/>
-        </AnimatedRoute>
-      }/> */}
-      <Route 
-      path='/resources/:resourceId'
-      element={
-        <AnimatePresence>
-          <ResourceDetailPage/>
-        </AnimatePresence>
-      }/>
-      <Route 
-        path="/setup/admin" 
-        element={
-          <AnimatedRoute>
-            <AdminSetup />
-          </AnimatedRoute>
-        } 
+      <Route
+        path="/about"
+        element={<Suspense fallback={<Loader message="Loading About..." />}><AboutPage /></Suspense>}
       />
+      <Route
+        path="/contact"
+        element={<Suspense fallback={<Loader message="Loading About..." />}><Contact /></Suspense>}
+      />
+      <Route
+        path="/referral"
+        element={<Suspense fallback={<Loader message="Loading About..." />}><ReferralPage /></Suspense>}
+      />
+      <Route
+        path="/settings"
+        element={<Suspense fallback={<Loader message="Loading Settings..." />}><Settings /></Suspense>}
+      />
+      
+      <Route
+        path='/resources/:resourceId'
+        element={<Suspense fallback={<Loader message="Loading Resource Details..." />}><ResourceDetailPage/></Suspense>}
+      />
+
+      <Route
+        path="/setup/admin"
+        element={<Suspense fallback={<Loader message="Loading Admin Setup..." />}><AdminSetup /></Suspense>}
+      />
+
+      {/* Protected routes wrapped in Suspense */}
       <Route element={<ProtectedRoute />}>
         <Route
           path="/resources"
-          element={
-            <AnimatedRoute>
-              <ResourcesSection isFullPage={true} showSearchControls={true} />
-            </AnimatedRoute>
-          }
+          element={<Suspense fallback={<Loader message="Loading Resources..." />}><FullPageResources isFullPage={true} showSearchControls={true} /></Suspense>}
         />
-        <Route 
-          path="/upload" 
-          element={
-            <AnimatedRoute>
-              <UploadPage />
-            </AnimatedRoute>
-          } 
+        <Route
+          path="/upload"
+          element={<Suspense fallback={<Loader message="Loading Upload..." />}><UploadPage /></Suspense>}
         />
-        <Route 
-          path="/profile" 
-          element={
-            <AnimatedRoute>
-              <Profile />
-            </AnimatedRoute>
-          } 
+        <Route
+          path="/profile"
+          element={<Suspense fallback={<Loader message="Loading Profile..." />}><Profile /></Suspense>}
         />
-        <Route 
-          path="/saved" 
-          element={
-            <AnimatedRoute>
-              <SavedResourcesPage />
-            </AnimatedRoute>
-          } 
+        <Route
+          path="/saved"
+          element={<Suspense fallback={<Loader message="Loading Saved Resources..." />}><SavedResourcesPage /></Suspense>}
         />
       </Route>
+
+      {/* Admin protected routes wrapped in Suspense */}
       <Route element={<ProtectedRoute requiredRole="admin" />}>
-        <Route 
-          path="/admin" 
-          element={
-            <AnimatedRoute>
-              <AdminLayout />
-            </AnimatedRoute>
-          }
+        <Route
+          path="/admin"
+          element={<Suspense fallback={<Loader message="Loading Admin Panel..." />}><AdminLayout /></Suspense>}
         >
-          <Route index element={<AdminDashboard />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="resources" element={<AdminResources />} />
-          <Route path="settings" element={<AdminSettings />} />
+          <Route index element={<Suspense fallback={<Loader message="Loading Dashboard..." />}><AdminDashboard /></Suspense>} />
+          <Route path="users" element={<Suspense fallback={<Loader message="Loading Users..." />}><AdminUsers /></Suspense>} />
+          <Route path="resources" element={<Suspense fallback={<Loader message="Loading Admin Resources..." />}><AdminResources /></Suspense>} />
+          <Route path="settings" element={<Suspense fallback={<Loader message="Loading Admin Settings..." />}><AdminSettings /></Suspense>} />
         </Route>
       </Route>
+
+      {/* 404 route */}
       <Route
         path="*"
         element={
-          <AnimatedRoute>
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx">
-              <motion.div
-                initial={{ scale: 0.95 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 300 }}
-                className="text-center"
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx">
+            <div className="text-center">
+              <h1 className="text-6xl font-bold text-gray-300 dark:text-gray-600 mb-4">
+                404
+              </h1>
+              <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
+                Page Not Found
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Sorry, the page you are looking for does not exist.
+              </p>
+              <button
+                onClick={() => window.history.back()}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
-                <h1 className="text-6xl font-bold text-gray-300 dark:text-gray-600 mb-4">
-                  404
-                </h1>
-                <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
-                  Page Not Found
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  Sorry, the page you are looking for does not exist.
-                </p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => window.history.back()}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Go Back
-                </motion.button>
-              </motion.div>
+                Go Back
+              </button>
             </div>
-          </AnimatedRoute>
+          </div>
         }
       />
     </>
   )
 );
 
-// Main App Wrapper with Animation Context
-const AppWithAnimations = () => {
-  // const location = useLocation();
-
-  return (
-    <AnimatePresence  >
-      <RouterProvider router={router} key={location.pathname} />
-      <CustomWarningModal />
-      <ChatbotToggle />
-    </AnimatePresence>
-  );
-};
-
-createRoot(document.getElementById('root')).render(
+// Main application wrapper with providers
+const AppWithProviders = () => (
   <StrictMode>
     <AuthProvider>
       <ThemeProvider>
         <ModalProvider>
-          <AppWithAnimations />
+          <RouterProvider router={router} />
+          <CustomWarningModal />
+          <ChatbotToggle />
         </ModalProvider>
       </ThemeProvider>
     </AuthProvider>
   </StrictMode>
+);
+
+// Render the application, wrapping everything in HelmetProvider
+createRoot(document.getElementById('root')).render(
+  <HelmetProvider> {/* <<<<<<< WRAP YOUR ENTIRE APP HERE */}
+    <AppWithProviders />
+  </HelmetProvider>
 );

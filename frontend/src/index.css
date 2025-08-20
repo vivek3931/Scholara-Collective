@@ -46,13 +46,50 @@
   /* Overwrite the scrollbar track color for dark mode */
   scrollbar-color: rgb(var(--color-amber-400)) rgb(var(--color-bg-primary));
 }
+/* Removed `background-color: inherit;` from here in the previous update */
+* {
+  color: inherit;
+  box-sizing: border-box; /* Ensure this is always applied */
+}
 
 /* Base styles */
-body {
-  font-family: 'Poppins', sans-serif;
+html, body { /* Apply min-height and background-color here */
   min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  font-family: 'Poppins', sans-serif;
   scroll-behavior: smooth;
-  /* Removed duplicate scrollbar-color here */
+  /* Default background for html/body, set to midnight for an immediate dark base */
+  background-color: #0C0C0C; /* Midnight - your darkest provided color */
+  transition: background-color 0.3s ease; /* Transition for base background color */
+  will-change: background-color; /* Optimize rendering for background changes */
+}
+
+/* Ensure the dark class applies solid onyx background after initial load */
+html.dark, body.dark {
+  background-color: rgb(28, 37, 38); /* Solid onyx fallback for dark mode */
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Ensure the dark class is applied immediately to #root as well for the gradient */
+#root.dark {
+  background: linear-gradient(
+    to bottom right,
+    #1a1a1d, /* onyx */
+    #333333, /* charcoal */
+    #1a1a1d  /* onyx */
+  );
+  color: rgb(var(--color-text-primary));
+}
+
+/* Removed the problematic transition: none !important; block */
+
+/* Re-enable transitions after initial load (if you apply a 'loaded' class with JS) */
+html.loaded, body.loaded, #root.loaded {
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Scrollbar styles for WebKit browsers (Chrome, Safari, Edge) */
@@ -65,7 +102,6 @@ body {
   scrollbar-width: thin;
   scroll-behavior: smooth;
 }
-
 
 .scroll-container-none {
   scrollbar-width: none;
@@ -172,41 +208,6 @@ body.dark ::-webkit-scrollbar-track {
   z-index: 10000 !important;
 }
 
-/* Add this to your existing index.css file to prevent white flash */
-
-/* Ensure root elements have your dark theme colors */
-html, body, #root {
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-}
-
-/* Ensure the dark class is applied immediately */
-html.dark, body.dark, #root.dark {
-  background: linear-gradient(
-    to bottom right,
-    #1a1a1d, /* onyx */
-    #333333, /* charcoal */
-    #1a1a1d  /* onyx */
-  );
-  color: rgb(var(--color-text-primary));
-}
-
-/* Prevent any transition delays on background colors during route changes */
-html, body, #root, .dark {
-  transition: none !important;
-}
-
-/* Re-enable transitions after initial load */
-html.loaded, body.loaded, #root.loaded {
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-/* Your existing scroll styles with theme integration */
-.scroll-container::-webkit-scrollbar-thumb {
-  background-color: rgb(var(--color-amber-400));
-}
-
 /* Dark scrollbar for route transition containers */
 .route-container::-webkit-scrollbar {
   width: 6px;
@@ -218,10 +219,7 @@ html.loaded, body.loaded, #root.loaded {
   border-radius: 3px;
 }
 
-/* Prevent flash during theme switching */
-* {
-  box-sizing: border-box;
-}
+/* Removed the * { box-sizing: border-box; } duplicate as it's at the top. */
 
 /* Animation performance optimizations */
 .route-animation {
@@ -229,6 +227,10 @@ html.loaded, body.loaded, #root.loaded {
   transform: translateZ(0);
   will-change: opacity;
 }
+.custom-warning-modal{
+  z-index: 9999999;
+}
+
 
 /* Prevent white flash on slower devices */
 @media (prefers-reduced-motion: no-preference) {

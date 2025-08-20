@@ -64,8 +64,7 @@ export const login = async (credentials) => {
   return { user, token };
 };
 
-// The original register function might still be used for other flows if needed,
-// but for the OTP flow, verifyRegistrationOtp will handle the final registration.
+
 export const register = async (userData) => {
   const response = await api.post('/auth/register', userData);
   return response.data;
@@ -95,14 +94,13 @@ export const verifyRegistrationOtp = async ({ username, email, password, otp }) 
 
 export const logout = async () => {
   try {
-    await api.post('/api/auth/logout'); // Invalidate token on server side
+    await api.post('/auth/logout'); // Invalidate token on server side
   } catch (error) {
     console.error('Error during server-side logout:', error);
   } finally {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // For a full client-side logout, redirect is handled by interceptor if token is truly expired
-    // or by AuthContext for explicit logout.
+   
   }
 };
 
