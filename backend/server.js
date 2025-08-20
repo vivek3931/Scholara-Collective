@@ -13,6 +13,11 @@ const resourceRoutes = require('./routes/resourceRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const geminiRoutes = require('./routes/geminiRoutes');
+const chatbotRoutes = require('./routes/chatbotRoutes');
+const userRoutes = require('./routes/userRoutes');
+const subjectRoutes = require('./routes/subjectRoutes');
+
 
 const { errorHandler } = require('./middleware/errorMiddleware');
 
@@ -60,7 +65,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/users' , userRoutes);
+app.use('/api' , subjectRoutes);
 app.use('/api', searchRoutes);
+app.use('/api' , geminiRoutes);
+app.use('/api' , chatbotRoutes);
 
 
 
