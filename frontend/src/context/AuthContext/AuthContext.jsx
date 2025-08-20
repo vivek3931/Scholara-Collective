@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import * as api from "../../api.js"; // Assuming api.js handles your backend calls
+import * as api from "../../api.js"; // Assuming this handles your API calls
 
 // Create the context
 const AuthContext = createContext(null);
@@ -10,40 +10,149 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const clearError = () => setError(null);
 
+  // Centralized function to clear authentication state and local storage
+  const clearAuthAndStorage = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    clearError(); // Clear any existing errors
+  };
+
   useEffect(() => {
-    // Load user and token from localStorage on mount
     const loadAuthData = async () => {
-      const storedToken = localStorage.getItem("token");
-      const storedUser = localStorage.getItem("user");
-      if (storedToken && storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-          setToken(storedToken);
-        } catch (e) {
-          console.error("Failed to parse auth data from localStorage", e);
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+      try {
+        const storedToken = localStorage.getItem("token");
+        const storedUser = localStorage.getItem("user");
+
+        if (storedToken && storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+            setToken(storedToken);
+
+            const isValid = await verifyTokenInBackground(storedToken);
+            if (!isValid) {
+              console.warn('Stored token was invalid during initialization, logging out.');
+              clearAuthAndStorage();
+            } else {
+              // Fetch fresh coin data after successful token verification
+              await fetchUserCoinsInternal(storedToken);
+            }
+          } catch (e) {
+            console.error("Failed to parse auth data from storage, clearing corrupted data:", e);
+            clearAuthAndStorage();
+          }
         }
+      } catch (error) {
+        console.error("Failed to load auth data from local storage:", error);
+        clearAuthAndStorage();
+      } finally {
+        setAuthLoading(false);
+        setIsInitialized(true);
       }
-      setAuthLoading(false);
     };
 
     loadAuthData();
   }, []);
+
+  // Set up periodic coin updates (every 5 minutes)
+  useEffect(() => {
+    // Check authentication inline instead of using isAuthenticated variable
+    if (!user || !token) return;
+
+    const interval = setInterval(() => {
+      fetchUserCoins();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [user, token]);
+
+  const verifyTokenInBackground = async (tokenToVerify) => {
+    if (!tokenToVerify) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/verify-token`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenToVerify}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        console.log('Token successfully verified.');
+        return true;
+      } else if (response.status === 401 || response.status === 403) {
+        console.warn('Token verification failed: Unauthorized or Forbidden. Token is invalid.');
+        return false;
+      } else {
+        console.warn(`Token verification returned non-OK status ${response.status}. Keeping auth for now.`);
+        return true;
+      }
+    } catch (error) {
+      console.warn('Token verification network error (keeping auth):', error);
+      return true;
+    }
+  };
+
+  // Internal function that accepts token parameter (for initial load)
+  const fetchUserCoinsInternal = async (authToken = token) => {
+    if (!authToken) {
+      console.warn("Cannot fetch user coins: No token available.");
+      return null;
+    }
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/me`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Update the user object with fresh data
+        setUser(prevUser => ({
+          ...prevUser,
+          scholaraCoins: data.scholaraCoins
+        }));
+        
+        // Also update local storage to keep it in sync
+        const updatedUser = JSON.parse(localStorage.getItem("user") || '{}');
+        const newUserData = { ...updatedUser, scholaraCoins: data.scholaraCoins };
+        localStorage.setItem("user", JSON.stringify(newUserData));
+        
+        console.log("User coins updated:", data.scholaraCoins);
+        return data.scholaraCoins;
+      } else {
+        console.error("Failed to fetch user coins:", response.status);
+        if (response.status === 401 || response.status === 403) {
+          clearAuthAndStorage(); // Token expired, log out
+        }
+        return null;
+      }
+    } catch (error) {
+      console.error("Network error fetching user coins:", error);
+      return null;
+    }
+  };
+
+  // --- Core Authentication Methods ---
 
   const register = async (credentials) => {
     clearError();
     setAuthLoading(true);
     try {
       const response = await api.register(credentials);
-      // Assuming api.register returns { message: 'Registration initiated...' }
-      // No token/user expected here yet for OTP flow
       setAuthLoading(false);
-      return { success: true, data: response }; // response is already response.data from api.js
+      return { success: true, data: response };
     } catch (err) {
       setAuthLoading(false);
       const errorMessage =
@@ -56,9 +165,9 @@ export const AuthProvider = ({ children }) => {
 
   const sendRegistrationOtp = async ({ email }) => {
     clearError();
-    setAuthLoading(true); // Indicate loading for OTP sending
+    setAuthLoading(true);
     try {
-      const result = await api.sendRegistrationOtp({ email }); // api.js returns response.data directly
+      const result = await api.sendRegistrationOtp({ email });
       setAuthLoading(false);
       return { success: true, data: result };
     } catch (err) {
@@ -75,11 +184,8 @@ export const AuthProvider = ({ children }) => {
     clearError();
     setAuthLoading(true);
     try {
-      // api.verifyRegistrationOtp already returns response.data directly
-      const result = await api.verifyRegistrationOtp(userData); 
-      
-      // Destructure directly from 'result' as it contains the backend's response.data
-      const { success, token: newToken, user: newUser, message } = result; 
+      const result = await api.verifyRegistrationOtp(userData);
+      const { success, token: newToken, user: newUser, message } = result;
 
       if (success) {
         localStorage.setItem("token", newToken);
@@ -89,16 +195,13 @@ export const AuthProvider = ({ children }) => {
         setAuthLoading(false);
         return { success: true, message: message };
       } else {
-        // This 'else' block should ideally not be hit if backend always sends success:true on actual success
-        // It would only be hit if backend sends 200 OK with success:false, which is not ideal API design.
-        // Given your backend sends 409 for 'already verified', this path is less likely for true errors.
         setAuthLoading(false);
         setError(message);
         return {
           success: false,
           message: message,
-          shouldRedirect: result.isAlreadyVerified, // Use result directly
-          shouldResend: result.isOtpExpired,        // Use result directly
+          shouldRedirect: result.isAlreadyVerified,
+          shouldResend: result.isOtpExpired,
         };
       }
     } catch (err) {
@@ -108,25 +211,21 @@ export const AuthProvider = ({ children }) => {
       let shouldResend = false;
 
       if (err.response) {
-        // Server responded with a status other than 2xx
         console.error("Error response from server:", err.response.data);
         console.error("Error status:", err.response.status);
 
-        if (err.response.status === 409) { // Conflict status for already verified
+        if (err.response.status === 409) {
           errorMessage = err.response.data.message || "Email already verified. Please login instead.";
-          shouldRedirect = true; // Flag to redirect to login
-        } else if (err.response.status === 400 && err.response.data.isOtpExpired) { // Bad request with OTP expired flag
+          shouldRedirect = true;
+        } else if (err.response.status === 400 && err.response.data.isOtpExpired) {
           errorMessage = err.response.data.message || "OTP has expired. Please request a new OTP.";
-          shouldResend = true; // Flag to prompt resend
+          shouldResend = true;
         } else {
-          // Fallback to backend's message for other 4xx/5xx errors
-          errorMessage = err.response.data.message || errorMessage; 
+          errorMessage = err.response.data.message || errorMessage;
         }
       } else if (err.request) {
-        // Request was made but no response was received (e.g., network down)
         errorMessage = "Network error. Please check your internet connection.";
       } else {
-        // Something else happened while setting up the request (e.g., Axios config error)
         errorMessage = err.message || errorMessage;
       }
 
@@ -140,14 +239,17 @@ export const AuthProvider = ({ children }) => {
     clearError();
     setAuthLoading(true);
     try {
-      const { token: newToken, user: loggedInUser } = await api.login(
-        credentials
-      );
+      const { token: newToken, user: loggedInUser } = await api.login(credentials);
+
       localStorage.setItem("token", newToken);
       localStorage.setItem("user", JSON.stringify(loggedInUser));
       setToken(newToken);
       setUser(loggedInUser);
       setAuthLoading(false);
+      
+      // Fetch fresh coin data after login
+      await fetchUserCoinsInternal(newToken);
+      
       return loggedInUser;
     } catch (err) {
       setAuthLoading(false);
@@ -163,12 +265,49 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await api.logout();
+    } catch (error) {
+      console.warn('Logout API call failed, but clearing local auth state anyway:', error);
     } finally {
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      clearError();
+      clearAuthAndStorage();
+    }
+  };
+
+  // Public function to fetch user coins (can be called manually)
+  const fetchUserCoins = async () => {
+    return await fetchUserCoinsInternal();
+  };
+
+  // Function to update coins locally (useful when you know coins changed)
+  const updateUserCoins = (newCoins) => {
+    setUser(prevUser => ({
+      ...prevUser,
+      scholaraCoins: newCoins
+    }));
+    
+    const currentUser = JSON.parse(localStorage.getItem("user") || '{}');
+    const updatedUser = { ...currentUser, scholaraCoins: newCoins };
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+  };
+
+  // Function to add/subtract coins locally and optionally sync with server
+  const adjustUserCoins = async (coinChange, syncWithServer = true) => {
+    // Update locally first for immediate UI feedback
+    setUser(prevUser => ({
+      ...prevUser,
+      scholaraCoins: (prevUser.scholaraCoins || 0) + coinChange
+    }));
+    
+    // Update localStorage
+    const currentUser = JSON.parse(localStorage.getItem("user") || '{}');
+    const updatedUser = { 
+      ...currentUser, 
+      scholaraCoins: (currentUser.scholaraCoins || 0) + coinChange 
+    };
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+    
+    // Optionally sync with server to get the actual value
+    if (syncWithServer) {
+      setTimeout(() => fetchUserCoins(), 1000); // Fetch fresh data after 1 second
     }
   };
 
@@ -180,19 +319,22 @@ export const AuthProvider = ({ children }) => {
     token,
     isAuthenticated,
     authLoading,
+    isInitialized,
     error,
     clearError,
     login,
     logout,
     register,
-    sendRegistrationOtp, // Expose the new function
-    verifyRegistrationOtp, // Expose the new function
+    sendRegistrationOtp,
+    verifyRegistrationOtp,
+    fetchUserCoins,
+    updateUserCoins,
+    adjustUserCoins,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Create the custom hook to consume the context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
