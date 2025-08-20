@@ -78,7 +78,7 @@ const colors = {
   },
   background: {
     light: "bg-gray-50",
-    dark: "bg-onyx shadow-glow-sm",
+    dark: "bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx shadow-glow-sm",
   },
   card: {
     light: "bg-white shadow-sm",
@@ -86,7 +86,7 @@ const colors = {
   },
   border: {
     light: "border-gray-200",
-    dark: "border-gray-700",
+    dark: "border-charcoal/60",
   },
   text: {
     primary: {
@@ -714,8 +714,8 @@ const ChatBubble = memo(({ message, isUser }) => {
       <div
         className={`max-w-[90%] sm:max-w-lg p-4 rounded-2xl transition-all duration-300 font-poppins ${
           isUser
-            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-sm hover:shadow-md hover:from-blue-600 hover:to-blue-700"
-            : `${colors.card.light} dark:${colors.card.dark} ${colors.text.primary.light} dark:${colors.text.primary.dark} rounded-bl-sm border ${colors.border.light} dark:${colors.border.dark} hover:shadow-md hover:border-amber-400/30 dark:hover:border-amber-500/30`
+            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-sm hover:shadow-glow-sm hover:from-blue-600 hover:to-blue-700"
+            : `${colors.card.light} dark:${colors.card.dark} shadow-glow-sm  ${colors.text.primary.light} dark:${colors.text.primary.dark} rounded-bl-sm border ${colors.border.light} dark:border-amber-500/30 hover:shadow-glow-sm hover:border-amber-400/30 dark:hover:border-amber-500/30`
         } ${isUser ? "order-2" : "order-1"}`}
       >
         <div className="text-sm leading-relaxed prose prose-sm max-w-none">
@@ -877,6 +877,7 @@ const ScholaraAdvancedChatbot = ({
   isInToggle = false,
   isMobile = false,
   setIsOpen,
+  isOpen
 }) => {
   const [messages, setMessages] = useState([]);
   const [userInput, setUserInput] = useState("");
@@ -891,6 +892,15 @@ const ScholaraAdvancedChatbot = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragY, setDragY] = useState(0);
   const startY = useRef(0);
+
+  useEffect(()=>{
+    if(isOpen){
+      document.body.style.overflow = "hidden"
+    }
+    else{
+      document.body.style.overflow = "auto"
+    }
+  },[])
 
 
 const handleTouchStart = (e) => {
@@ -2067,21 +2077,21 @@ return (
       </button>
 
       {/* Mobile Drag Handle Visual */}
-      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-12 h-1.5 rounded-full bg-gray-300 dark:bg-white lg:hidden"></div>
+      <div className="absolute top-1 left-1/2  -translate-x-1/2 w-12 h-1.5 rounded-full bg-gray-300 dark:bg-[#ffffff6c] lg:hidden"></div>
     </header>
 
     {/* ---------------- Main Chat Area ---------------- */}
-    <main className="flex-1 flex flex-col overflow-hidden pt-1">
+    <main className="flex-1 flex flex-col overflow-hidden">
       {/* Messages Container */}
       <div
         ref={chatMessagesRef}
-        className={`flex-1 p-4 sm:p-6 pb-24 overflow-y-auto custom-scrollbar ${colors.background.light} dark:${colors.background.dark} space-y-4`}
+        className={`flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar ${colors.background.light} dark:${colors.background.dark} space-y-4`}
       >
         {/* Loading State */}
         {!isResourcesLoaded && (
           <div className="flex justify-start animate-fade-in">
             <div
-              className={`${colors.card.light} dark:${colors.card.dark} p-3 rounded-xl border ${colors.border.light} dark:${colors.border.dark} shadow-xs flex items-center space-x-3 max-w-md`}
+              className={`${colors.card.light} dark:${colors.card.dark} p-3 rounded-xl border ${colors.border.light} shadow-xs flex items-center space-x-3 max-w-md`}
             >
               <FontAwesomeIcon
                 icon={faSpinner}
@@ -2130,7 +2140,7 @@ return (
       {/* File Upload Section */}
       {activeFeature === "upload" && (
         <div
-          className={`px-4 pb-3 border-t ${colors.border.light} dark:${colors.border.dark} bg-white/50 dark:bg-gray-900/30 backdrop-blur-sm`}
+          className={`px-4 pt-3 pb-4 border-t ${colors.border.light} dark:${colors.border.dark} bg-white/50 dark:bg-gray-900/30 backdrop-blur-sm`}
         >
           <FileUploadComponent
             onFileUpload={handleFileUpload}
@@ -2140,9 +2150,9 @@ return (
         </div>
       )}
 
-      {/* Floating Input Area */}
+      {/* Input Area */}
       <div
-        className={`fixed bottom-0 left-0 right-0 p-4 border-t ${colors.border.light} dark:${colors.border.dark} ${colors.card.light} dark:${colors.card.dark} shadow-[0_-5px_15px_rgba(0,0,0,0.08)] lg:relative lg:shadow-none`}
+        className={`p-4 border-t ${colors.border.light} dark:border-gray-600 ${colors.card.light} dark:${colors.card.dark} shadow-[0_-5px_15px_rgba(0,0,0,0.08)] lg:relative lg:shadow-none`}
       >
         <div className="max-w-4xl mx-auto space-y-3">
           {/* Quick Action Chips */}
@@ -2165,7 +2175,7 @@ return (
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all active:scale-95 ${
                   action.category === "tools"
                     ? "bg-amber-100/80 hover:bg-amber-200/70 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/40"
-                    : "bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                    : "bg-gray-100 hover:bg-gray-200 text-gray-700 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx shadow-glow-sm  dark:text-gray-300 dark:hover:bg-gray-700"
                 }`}
               >
                 {action.icon && <action.icon className="w-3 h-3" />}
@@ -2174,25 +2184,23 @@ return (
             ))}
           </div>
 
-          {/* Input Container */}
-          <div className="relative">
-            {/* Left Controls */}
-            <div className="absolute left-2 top-2.5 flex items-center gap-1 z-10">
-              <button
-                onClick={() =>
-                  setActiveFeature(
-                    activeFeature === "upload" ? "chat" : "upload"
-                  )
-                }
-                className={`p-1.5 rounded-lg transition-all active:scale-90 ${
-                  activeFeature === "upload"
-                    ? "bg-amber-100 text-amber-600 shadow-inner dark:bg-amber-900/40 dark:text-amber-300"
-                    : "text-gray-500 hover:text-amber-500 hover:bg-gray-100/70 dark:hover:bg-gray-700/50"
-                }`}
-              >
-                <Upload size={16} strokeWidth={2.5} />
-              </button>
-            </div>
+          {/* New Input Container Layout */}
+          <div className="relative ">
+            {/* Upload Button */}
+            <button
+              onClick={() =>
+                setActiveFeature(
+                  activeFeature === "upload" ? "chat" : "upload"
+                )
+              }
+              className={`absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all active:scale-90 ${
+                activeFeature === "upload"
+                  ? "bg-amber-100 text-amber-600 shadow-inner dark:bg-amber-900/40 dark:text-amber-300"
+                  : "text-gray-500 hover:text-amber-500 hover:bg-gray-100/70 dark:hover:bg-gray-700/50"
+              }`}
+            >
+              <Upload size={16} strokeWidth={2.5} />
+            </button>
 
             {/* Text Input */}
             <textarea
@@ -2205,7 +2213,7 @@ return (
                   ? "Ask about your document..."
                   : "Message Scholara..."
               }
-              className={`w-full pl-11 pr-11 py-3 rounded-xl ${
+              className={`w-full pl-11 pr-14 py-3 rounded-2xl ${
                 colors.card.light
               } dark:${colors.card.dark} ${colors.text.primary.light} dark:${
                 colors.text.primary.dark
@@ -2215,57 +2223,31 @@ return (
                 colors.text.secondary.light
               } dark:placeholder:${colors.text.secondary.dark} resize-none custom-scrollbar ${
                 expandedInput ? "min-h-[100px]" : "min-h-[52px]"
-              } shadow-xs text-base`}
+              } shadow-sm hover:shadow-md text-base`}
               disabled={isLoading}
               rows={1}
             />
 
-            {/* Right Controls */}
-            <div className="absolute right-2 top-2.5 flex items-center gap-1">
-              {userInput && (
-                <button
-                  onClick={() => setUserInput("")}
-                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100/70 dark:hover:text-gray-200 dark:hover:bg-gray-700/50 transition-all active:scale-90"
-                >
-                  <X size={16} strokeWidth={2.5} />
-                </button>
+            {/* Send Button */}
+            <button
+              onClick={sendMessage}
+              disabled={isLoading || userInput.trim() === ""}
+              className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all active:scale-95 ${
+                isLoading || userInput.trim() === ""
+                  ? "bg-gray-200 text-gray-400 dark:bg-[#80808031] dark:text-gray-500 cursor-not-allowed"
+                  : `${colors.primary.light} dark:${colors.primary.dark} text-white shadow-md hover:shadow-lg`
+              }`}
+            >
+              {isLoading ? (
+                <FontAwesomeIcon
+                  icon={faSpinner}
+                  spin
+                  className="w-3.5 h-3.5"
+                />
+              ) : (
+                <Send className="w-3.5 h-3.5" strokeWidth={2.2} />
               )}
-
-              <button
-                onClick={toggleInputExpansion}
-                className={`p-1.5 rounded-lg transition-all active:scale-90 ${
-                  expandedInput
-                    ? "text-amber-500 bg-amber-100/50 dark:bg-amber-900/30"
-                    : "text-gray-500 hover:text-amber-500 hover:bg-gray-100/70 dark:hover:bg-gray-700/50"
-                }`}
-              >
-                {expandedInput ? (
-                  <ChevronUp size={16} strokeWidth={2.5} />
-                ) : (
-                  <ChevronDown size={16} strokeWidth={2.5} />
-                )}
-              </button>
-
-              <button
-                onClick={sendMessage}
-                disabled={isLoading || userInput.trim() === ""}
-                className={`p-2 rounded-lg transition-all active:scale-95 ${
-                  isLoading || userInput.trim() === ""
-                    ? "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed"
-                    : `${colors.primary.light} dark:${colors.primary.dark} text-white shadow-md hover:shadow-lg`
-                }`}
-              >
-                {isLoading ? (
-                  <FontAwesomeIcon
-                    icon={faSpinner}
-                    spin
-                    className="w-3.5 h-3.5"
-                  />
-                ) : (
-                  <Send className="w-3.5 h-3.5" strokeWidth={2.2} />
-                )}
-              </button>
-            </div>
+            </button>
           </div>
         </div>
       </div>
