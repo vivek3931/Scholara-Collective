@@ -3,7 +3,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/emailSender');
 const crypto = require('crypto');
-const mongoose = require('mongoose'); // Import mongoose for sessions
+const mongoose = require('mongoose');
+const { JWT_SECRET } = process.env;
 
 const signToken = (payload) => {
     return new Promise((resolve, reject) => {
@@ -51,19 +52,16 @@ exports.register = async (req, res) => {
     }
 };
 
-// Complete sendRegistrationOtp function
 exports.sendRegistrationOtp = async (req, res) => {
     const { email } = req.body;
     try {
         console.log('--- sendRegistrationOtp hit ---');
         console.log('Email received:', email);
 
-        // Validate email format
         if (!email || !email.includes('@')) {
             return res.status(400).json({ message: 'Valid email address is required.' });
         }
 
-        // Check if user exists and is already verified
         let user = await User.findOne({ email }).select('+otp +otpExpires');
 
         if (user && user.isVerified) {
@@ -71,16 +69,12 @@ exports.sendRegistrationOtp = async (req, res) => {
             return res.status(400).json({ message: 'Email already registered and verified.' });
         }
 
-        // If user doesn't exist or is unverified temporary user
         if (!user || (user.username.startsWith('temp_user_') && !user.isVerified)) {
             console.log('Creating/updating temporary user');
-            
-            // Generate a random password for the temporary user
             const tempPassword = crypto.randomBytes(16).toString('hex');
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(tempPassword, salt);
             
-            // Update or create user
             user = user || new User({
                 email,
                 username: `temp_user_${Date.now()}`,
@@ -88,8 +82,7 @@ exports.sendRegistrationOtp = async (req, res) => {
                 isVerified: false,
             });
 
-            // Ensure these fields are reset for new OTP requests
-            user.password = hashedPassword; // Re-hash a new temporary password if needed
+            user.password = hashedPassword;
             user.isVerified = false;
             user.otp = undefined;
             user.otpExpires = undefined;
@@ -98,21 +91,18 @@ exports.sendRegistrationOtp = async (req, res) => {
             console.log('Temporary user created/updated');
         }
 
-        // Generate OTP
         const otp = crypto.randomInt(100000, 999999).toString();
-        const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes from now
+        const otpExpires = Date.now() + 10 * 60 * 1000;
 
         console.log('Generated OTP:', otp);
         console.log('OTP expires at:', new Date(otpExpires));
 
-        // Save OTP to user
         user.otp = otp;
         user.otpExpires = new Date(otpExpires);
         await user.save();
 
         console.log('OTP saved to user. User OTP:', user.otp, 'Expires:', user.otpExpires);
 
-        // Email content
         const emailSubject = 'Your Scholara Collective Registration OTP';
         const emailHtml = `
             <div style="font-family: 'Inter', sans-serif; line-height: 1.6; color: #333; background-color: #f8f8f8; padding: 20px; border-radius: 8px; max-width: 600px; margin: 20px auto; border: 1px solid #e0e0e0; box-shadow: 0 4px 8px rgba(0,0,0,0.05);">
@@ -155,7 +145,6 @@ exports.sendRegistrationOtp = async (req, res) => {
             </div>
         `;
 
-        // Send email
         await sendEmail({
             email: user.email,
             subject: emailSubject,
@@ -184,14 +173,12 @@ exports.sendRegistrationOtp = async (req, res) => {
     }
 };
 
-// Complete verifyRegistrationOtp function
 exports.verifyRegistrationOtp = async (req, res) => {
     console.log('--- verifyRegistrationOtp hit ---');
     console.log('Request Body:', req.body);
 
-    const { username, email, password, otp } = req.body;
+    const { username, email, password, otp, referralCode } = req.body;
 
-    // Input validation
     if (!username || !email || !password || !otp) {
         return res.status(400).json({ 
             success: false,
@@ -203,9 +190,8 @@ exports.verifyRegistrationOtp = async (req, res) => {
     session.startTransaction();
     
     try {
-        // 1. Find user with OTP fields (force fresh database read within transaction)
         const user = await User.findOne({ email })
-            .select('+otp +otpExpires +password') // Ensure these are selected
+            .select('+otp +otpExpires +password')
             .session(session);
 
         if (!user) {
@@ -216,7 +202,6 @@ exports.verifyRegistrationOtp = async (req, res) => {
             });
         }
 
-        // 2. Debug logs for verification context
         console.log('Verification Context:', {
             dbOtp: user.otp,
             receivedOtp: otp,
@@ -233,18 +218,16 @@ exports.verifyRegistrationOtp = async (req, res) => {
             return res.status(409).json({
                 success: false,
                 message: 'Email already verified. Please login instead.',
-                isAlreadyVerified: true // Flag for frontend
+                isAlreadyVerified: true
             });
         }
 
-        // 3. Use the schema method for OTP validation
         const isOtpValidAndNotExpired = user.verifyOtp(otp);
 
         if (!isOtpValidAndNotExpired) {
-            // If the combined check fails, differentiate why for better feedback
             const isOtpExpired = user.otpExpires ? new Date(user.otpExpires) < new Date() : true;
             
-            if (!user.otp || !user.otpExpires) { // No OTP was ever set or cleared
+            if (!user.otp || !user.otpExpires) {
                  await session.abortTransaction();
                  return res.status(400).json({
                      success: false,
@@ -255,9 +238,9 @@ exports.verifyRegistrationOtp = async (req, res) => {
                 return res.status(400).json({
                     success: false,
                     message: 'OTP has expired. Please request a new OTP.',
-                    isOtpExpired: true // Flag for frontend
+                    isOtpExpired: true
                 });
-            } else { // It must be an invalid OTP if not expired and not missing
+            } else {
                 await session.abortTransaction();
                 return res.status(400).json({
                     success: false,
@@ -271,7 +254,6 @@ exports.verifyRegistrationOtp = async (req, res) => {
             }
         }
 
-        // 4. Username uniqueness check
         const existingUsername = await User.findOne({
             username,
             _id: { $ne: user._id }
@@ -285,21 +267,30 @@ exports.verifyRegistrationOtp = async (req, res) => {
             });
         }
 
-        // 5. Hash the new password provided during verification
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // 6. Update user details and mark as verified
+        // Update user details and mark as verified
         user.username = username;
-        user.password = hashedPassword; // Update with the new, hashed password
+        user.password = hashedPassword;
         user.isVerified = true;
         user.otp = undefined;
         user.otpExpires = undefined;
         user.stats.lastLogin = new Date();
 
         await user.save({ session });
+        
+        // Referral logic: Award coins to the referrer if a referral code exists
+        if (referralCode) {
+            const referrer = await User.findById(referralCode).session(session);
+            if (referrer) {
+                referrer.scholaraCoins += 50;
+                referrer.referralCount += 1;
+                await referrer.save({ session });
+                console.log(`User ${referrer.username} (ID: ${referrer._id}) received 50 coins for a referral.`);
+            }
+        }
 
-        // 7. Generate JWT token
         const token = await signToken({
             user: {
                 id: user.id,
@@ -342,7 +333,6 @@ exports.verifyRegistrationOtp = async (req, res) => {
     }
 };
 
-
 exports.login = async (req, res) => {
     const { email, password } = req.body;
 
@@ -379,6 +369,8 @@ exports.login = async (req, res) => {
                 roles: [user.role],
                 bio: user.bio,
                 isVerified: user.isVerified,
+                scholaraCoins: user.scholaraCoins,
+                referralCount: user.referralCount,
             },
             message: 'Login successful!',
         });
@@ -386,6 +378,37 @@ exports.login = async (req, res) => {
         console.error('Login Error:', err.message);
         res.status(500).send('Server Error during login');
     }
+};
+
+exports.verifyToken = (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ 
+      success: false,
+      message: 'No token found! The spaceship is adrift in deep space without a pilot.',
+    });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      console.error('Token verification failed:', err.message);
+      return res.status(403).json({
+        success: false,
+        message: 'Token verification failed. Your access key has expired! Looks like your warp drive needs a reboot.',
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Token verified! You are cleared for launch. Welcome aboard, Commander.',
+      user: {
+        id: user.id,
+        roles: user.roles,
+      },
+    });
+  });
 };
 
 exports.updateProfile = async (req, res) => {
@@ -420,6 +443,8 @@ exports.getMe = async (req, res) => {
             roles: [user.role],
             notifications: user.notifications,
             bio: user.bio,
+            scholaraCoins: user.scholaraCoins,
+            referralCount: user.referralCount,
         });
     } catch (err) {
         console.error('Get user data error:', err.message);
