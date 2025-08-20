@@ -36,12 +36,10 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
-    // CHANGED: from isEmailVerified to isVerified
     isVerified: {
         type: Boolean,
         default: false
     },
-    // MOVED: bio from profile to root level
     bio: {
         type: String,
         maxlength: 500,
@@ -59,6 +57,20 @@ const userSchema = new mongoose.Schema({
             ref: 'Resource'
         }
     ],
+    // --- START: New fields for Scholar Coins and Referral System ---
+    scholaraCoins: {
+        type: Number,
+        default: 50, // Initial coins for new users
+        required: true
+    },
+    referralCode: {
+        type: String,
+        unique: true,
+        sparse: true // Allows for null values on non-referred users
+    },
+        referralCount: { type: Number, default: 0 },
+
+    // --- END: New fields for Scholar Coins and Referral System ---
     profile: {
         institution: {
             type: String,
@@ -75,7 +87,6 @@ const userSchema = new mongoose.Schema({
             min: 1,
             max: 10
         }
-        // REMOVED: bio (moved to root level)
     },
     stats: {
         uploadCount: {
@@ -96,24 +107,22 @@ const userSchema = new mongoose.Schema({
         default: '',
         select: false
     },
-    // KEEP: OTP fields (these are correct)
     otp: {
-    type: String,
-    select: false,
-    trim: true,  // Add trim to ensure no whitespace
-    validate: {
-        validator: function(v) {
-            return /^\d{6}$/.test(v); // Ensure 6-digit OTP
-        },
-        message: props => `${props.value} is not a valid 6-digit OTP!`
-    }
-},
-   otpExpires: {
-    type: Date,
-    select: false,
-    index: { expires: '10m' } // Auto-expire after 10 minutes
-},
-    // OPTIONAL: Keep these if you use password reset functionality
+        type: String,
+        select: false,
+        trim: true,
+        validate: {
+            validator: function(v) {
+                return /^\d{6}$/.test(v);
+            },
+            message: props => `${props.value} is not a valid 6-digit OTP!`
+        }
+    },
+    otpExpires: {
+        type: Date,
+        select: false,
+        index: { expires: '10m' }
+    },
     passwordResetToken: {
         type: String,
         select: false
@@ -152,7 +161,6 @@ userSchema.pre('save', async function(next) {
 });
 
 userSchema.methods.verifyOtp = function(enteredOtp) {
-    // Debug logs
     console.log('OTP Verification:', {
         storedOtp: this.otp,
         enteredOtp: enteredOtp,
@@ -160,14 +168,12 @@ userSchema.methods.verifyOtp = function(enteredOtp) {
         timeRemaining: this.timeUntilOtpExpiry / 1000 + ' seconds'
     });
 
-    // Convert both to string and trim whitespace
     const cleanStored = String(this.otp).trim();
     const cleanEntered = String(enteredOtp).trim();
     
     return cleanStored === cleanEntered && this.otpExpires > new Date();
 };
 
-// Update pre-save hook to handle OTP changes
 userSchema.pre('save', async function(next) {
     this.updatedAt = new Date();
     
@@ -176,20 +182,17 @@ userSchema.pre('save', async function(next) {
         this.password = await bcrypt.hash(this.password, salt);
     }
     
-    // Auto-set OTP expiration if OTP is being set
     if (this.isModified('otp') && this.otp) {
-        this.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        this.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
     }
     
     next();
 });
 
-// Password comparison method
 userSchema.methods.matchPassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Admin functionality methods
 userSchema.methods.isAdmin = function() {
     return this.role === 'admin' || this.role === 'superadmin';
 };
@@ -208,7 +211,6 @@ userSchema.methods.canManageUser = function(targetUser) {
     return false;
 };
 
-// User statistics method
 userSchema.methods.getStats = async function() {
     const Resource = mongoose.model('Resource');
     
@@ -227,12 +229,10 @@ userSchema.methods.getStats = async function() {
     };
 };
 
-// Static method to get admin users
 userSchema.statics.getAdmins = function() {
     return this.find({ role: { $in: ['admin', 'superadmin'] } });
 };
 
-// Static method to get active users
 userSchema.statics.getActiveUsers = function() {
     return this.find({ isActive: true });
 };

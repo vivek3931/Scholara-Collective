@@ -25,6 +25,18 @@ const flagSchema = new mongoose.Schema({
 // Main resource schema
 const resourceSchema = new mongoose.Schema({
     title: { type: String, required: true, trim: true },
+    fileHash: { 
+        type: String, 
+        required: true, 
+        unique: true, 
+        index: true 
+    },
+    textHash: {
+        type: String,
+        required: true,
+        unique: true,
+        index: true
+    },
     description: { type: String, trim: true },
     cloudinaryUrl: { type: String, required: true },
     cloudinaryPublicId: { type: String, required: true },
