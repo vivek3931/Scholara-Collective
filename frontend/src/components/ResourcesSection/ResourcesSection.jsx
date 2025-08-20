@@ -236,6 +236,7 @@ const SearchSection = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [filterSelect , setFilterSelect]= useState(false)
   
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -401,7 +402,7 @@ const SearchSection = ({
         duration: 0.5,
         ease: [0.16, 1, 0.3, 1],
       }}
-      className="px-4 py-4 w-full flex justify-center"
+      className="px-1 py-4 w-full flex justify-center"
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
