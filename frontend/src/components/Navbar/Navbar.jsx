@@ -14,9 +14,13 @@ import {
   Bookmark,
   LayoutDashboard,
 } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUserFriends } from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "../../context/AuthContext/AuthContext";
 import { useNavigate } from "react-router-dom";
 import logo from '../../assets/logo.svg'
+import coin from '../../assets/coin.svg'
+import axios from 'axios';
 
 // Desktop NavLink component
 const DesktopNavLink = ({ to, text }) => (
@@ -45,26 +49,48 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-  const { isAuthenticated, user, logout } = useAuth();
+  // REMOVE: const [userCoins, setUserCoins] = useState(0); 
+  const { isAuthenticated, user, logout, token } = useAuth(); // user will now contain scholaraCoins
   const navigate = useNavigate();
   const profileDropdownRef = useRef(null);
   const mobileMenuRef = useRef(null);
+  // REMOVE: const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  
   // Check if the user is an admin or superadmin
   const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
+
+  // REMOVE this entire useEffect hook as coins will be managed by AuthContext
+  // useEffect(() => {
+  //   const fetchUserCoins = async () => {
+  //     if (!isAuthenticated || !token) {
+  //       setUserCoins(0);
+  //       return;
+  //     }
+  //     try {
+  //       const config = {
+  //         headers: {
+  //           Authorization: `Bearer ${token}`,
+  //         },
+  //       };
+  //       const response = await axios.get(`${API_URL}/users/me`, config);
+  //       if (response.data && typeof response.data.scholaraCoins === 'number') {
+  //         setUserCoins(response.data.scholaraCoins);
+  //       }
+  //     } catch (error) {
+  //       console.error("Failed to fetch user coins:", error);
+  //     }
+  //   };
+  //   fetchUserCoins();
+  // }, [isAuthenticated, token, API_URL]);
 
   // --- Body Scroll Lock Logic ---
   useEffect(() => {
     const body = document.body;
-
     if (isMobileMenuOpen) {
-      // Prevent scrolling
       body.style.overflow = "hidden";
     } else {
-      // Restore scrolling
       body.style.overflow = "";
     }
-
-    // Cleanup
     return () => {
       body.style.overflow = "";
     };
@@ -124,7 +150,6 @@ const Navbar = () => {
         toggleMobileMenu();
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -199,21 +224,28 @@ const Navbar = () => {
                       </p>
                     </div>
                   )}
+                  <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                    <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
+                    <span className="font-medium">{user?.scholaraCoins || 0} Coins</span> {/* USE user?.scholaraCoins */}
+                  </div>
                   <Link
-                    to="/saved"
+                    to="/referral"
                     onClick={handleNavLinkClick}
                     className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                   >
-                    <Bookmark size={16} className="mr-3" /> My Library
-                  </Link>
+<FontAwesomeIcon 
+  icon={faUserFriends} 
+  className="mr-3 text-amber-500 dark:text-amber-400" 
+  size="sm" 
+/>
+Referrals                  </Link>
                   {isAdmin && (
                     <Link
                       to="/admin"
                       onClick={handleNavLinkClick}
                       className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                     >
-                      <LayoutDashboard size={16} className="mr-3" /> Admin
-                      Dashboard
+                      <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
                     </Link>
                   )}
                   <Link
@@ -373,6 +405,10 @@ const Navbar = () => {
                           {user?.roles || "Member"}
                         </p>
                       </div>
+                    </div>
+                    <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                      <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
+                      <span className="font-medium">{user?.scholaraCoins || 0} Coins</span> {/* USE user?.scholaraCoins */}
                     </div>
                     <div className="space-y-1">
                       <Link

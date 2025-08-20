@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import ResourceCard from "../ResourceCard/ResourceCard";
+import UniversalResourceCard from "../UniversalResourceCard/UniversalResourceCard";
 import {
   faSearch,
   faSpinner,
   faArrowLeft,
+  faMinimize,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -26,16 +27,195 @@ import {
   FlaskConical,
   MoveRight,
   Settings,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { useModal } from "../../context/ModalContext/ModalContext";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext/AuthContext";
 
-// Create a simple cache outside component to persist across re-renders
-const resourcesCache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// Enhanced Cache Manager
+class ResourcesCacheManager {
+  constructor() {
+    this.memoryCache = new Map();
+    this.cacheKeys = this.loadCacheKeys();
+    this.CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    this.STALE_TIME = 30 * 1000; // 30 seconds - data is stale after this
+    this.MAX_CACHE_SIZE = 100; // Maximum number of cached items
+    this.backgroundFetches = new Map(); // Track ongoing background fetches
+  }
 
-// SearchSection Component
+  loadCacheKeys() {
+    try {
+      const keys = localStorage.getItem('resources_cache_keys');
+      return keys ? JSON.parse(keys) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  saveCacheKeys() {
+    try {
+      localStorage.setItem('resources_cache_keys', JSON.stringify(this.cacheKeys));
+    } catch (error) {
+      console.warn('Failed to save cache keys:', error);
+    }
+  }
+
+  generateCacheKey(params) {
+    const { searchQuery, filterType, filterCourse, filterSubject, sortBy } = params;
+    return `${searchQuery || ''}-${filterType || 'All'}-${filterCourse || 'All'}-${filterSubject || 'All'}-${sortBy || 'recent'}`;
+  }
+
+  isValidCache(cacheEntry) {
+    if (!cacheEntry || !cacheEntry.timestamp) return false;
+    return Date.now() - cacheEntry.timestamp < this.CACHE_DURATION;
+  }
+
+  isStaleCache(cacheEntry) {
+    if (!cacheEntry || !cacheEntry.timestamp) return true;
+    return Date.now() - cacheEntry.timestamp > this.STALE_TIME;
+  }
+
+  get(params) {
+    const key = this.generateCacheKey(params);
+    
+    // Try memory cache first
+    let cacheEntry = this.memoryCache.get(key);
+    
+    // If not in memory, try localStorage
+    if (!cacheEntry) {
+      try {
+        const stored = localStorage.getItem(`resources_cache_${key}`);
+        if (stored) {
+          cacheEntry = JSON.parse(stored);
+          // Re-populate memory cache
+          this.memoryCache.set(key, cacheEntry);
+        }
+      } catch (error) {
+        console.warn('Failed to read from localStorage cache:', error);
+      }
+    }
+
+    if (this.isValidCache(cacheEntry)) {
+      return {
+        data: cacheEntry.data,
+        isStale: this.isStaleCache(cacheEntry),
+        timestamp: cacheEntry.timestamp,
+        fromCache: true
+      };
+    }
+
+    // Clean up expired entry
+    this.delete(key);
+    return null;
+  }
+
+  set(params, data) {
+    const key = this.generateCacheKey(params);
+    const cacheEntry = {
+      data,
+      timestamp: Date.now(),
+      params: { ...params }
+    };
+
+    // Store in memory cache
+    this.memoryCache.set(key, cacheEntry);
+
+    // Store in localStorage with error handling
+    try {
+      localStorage.setItem(`resources_cache_${key}`, JSON.stringify(cacheEntry));
+      
+      // Update cache keys tracking
+      if (!this.cacheKeys.includes(key)) {
+        this.cacheKeys.push(key);
+        
+        // Implement LRU eviction if cache is too large
+        if (this.cacheKeys.length > this.MAX_CACHE_SIZE) {
+          const oldestKey = this.cacheKeys.shift();
+          this.delete(oldestKey);
+        }
+        
+        this.saveCacheKeys();
+      }
+    } catch (error) {
+      console.warn('Failed to save to localStorage cache:', error);
+      // Continue with memory-only caching
+    }
+  }
+
+  delete(key) {
+    this.memoryCache.delete(key);
+    try {
+      localStorage.removeItem(`resources_cache_${key}`);
+      this.cacheKeys = this.cacheKeys.filter(k => k !== key);
+      this.saveCacheKeys();
+    } catch (error) {
+      console.warn('Failed to delete from localStorage cache:', error);
+    }
+  }
+
+  clear() {
+    this.memoryCache.clear();
+    try {
+      this.cacheKeys.forEach(key => {
+        localStorage.removeItem(`resources_cache_${key}`);
+      });
+      localStorage.removeItem('resources_cache_keys');
+    } catch (error) {
+      console.warn('Failed to clear localStorage cache:', error);
+    }
+    this.cacheKeys = [];
+    this.backgroundFetches.clear();
+  }
+
+  // Prefetch data for common filter combinations
+  prefetch(commonParams, fetchFunction) {
+    commonParams.forEach(params => {
+      const key = this.generateCacheKey(params);
+      if (!this.get(params) && !this.backgroundFetches.has(key)) {
+        this.backgroundFetches.set(key, true);
+        fetchFunction(params).then(data => {
+          this.set(params, data);
+        }).catch(error => {
+          console.warn('Prefetch failed:', error);
+        }).finally(() => {
+          this.backgroundFetches.delete(key);
+        });
+      }
+    });
+  }
+
+  getStats() {
+    const memorySize = this.memoryCache.size;
+    const localStorageSize = this.cacheKeys.length;
+    const validEntries = this.cacheKeys.filter(key => {
+      try {
+        const stored = localStorage.getItem(`resources_cache_${key}`);
+        if (stored) {
+          const entry = JSON.parse(stored);
+          return this.isValidCache(entry);
+        }
+      } catch {
+        return false;
+      }
+      return false;
+    }).length;
+
+    return {
+      memorySize,
+      localStorageSize,
+      validEntries,
+      expiredEntries: localStorageSize - validEntries,
+      backgroundFetches: this.backgroundFetches.size
+    };
+  }
+}
+// Create singleton cache instance
+const cacheManager = new ResourcesCacheManager();
+
+// SearchSection Component (keeping existing implementation with refresh prop)
 const SearchSection = ({
   searchQuery,
   setSearchQuery,
@@ -45,7 +225,9 @@ const SearchSection = ({
   setFilterCourse,
   filterSubject,
   setFilterSubject,
-  handleRefresh, // Added prop for refresh functionality
+  handleRefresh,
+  cacheStats, // New prop to show cache info
+  resource, onSave,
 }) => {
   const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [suggestions, setSuggestions] = useState([]);
@@ -54,6 +236,7 @@ const SearchSection = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  
   const inputRef = useRef(null);
   const navigate = useNavigate();
   const { showModal } = useModal();
@@ -117,7 +300,9 @@ const SearchSection = ({
     }
     setShowSuggestions(false);
   };
-
+  
+  
+  
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -160,6 +345,17 @@ const SearchSection = ({
         filterSubject,
         focusInput: true,
       },
+    });
+  };
+
+  const handleClearCache = () => {
+    cacheManager.clear();
+    handleRefresh(true); // Force refresh after clearing cache
+    showModal({
+      type: 'success',
+      title: 'Cache Cleared',
+      message: 'All cached data has been cleared and fresh data is being loaded.',
+      confirmText: 'OK',
     });
   };
 
@@ -213,7 +409,7 @@ const SearchSection = ({
         transition={{ delay: 0.1 }}
         className="bg-white dark:bg-charcoal/95 rounded-2xl shadow-lg p-4 w-full max-w-[1150px]"
       >
-        {/* Header - Mobile style for all screens */}
+        {/* Header with cache info */}
         <div className="flex justify-between items-center mb-4">
           <motion.h2
             initial={{ opacity: 0, y: -10 }}
@@ -226,16 +422,26 @@ const SearchSection = ({
               className="text-amber-600 dark:text-amber-200"
             />
             <span>Search</span>
+            {cacheStats && (
+              <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded-full">
+                {cacheStats.validEntries} cached
+              </span>
+            )}
           </motion.h2>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleFullViewClick}
-            className="text-sm font-medium text-amber-600 dark:text-amber-200 flex items-center gap-1"
-          >
-            <span>Full View</span>
-            <MoveRight size={16} />
-          </motion.button>
+          <div className="flex items-center gap-2">
+            
+            {cacheStats && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleClearCache}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                title="Clear Cache"
+              >
+                Clear Cache
+              </motion.button>
+            )}
+          </div>
         </div>
 
         <form className="space-y-4">
@@ -419,7 +625,7 @@ const SearchSection = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="button"
-              onClick={handleRefresh}
+              onClick={() => handleRefresh()}
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-onyx rounded-lg shadow-sm text-sm font-medium bg-white dark:bg-onyx/90 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-amber-950/40 transition-colors duration-200"
             >
               <RefreshCcw
@@ -465,7 +671,7 @@ const SearchSection = ({
                   icon={Bookmark}
                   options={subjectOptions}
                   selectedValue={filterSubject}
-                  onSelect={handleFilterSelect(setFilterSubject)}
+                  onSelect={handleFilterSelect(setFilterSelect)}
                   loading={isFiltering}
                 />
               </div>
@@ -476,8 +682,8 @@ const SearchSection = ({
         {/* Recent Searches */}
         {recentSearches.length > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             className="mt-4 flex items-center gap-2 flex-wrap max-w-full overflow-x-auto pb-2 scroll-container"
           >
@@ -509,7 +715,7 @@ const SearchSection = ({
   );
 };
 
-// Dropdown Component
+// Dropdown Component (keeping existing implementation)
 const Dropdown = ({
   label,
   icon: Icon,
@@ -534,7 +740,7 @@ const Dropdown = ({
     onSelect(value);
     setIsOpen(false);
   };
-
+  
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -568,8 +774,8 @@ const Dropdown = ({
               icon={faSpinner}
               spin
               className="text-amber-600 dark:text-amber-200"
-            />
-          ) : (
+              />
+            ) : (
             Icon && (
               <Icon className="text-amber-600 dark:text-amber-200" size={20} />
             )
@@ -601,7 +807,7 @@ const Dropdown = ({
               key={option.value}
               whileHover={{
                 backgroundColor:
-                  option.value === selectedValue
+                option.value === selectedValue
                     ? "rgba(253, 230, 138, 0.5)"
                     : "rgba(249, 250, 251, 0.5)",
                 dark: {
@@ -635,7 +841,7 @@ const Dropdown = ({
   );
 };
 
-// ResourcesSection Component
+// Enhanced ResourcesSection Component
 const ResourcesSection = ({
   searchQuery: propSearchQuery,
   filterType: propFilterType,
@@ -648,10 +854,12 @@ const ResourcesSection = ({
   fetchSuggestions,
   recentSearches = [],
   addRecentSearch,
+   onSave , onFlag
 }) => {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isStaleData, setIsStaleData] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const [localSearchQuery, setLocalSearchQuery] = useState("");
@@ -661,7 +869,15 @@ const ResourcesSection = ({
   const [localSortBy, setLocalSortBy] = useState("recent");
   const initialLoadDone = useRef(false);
   const lastFetchParams = useRef(null);
-
+  const backgroundFetchRef = useRef(null);
+  const [cacheStats, setCacheStats] = useState(null);
+  const {isAuthenticated , token} = useAuth();
+  const [saving, setSaving] = useState(false);
+  const [flagging, setFlagging] = useState(false);
+  
+  // New state to control exit animation
+  const [isExiting, setIsExiting] = useState(false);
+  
   const {
     searchQuery = propSearchQuery || "",
     filterType = propFilterType || "All",
@@ -678,43 +894,224 @@ const ResourcesSection = ({
     setLocalFilterSubject(filterSubject);
     setLocalSortBy(sortBy);
     if (focusInput) {
-      // Note: inputRef is managed within SearchSection
+      // Focus handling would be in SearchSection
     }
   }, [searchQuery, filterType, filterCourse, filterSubject, sortBy, focusInput]);
-
+  
+  const handleSave = async () => {
+      if (!isAuthenticated) {
+        showModal({
+          type: "warning",
+          title: "Authentication Required",
+          message:
+            "You need to be logged in to save resources to your library. Please log in or create an account.",
+          confirmText: "Go to Login",
+          onConfirm: () => (window.location.href = "/login"),
+          cancelText: "Cancel",
+          isDismissible: true,
+        });
+        return;
+      }
+      setSaving(true);
+      try {
+        const response = await fetch(
+          `${API_URL}/resources/${resources._id}/save`,
+          {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+  
+        const data = await response.json();
+        if (response.ok) {
+          showModal({
+            type: "success",
+            title: "Resource Saved!",
+            message:
+              "This resource has been successfully added to your library!",
+            confirmText: "Great!",
+          });
+          onSave?.(resources._id);
+        } else {
+          showModal({
+            type: "error",
+            title: "Failed to Save",
+            message: `Could not save resource: ${data.msg || "Unknown error"}`,
+            confirmText: "OK",
+          });
+        }
+      } catch (error) {
+        console.error("Save error:", error);
+        showModal({
+          type: "error",
+          title: "Save Error",
+          message:
+            "An unexpected error occurred while saving the resource. Please try again.",
+          confirmText: "OK",
+        });
+      } finally {
+        setSaving(false);
+      }
+    };
+  
+    const handleFlag = async () => {
+      if (!isAuthenticated) {
+        showModal({
+          type: "warning",
+          title: "Authentication Required",
+          message:
+            "You need to be logged in to flag resources. Please log in or create an account.",
+          confirmText: "Go to Login",
+          onConfirm: () => (window.location.href = "/login"),
+          cancelText: "Cancel",
+          isDismissible: true,
+        });
+        return;
+      }
+  
+      showModal({
+        type: "info",
+        title: "Confirm Flagging",
+        message:
+          "Are you sure you want to flag this resource for review? This action cannot be undone.",
+        confirmText: "Flag",
+        onConfirm: async () => {
+          setFlagging(true);
+          try {
+            const response = await fetch(
+              `${API_URL}/resources/${resources._id}/flag`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ reason: "Reported by user" }),
+              }
+            );
+  
+            const data = await response.json();
+            if (response.ok) {
+              showModal({
+                type: "success",
+                title: "Resource Flagged",
+                message:
+                  "This resource has been flagged for review. Thank you for helping us maintain content quality!",
+                confirmText: "Got It",
+              });
+              onFlag?.(resources._id);
+            } else {
+              showModal({
+                type: "error",
+                title: "Failed to Flag",
+                message: `Could not flag resource: ${
+                  data.msg || "Unknown error"
+                }`,
+                confirmText: "OK",
+              });
+            }
+          } catch (error) {
+            console.error("Flag error:", error);
+            showModal({
+              type: "error",
+              title: "Flagging Error",
+              message:
+                "An unexpected error occurred while flagging the resource. Please try again.",
+              confirmText: "OK",
+            });
+          } finally {
+            setFlagging(false);
+          }
+        },
+        cancelText: "Cancel",
+        isDismissible: true,
+      });
+    };
   const setSortBy = propSetSortBy || setLocalSortBy;
   const { showModal } = useModal();
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-  const createCacheKey = useCallback(
+  // Update cache stats
+  useEffect(() => {
+    const updateCacheStats = () => {
+      setCacheStats(cacheManager.getStats());
+    };
+    
+    updateCacheStats();
+    const interval = setInterval(updateCacheStats, 5000); // Update every 5 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const createFetchParams = useCallback(
     (searchQuery, filterType, filterCourse, filterSubject, sortBy) => {
-      return `${searchQuery}-${filterType}-${filterCourse}-${filterSubject}-${sortBy}`;
+      return {
+        searchQuery: searchQuery || "",
+        filterType: filterType || "All",
+        filterCourse: filterCourse || "All",
+        filterSubject: filterSubject || "All",
+        sortBy: sortBy || "recent",
+      };
     },
     []
   );
 
   const shouldSkipFetch = useMemo(() => {
-    const currentParams = {
-      search: localSearchQuery,
-      type: localFilterType,
-      course: localFilterCourse,
-      subject: localFilterSubject,
-      sort: localSortBy,
-    };
+    const currentParams = createFetchParams(
+      localSearchQuery,
+      localFilterType,
+      localFilterCourse,
+      localFilterSubject,
+      localSortBy
+    );
 
     const paramsString = JSON.stringify(currentParams);
     const lastParamsString = JSON.stringify(lastFetchParams.current);
 
     return paramsString === lastParamsString && initialLoadDone.current;
-  }, [localSearchQuery, localFilterType, localFilterCourse, localFilterSubject, localSortBy]);
+  }, [localSearchQuery, localFilterType, localFilterCourse, localFilterSubject, localSortBy, createFetchParams]);
+
+  const fetchFromAPI = useCallback(async (params) => {
+    const queryParams = new URLSearchParams();
+    if (params.searchQuery) queryParams.append("search", params.searchQuery);
+    if (params.filterType && params.filterType !== "All")
+      queryParams.append("type", params.filterType);
+    if (params.filterCourse && params.filterCourse !== "All")
+      queryParams.append("course", params.filterCourse);
+    if (params.filterSubject && params.filterSubject !== "All")
+      queryParams.append("subject", params.filterSubject);
+    if (params.sortBy === "popular") queryParams.append("sortBy", "downloads");
+    if (params.sortBy === "rating") queryParams.append("sortBy", "averageRating");
+    if (params.sortBy === "recent") queryParams.append("sortBy", "createdAt");
+
+    const url = `${API_URL}/resources?${queryParams.toString()}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    let resourcesData = [];
+
+    if (Array.isArray(data)) {
+      resourcesData = data;
+    } else if (data && Array.isArray(data.resources)) {
+      resourcesData = data.resources;
+    } else {
+      console.error("API response format is not as expected:", data);
+      resourcesData = [];
+    }
+
+    return resourcesData;
+  }, [API_URL]);
 
   const fetchResources = useCallback(
-    async (isRefresh = false) => {
-      if (shouldSkipFetch && !isRefresh) {
-        return;
-      }
-
-      const cacheKey = createCacheKey(
+    async (isRefresh = false, showLoadingState = true) => {
+      const currentParams = createFetchParams(
         localSearchQuery,
         localFilterType,
         localFilterCourse,
@@ -722,70 +1119,94 @@ const ResourcesSection = ({
         localSortBy
       );
 
+      if (shouldSkipFetch && !isRefresh) {
+        return;
+      }
+
+      // Cancel any ongoing background fetch
+      if (backgroundFetchRef.current) {
+        backgroundFetchRef.current.abort();
+        backgroundFetchRef.current = null;
+      }
+
+      // Try to get from cache first (unless force refresh)
       if (!isRefresh) {
-        const cached = resourcesCache.get(cacheKey);
-        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        const cached = cacheManager.get(currentParams);
+        if (cached) {
           setResources(cached.data);
+          setError(null);
+          setIsStaleData(cached.isStale);
           initialLoadDone.current = true;
-          return;
+
+          // If data is stale, fetch fresh data in background
+          if (cached.isStale) {
+            console.log("Using stale cached data, fetching fresh data in background...");
+            
+            // Create abort controller for background fetch
+            const abortController = new AbortController();
+            backgroundFetchRef.current = abortController;
+            
+            try {
+              const freshData = await fetchFromAPI(currentParams);
+              
+              // Only update if this fetch wasn't cancelled
+              if (!abortController.signal.aborted) {
+                cacheManager.set(currentParams, freshData);
+                setResources(freshData);
+                setIsStaleData(false);
+                console.log("Background refresh completed");
+              }
+            } catch (err) {
+              if (!abortController.signal.aborted) {
+                console.warn("Background refresh failed:", err);
+              }
+            } finally {
+              if (backgroundFetchRef.current === abortController) {
+                backgroundFetchRef.current = null;
+              }
+            }
+          }
+
+          return cached.data;
         }
       }
 
-      lastFetchParams.current = {
-        search: localSearchQuery,
-        type: localFilterType,
-        course: localFilterCourse,
-        subject: localFilterSubject,
-        sort: localSortBy,
-      };
+      // No cache hit or force refresh - show loading and fetch
+      lastFetchParams.current = currentParams;
 
-      setLoading(true);
+      if (showLoadingState) {
+        setLoading(true);
+      }
       setError(null);
 
       try {
-        const queryParams = new URLSearchParams();
-        if (localSearchQuery) queryParams.append("search", localSearchQuery);
-        if (localFilterType && localFilterType !== "All")
-          queryParams.append("type", localFilterType);
-        if (localFilterCourse && localFilterCourse !== "All")
-          queryParams.append("course", localFilterCourse);
-        if (localFilterSubject && localFilterSubject !== "All")
-          queryParams.append("subject", localFilterSubject);
-        if (localSortBy === "popular") queryParams.append("sortBy", "downloads");
-        if (localSortBy === "rating") queryParams.append("sortBy", "averageRating");
-        if (localSortBy === "recent") queryParams.append("sortBy", "createdAt");
-
-        const url = `${API_URL}/resources?${queryParams.toString()}`;
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        let resourcesData = [];
-
-        if (Array.isArray(data)) {
-          resourcesData = data;
-        } else if (data && Array.isArray(data.resources)) {
-          resourcesData = data.resources;
-        } else {
-          console.error("API response format is not as expected:", data);
-          resourcesData = [];
-        }
-
-        setResources(resourcesData);
-
-        resourcesCache.set(cacheKey, {
-          data: resourcesData,
-          timestamp: Date.now(),
-        });
-
+        const freshData = await fetchFromAPI(currentParams);
+        
+        // Update cache and state
+        cacheManager.set(currentParams, freshData);
+        setResources(freshData);
+        setIsStaleData(false);
+        setError(null);
         initialLoadDone.current = true;
+
+        // Prefetch common filter combinations
+        const commonParams = [
+          { ...currentParams, filterType: "Notes" },
+          { ...currentParams, filterType: "Question Paper" },
+          { ...currentParams, sortBy: "popular" },
+        ];
+        
+        // Don't wait for prefetch
+        setTimeout(() => {
+          cacheManager.prefetch(commonParams, fetchFromAPI);
+        }, 1000);
+
+        return freshData;
       } catch (err) {
         console.error("Failed to fetch resources:", err);
         setError("Failed to load resources. Please try again.");
         setResources([]);
+        setIsStaleData(false);
       } finally {
         setLoading(false);
       }
@@ -796,9 +1217,9 @@ const ResourcesSection = ({
       localFilterCourse,
       localFilterSubject,
       localSortBy,
-      API_URL,
-      createCacheKey,
+      createFetchParams,
       shouldSkipFetch,
+      fetchFromAPI,
     ]
   );
 
@@ -814,226 +1235,296 @@ const ResourcesSection = ({
     }
   }, [localSearchQuery, localFilterType, localFilterCourse, localFilterSubject, localSortBy, fetchResources]);
 
-  const handleRefresh = useCallback(() => {
-    fetchResources(true);
+  const handleRefresh = useCallback((forceClear = false) => {
+    if (forceClear) {
+      cacheManager.clear();
+    }
+    fetchResources(true, true); // Force refresh with loading state
   }, [fetchResources]);
 
   const displayedResources = useMemo(() => resources, [resources]);
 
   const showLoadingState = loading && (!initialLoadDone.current || resources.length === 0);
 
+  // New logic for the minimize/exit animation
+  const handleMinimize = () => {
+    setIsExiting(true);
+  };
+  
+  useEffect(() => {
+    if (isExiting) {
+      const timer = setTimeout(() => {
+        navigate("/");
+      }, 500); // Duration of the exit animation
+      return () => clearTimeout(timer);
+    }
+  }, [isExiting, navigate]);
+  
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (backgroundFetchRef.current) {
+        backgroundFetchRef.current.abort();
+      }
+    };
+  }, []);
+
   return (
-    <motion.section
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className={`px-4 py-8 max-w-full mx-auto min-h-screen transition-all duration-300 ${
-        isFullPage
-          ? "bg-gray-100 dark:bg-gradient-to-br pt-16 dark:from-onyx dark:via-charcoal dark:to-onyx"
-          : "bg-transparent"
-      }`}
-    >
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => navigate("/")}
-        className={`fixed ${
-          isFullPage ? "visible" : "hidden"
-        } top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal`}
-      >
-        <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
-        <span>Back</span>
-      </motion.button>
+    <AnimatePresence>
+      {!isExiting && (
+        <motion.section
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, scale: 0.8, y: 100 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className={`px-4 py-8 max-w-full mx-auto min-h-screen transition-all duration-300 ${
+            isFullPage
+              ? "bg-gradient-to-br from-pearl via-ivory to-cream dark:bg-gradient-to-br pt-16 dark:from-onyx dark:via-charcoal dark:to-onyx dark:text-white text-gray-500"
+              : "bg-transparent"
+          }`}
+        >
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleMinimize}
+            className={`fixed ${
+              isFullPage ? "visible" : "hidden"
+            } top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal`}
+          >
+            <FontAwesomeIcon icon={faMinimize} className="text-sm" />
+            <span>Minimize</span>
+          </motion.button>
 
-      {showSearchControls && (
-        <SearchSection
-          searchQuery={localSearchQuery}
-          setSearchQuery={setLocalSearchQuery}
-          filterType={localFilterType}
-          setFilterType={setLocalFilterType}
-          filterCourse={localFilterCourse}
-          setFilterCourse={setLocalFilterCourse}
-          filterSubject={localFilterSubject}
-          setFilterSubject={setLocalFilterSubject}
-          handleRefresh={handleRefresh}
-        />
-      )}
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 max-w-6xl mx-auto"
-      >
-        <h2 className="text-2xl font-semibold dark:text-white font-poppins">
-          Popular Resources{" "}
-          {loading && initialLoadDone.current && (
-            <FontAwesomeIcon
-              icon={faSpinner}
-              spin
-              className="ml-2 text-amber-600 dark:text-amber-200"
-              size="sm"
+          {showSearchControls && (
+            <SearchSection
+              searchQuery={localSearchQuery}
+              setSearchQuery={setLocalSearchQuery}
+              filterType={localFilterType}
+              setFilterType={setLocalFilterType}
+              filterCourse={localFilterCourse}
+              setFilterCourse={setLocalFilterCourse}
+              filterSubject={localFilterSubject}
+              setFilterSubject={setLocalFilterSubject}
+              handleRefresh={handleRefresh}
+              cacheStats={cacheStats}
             />
           )}
-        </h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600 dark:text-platinum font-poppins">
-            Sort by:
-          </span>
-          <div className="relative">
-            <motion.select
-              whileHover={{ scale: 1.02 }}
-              whileFocus={{ scale: 1.02 }}
-              className="p-2 pr-8 border rounded-lg bg-white text-gray-700 border-gray-300 hover:border-gray-400 dark:bg-onyx/80 dark:text-platinum dark:border-onyx font-poppins focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:focus:ring-amber-200 dark:focus:border-amber-200 shadow-glow-sm"
-              value={localSortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <option value="recent">Most Recent</option>
-              <option value="popular">Most Popular</option>
-              <option value="rating">Highest Rated</option>
-            </motion.select>
-            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <svg
-                className="w-4 h-4 text-gray-500 dark:text-amber-200"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 max-w-6xl mx-auto"
+          >
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-semibold dark:text-white font-poppins">
+                Popular Resources{" "}
+                {loading && initialLoadDone.current && (
+                  <FontAwesomeIcon
+                    icon={faSpinner}
+                    spin
+                    className="ml-2 text-amber-600 dark:text-amber-200"
+                    size="sm"
+                  />
+                )}
+              </h2>
+              
+              {/* Connection and Cache Status */}
+              <div className="flex items-center gap-2">
+                {isStaleData && (
+                  <span className="flex items-center gap-1 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded-full">
+                    <WifiOff size={12} />
+                    Cached
+                  </span>
+                )}
+                {backgroundFetchRef.current && (
+                  <span className="flex items-center gap-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
+                    <RefreshCcw size={12} className="animate-spin" />
+                    Updating
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {showLoadingState && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="text-center py-12 flex flex-col items-center justify-center text-gray-600 dark:text-platinum font-poppins"
-        >
-          <motion.div
-            animate={{
-              rotate: 360,
-            }}
-            transition={{
-              rotate: {
-                repeat: Infinity,
-                duration: 1.5,
-                ease: "linear",
-              },
-            }}
-          >
-            <FontAwesomeIcon
-              icon={faSpinner}
-              size="2x"
-              className="mb-4 text-amber-600 dark:text-amber-200"
-            />
+            
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-platinum font-poppins">
+                Sort by:
+              </span>
+              <div className="relative">
+                <motion.select
+                  whileHover={{ scale: 1.02 }}
+                  whileFocus={{ scale: 1.02 }}
+                  className="p-2 pr-8 border rounded-lg bg-white text-gray-700 border-gray-300 hover:border-gray-400 dark:bg-onyx/80 dark:text-platinum dark:border-onyx font-poppins focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:focus:ring-amber-200 dark:focus:border-amber-200 shadow-glow-sm"
+                  value={localSortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                >
+                  <option value="recent">Most Recent</option>
+                  <option value="popular">Most Popular</option>
+                  <option value="rating">Highest Rated</option>
+                </motion.select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                  <svg
+                    className="w-4 h-4 text-gray-500 dark:text-amber-200"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
           </motion.div>
-          <motion.p
-            animate={{
-              opacity: [0.6, 1, 0.6],
-            }}
-            transition={{
-              repeat: Infinity,
-              duration: 2,
-            }}
-          >
-            Loading resources...
-          </motion.p>
-        </motion.div>
-      )}
 
-      {error && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="text-center py-12 text-red-600 dark:text-amber-300 font-poppins"
-        >
-          Error: {error}
-        </motion.div>
-      )}
-
-      {!showLoadingState && !error && displayedResources.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="text-center py-12"
-        >
-          <div className="max-w-md mx-auto">
+          {showLoadingState && (
             <motion.div
-              animate={{
-                y: [0, -5, 0],
-                transition: { repeat: Infinity, duration: 2 },
-              }}
-              className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-charcoal flex items-center justify-center shadow-glow-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+              className="text-center py-12 flex flex-col items-center justify-center text-gray-600 dark:text-platinum font-poppins"
             >
-              <FontAwesomeIcon
-                icon={faSearch}
-                className="text-2xl text-amber-600 dark:text-amber-200"
-              />
+              <motion.div
+                animate={{
+                  rotate: 360,
+                }}
+                transition={{
+                  rotate: {
+                    repeat: Infinity,
+                    duration: 1.5,
+                    ease: "linear",
+                  },
+                }}
+              >
+                <FontAwesomeIcon
+                  icon={faSpinner}
+                  size="2x"
+                  className="mb-4 text-amber-600 dark:text-amber-200"
+                />
+              </motion.div>
+              <motion.p
+                animate={{
+                  opacity: [0.6, 1, 0.6],
+                }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 2,
+                }}
+              >
+                Loading resources...
+              </motion.p>
             </motion.div>
-            <h3 className="text-xl font-medium bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 bg-clip-text text-transparent font-poppins mb-2">
-              No resources found
-            </h3>
-            <p className="text-gray-600 dark:text-platinum font-poppins">
-              Try adjusting your search terms or filters.
-            </p>
-          </div>
-        </motion.div>
-      )}
+          )}
 
-      <motion.div
-        className="max-w-6xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mx-auto gap-8"
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: {
-            opacity: 1,
-            transition: {
-              when: "beforeChildren",
-              staggerChildren: 0.1,
-              staggerDirection: 1,
-            },
-          },
-        }}
-      >
-        {displayedResources.map((resource) => (
+          {error && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+              className="text-center py-12 text-red-600 dark:text-amber-300 font-poppins"
+            >
+              <div className="max-w-md mx-auto">
+                <div className="text-lg mb-2">⚠️ Error</div>
+                <p className="mb-4">{error}</p>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleRefresh(false)}
+                  className="px-4 py-2 bg-amber-600 dark:bg-amber-200 text-white dark:text-amber-900 rounded-lg hover:bg-amber-700 dark:hover:bg-amber-300 transition-colors"
+                >
+                  Try Again
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
+
+          {!showLoadingState && !error && displayedResources.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+              className="text-center py-12"
+            >
+              <div className="max-w-md mx-auto">
+                <motion.div
+                  animate={{
+                    y: [0, -5, 0],
+                    transition: { repeat: Infinity, duration: 2 },
+                  }}
+                  className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-charcoal flex items-center justify-center shadow-glow-sm"
+                >
+                  <FontAwesomeIcon
+                    icon={faSearch}
+                    className="text-2xl text-amber-600 dark:text-amber-200"
+                  />
+                </motion.div>
+                <h3 className="text-xl font-medium bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 bg-clip-text text-transparent font-poppins mb-2">
+                  No resources found
+                </h3>
+                <p className="text-gray-600 dark:text-platinum font-poppins">
+                  Try adjusting your search terms or filters.
+                </p>
+              </div>
+            </motion.div>
+          )}
+
           <motion.div
-            key={resource._id}
+            className="max-w-6xl grid grid-cols-1 md:grid-cols-2  lg:grid-cols-3 mx-auto gap-8"
+            initial="hidden"
+            animate="visible"
             variants={{
-              hidden: { opacity: 0, y: 20, scale: 0.95 },
+              hidden: { opacity: 0 },
               visible: {
                 opacity: 1,
-                y: 0,
-                scale: 1,
                 transition: {
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 20,
+                  when: "beforeChildren",
+                  staggerChildren: 0.1,
+                  staggerDirection: 1,
                 },
               },
             }}
           >
-            <Link
-              to={`/resources/${resource._id}`}
-              state={{ resource: resource }}
-            >
-              <ResourceCard resource={resource} />
-            </Link>
+            {displayedResources.map((resource) => (
+              <motion.div
+                key={resource._id}
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    transition: {
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 20,
+                    },
+                  
+                  },
+                }}
+              >
+                <Link
+                  to={`/resources/${resource._id}`}
+                  state={{ resource: resource }}
+                >
+                  <UniversalResourceCard 
+        key={resource._id}
+        resource={resource}
+        variant="default"
+        // onSave={handleSave}
+        // onFlag={handleFlag}
+      />
+                </Link>
+              </motion.div>
+            ))}
           </motion.div>
-        ))}
-      </motion.div>
-    </motion.section>
+        </motion.section>
+      )}
+    </AnimatePresence>
   );
 };
 

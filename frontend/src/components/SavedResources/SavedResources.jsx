@@ -5,7 +5,6 @@ import {
   faSearch,
   faFilter,
   faSpinner,
-  faTrash,
   faExclamationTriangle,
   faChevronDown,
   faChevronUp,
@@ -14,25 +13,16 @@ import {
   faArrowLeft,
 } from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "../../context/AuthContext/AuthContext";
-import ResourceCard from "../ResourceCard/ResourceCard"; // Adjust path as needed
+import { useModal } from "../../context/ModalContext/ModalContext";
+import { useTheme } from "../../context/ThemeProvider/ThemeProvider.jsx";
 import CustomWarningModal from "../CustomWarningModal/CustomWarningModal";
-
-// Enhanced ResourceCard wrapper for saved resources
-const SavedResourceCard = ({ resource, onUnsave, showModal }) => {
-  return (
-    <ResourceCard
-      resource={resource}
-      onSave={() => {}} // Already saved, no action needed
-      onFlag={() => {}} // Handle flag if needed
-      showModal={showModal}
-      isSavedPage={true} // Pass isSavedPage to show delete button
-      onUnsave={onUnsave} // Pass onUnsave handler
-    />
-  );
-};
+import UniversalResourceCard from "../UniversalResourceCard/UniversalResourceCard";
+import Navbar from "../Navbar/Navbar";
 
 const SavedResourcesPage = () => {
   const { token, isAuthenticated } = useAuth();
+  const { showModal, closeModal } = useModal();
+  const { isDarkMode } = useTheme();
   const [savedResources, setSavedResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -83,62 +73,12 @@ const SavedResourcesPage = () => {
     }
   }, [isAuthenticated, fetchSavedResources]);
 
-  // Modal handler
-  const showModal = useCallback((config) => {
-    setModalConfig(config);
-  }, []);
-
-  const closeModal = useCallback(() => {
-    setModalConfig(null);
-  }, []);
-
   // Handle unsaving a resource
-  const handleUnsave = useCallback(
-    async (resourceId) => {
-      try {
-        const response = await fetch(
-          `${API_URL}/resources/${resourceId}/unsave`,
-          {
-            method: "PUT",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.msg || "Failed to unsave resource");
-        }
-
-        // Remove the resource from local state
-        setSavedResources((prev) =>
-          prev.filter((resource) => resource._id !== resourceId)
-        );
-
-        showModal({
-          type: "success",
-          title: "Resource Removed",
-          message: "The resource has been removed from your saved library.",
-          confirmText: "OK",
-          onConfirm: () => closeModal(),
-          onCancel: null,
-        });
-      } catch (err) {
-        console.error("Error unsaving resource:", err);
-        showModal({
-          type: "error",
-          title: "Error",
-          message: `Failed to remove resource: ${err.message}`,
-          confirmText: "OK",
-          onConfirm: () => closeModal(),
-          onCancel: null,
-        });
-      }
-    },
-    [token, showModal, closeModal]
-  );
+  const handleUnsave = useCallback((resourceId) => {
+    setSavedResources((prev) =>
+      prev.filter((resource) => resource._id !== resourceId)
+    );
+  }, []);
 
   // Get unique subjects for filter
   const subjects = useMemo(() => {
@@ -206,15 +146,15 @@ const SavedResourcesPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-onyx flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200 dark:from-onyx dark:via-charcoal dark:to-onyx flex items-center justify-center">
+        <div className="text-center  backdrop-blur-lg rounded-2xl p-8 border border-gray-200/50 dark:border-charcoal/50">
           <FontAwesomeIcon
             icon={faSpinner}
             spin
             size="2x"
-            className="text-blue-500 mb-4"
+            className="text-amber-500 mb-4"
           />
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-gray-600 dark:text-gray-400 font-poppins">
             Loading your saved resources...
           </p>
         </div>
@@ -224,20 +164,20 @@ const SavedResourcesPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center max-w-md">
+      <div className="min-h-screen bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200 dark:from-onyx dark:via-charcoal dark:to-onyx flex items-center justify-center">
+        <div className="text-center max-w-md bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl p-8 shadow-glow-sm border border-gray-200/50 dark:border-charcoal/50">
           <FontAwesomeIcon
             icon={faExclamationTriangle}
             size="2x"
             className="text-red-500 mb-4"
           />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          <h2 className="text-xl font-poppins font-semibold text-gray-900 dark:text-white mb-2">
             Error Loading Resources
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+          <p className="text-gray-600 dark:text-gray-400 mb-4 font-poppins">{error}</p>
           <button
             onClick={fetchSavedResources}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-400 text-white rounded-xl font-medium shadow-glow-sm hover:shadow-glow-sm transition-all duration-300 hover:scale-105 transform active:scale-95 font-poppins"
           >
             Try Again
           </button>
@@ -247,34 +187,38 @@ const SavedResourcesPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Fixed Back Button */}
-        <button
-          onClick={handleGoBack}
-          className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal"
-        >
-          <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
-          <span>Back</span>
-        </button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200 dark:from-onyx dark:via-charcoal dark:to-onyx">
+      {/* Back Button */}
+      <button
+        onClick={handleGoBack}
+        className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-xl border border-gray-200/50 dark:border-charcoal/50"
+      >
+        <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
+        <span className="font-poppins">Back</span>
+      </button>
 
-        {/* Header */}
-        <div className="flex items-center justify-center gap-3 mb-6 sm:mb-10 pt-16 sm:pt-8">
-          <FontAwesomeIcon
-            icon={faBookmark}
-            className="text-blue-500 text-xl sm:text-2xl"
-          />
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+      <Navbar />
+      
+      <div className="relative z-10 max-w-7xl mx-auto p-4 pt-20 animate-fade-in">
+        {/* Page Header */}
+        <div className="flex items-center justify-center gap-3 mb-6 sm:mb-10 sm:pt-8">
+          <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-400 rounded-xl shadow-glow-sm">
+            <FontAwesomeIcon
+              icon={faBookmark}
+              className="text-white text-xl sm:text-2xl"
+            />
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-poppins font-bold text-gray-900 dark:text-white">
             My Saved Resources
           </h1>
         </div>
 
-        <p className="text-gray-600 dark:text-gray-400 mb-8 text-center sm:text-left">
+        <p className="text-gray-600 dark:text-gray-400 mb-8 text-center sm:text-left font-poppins">
           Your personal library of saved academic resources
         </p>
 
         {/* Search and Filters */}
-        <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-8 overflow-hidden">
+        <div className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-glow-sm border border-gray-200/50 dark:border-charcoal/50 p-6 mb-8 overflow-hidden">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search */}
             <div className="flex-1">
@@ -288,7 +232,7 @@ const SavedResourcesPage = () => {
                   placeholder="Search your saved resources..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx dark:text-white"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-charcoal rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:bg-onyx/95 dark:text-white bg-white/95 transition-all duration-200 hover:shadow-glow-sm font-poppins"
                 />
               </div>
             </div>
@@ -299,7 +243,7 @@ const SavedResourcesPage = () => {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx/60 dark:text-white appearance-none pr-8"
+                  className="w-full sm:w-auto px-4 py-3 border border-gray-300 dark:border-charcoal rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:bg-onyx/95 dark:text-white bg-white/95 appearance-none pr-8 transition-all duration-200 hover:shadow-glow-sm font-poppins"
                 >
                   <option value="savedDate">Recently Saved</option>
                   <option value="title">Title A-Z</option>
@@ -312,7 +256,7 @@ const SavedResourcesPage = () => {
 
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="w-full sm:w-auto px-4 py-2 bg-gray-100 dark:bg-onyx/60 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center gap-2 whitespace-nowrap"
+                className="w-full sm:w-auto px-4 py-3 bg-gray-100/95 dark:bg-onyx/95 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-200 hover:scale-105 shadow-glow-sm font-poppins"
               >
                 <FontAwesomeIcon icon={faFilter} />
                 <span>Filters</span>
@@ -325,17 +269,17 @@ const SavedResourcesPage = () => {
 
           {/* Advanced Filters */}
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="mt-6 pt-6 border-t border-gray-200/50 dark:border-charcoal/50">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 font-poppins">
                     Subject
                   </label>
                   <div className="relative">
                     <select
                       value={selectedSubject}
                       onChange={(e) => setSelectedSubject(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx dark:text-white appearance-none pr-8"
+                      className="w-full px-3 py-3 border border-gray-300 dark:border-charcoal rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:bg-onyx/95 dark:text-white bg-white/95 appearance-none pr-8 transition-all duration-200 hover:shadow-glow-sm font-poppins"
                     >
                       <option value="">All Subjects</option>
                       {subjects.map((subject) => (
@@ -348,14 +292,14 @@ const SavedResourcesPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 font-poppins">
                     File Type
                   </label>
                   <div className="relative">
                     <select
                       value={filterBy}
                       onChange={(e) => setFilterBy(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-charcoal rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-onyx/60 dark:text-white appearance-none pr-8"
+                      className="w-full px-3 py-3 border border-gray-300 dark:border-charcoal rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:bg-onyx/95 dark:text-white bg-white/95 appearance-none pr-8 transition-all duration-200 hover:shadow-glow-sm font-poppins"
                     >
                       <option value="all">All Types</option>
                       <option value="pdf">PDF Documents</option>
@@ -373,7 +317,7 @@ const SavedResourcesPage = () => {
                       setFilterBy("all");
                       setSortBy("savedDate");
                     }}
-                    className="w-full sm:w-auto px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-charcoal rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="w-full sm:w-auto px-4 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-charcoal rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-105 shadow-glow-sm font-poppins"
                   >
                     Clear Filters
                   </button>
@@ -383,49 +327,55 @@ const SavedResourcesPage = () => {
           )}
         </div>
 
-        {/* Stats */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
+          <div className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-glow-sm border border-gray-200/50 dark:border-charcoal/50 p-6 hover:scale-105 transition-all duration-300">
             <div className="flex items-center">
-              <FontAwesomeIcon
-                icon={faBookmark}
-                className="text-blue-500 text-2xl mr-3"
-              />
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl shadow-glow-sm mr-4">
+                <FontAwesomeIcon
+                  icon={faBookmark}
+                  className="text-white text-xl"
+                />
+              </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-2xl font-bold text-gray-900 dark:text-white font-poppins">
                   {savedResources.length}
                 </p>
-                <p className="text-gray-600 dark:text-gray-400">Total Saved</p>
+                <p className="text-gray-600 dark:text-gray-400 font-poppins">Total Saved</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
+          <div className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-glow-sm border border-gray-200/50 dark:border-charcoal/50 p-6 hover:scale-105 transition-all duration-300">
             <div className="flex items-center">
-              <FontAwesomeIcon
-                icon={faGraduationCap}
-                className="text-green-500 text-2xl mr-3"
-              />
+              <div className="p-3 bg-gradient-to-br from-green-500 to-teal-500 rounded-xl shadow-glow-sm mr-4">
+                <FontAwesomeIcon
+                  icon={faGraduationCap}
+                  className="text-white text-xl"
+                />
+              </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-2xl font-bold text-gray-900 dark:text-white font-poppins">
                   {subjects.length}
                 </p>
-                <p className="text-gray-600 dark:text-gray-400">Subjects</p>
+                <p className="text-gray-600 dark:text-gray-400 font-poppins">Subjects</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-onyx/60 rounded-lg shadow-sm border border-gray-200 dark:border-charcoal p-6">
+          <div className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-glow-sm border border-gray-200/50 dark:border-charcoal/50 p-6 hover:scale-105 transition-all duration-300">
             <div className="flex items-center">
-              <FontAwesomeIcon
-                icon={faEye}
-                className="text-purple-500 text-2xl mr-3"
-              />
+              <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-glow-sm mr-4">
+                <FontAwesomeIcon
+                  icon={faEye}
+                  className="text-white text-xl"
+                />
+              </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-2xl font-bold text-gray-900 dark:text-white font-poppins">
                   {filteredAndSortedResources.length}
                 </p>
-                <p className="text-gray-600 dark:text-gray-400">Showing</p>
+                <p className="text-gray-600 dark:text-gray-400 font-poppins">Showing</p>
               </div>
             </div>
           </div>
@@ -433,26 +383,28 @@ const SavedResourcesPage = () => {
 
         {/* Resources Grid */}
         {filteredAndSortedResources.length === 0 ? (
-          <div className="text-center py-12">
-            <FontAwesomeIcon
-              icon={faBookmark}
-              size="3x"
-              className="text-gray-300 dark:text-gray-600 mb-4"
-            />
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          <div className="text-center py-16 bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-glow-sm border border-gray-200/50 dark:border-charcoal/50">
+            <div className="p-6 bg-gradient-to-br from-gray-100 to-gray-200 dark:bg-onyx/60 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+              <FontAwesomeIcon
+                icon={faBookmark}
+                size="2x"
+                className="text-gray-400 dark:text-charcoal"
+              />
+            </div>
+            <h3 className="text-2xl font-poppins font-semibold text-gray-900 dark:text-white mb-3">
               {savedResources.length === 0
                 ? "No Saved Resources Yet"
                 : "No Resources Found"}
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto font-poppins">
               {savedResources.length === 0
                 ? "Start building your library by saving resources you find interesting!"
                 : "Try adjusting your search or filter criteria."}
             </p>
             {savedResources.length === 0 && (
               <button
-                onClick={() => (window.location.href = "/explore")} // Adjust route as needed
-                className="px-6 py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                onClick={() => (window.location.href = "/resources")}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-400 text-white rounded-xl font-medium shadow-glow-sm hover:shadow-glow-sm transition-all duration-300 hover:scale-105 transform active:scale-95 font-poppins"
               >
                 Explore Resources
               </button>
@@ -460,13 +412,19 @@ const SavedResourcesPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredAndSortedResources.map((resource) => (
-              <SavedResourceCard
+            {filteredAndSortedResources.map((resource, index) => (
+              <div
                 key={resource._id}
-                resource={resource}
-                onUnsave={handleUnsave}
-                showModal={showModal}
-              />
+                className="animate-fade-in"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <UniversalResourceCard
+                  resource={resource}
+                  variant="saved"
+                  onUnsave={handleUnsave}
+                  onSave={fetchSavedResources}
+                />
+              </div>
             ))}
           </div>
         )}

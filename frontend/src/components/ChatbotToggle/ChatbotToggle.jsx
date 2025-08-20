@@ -36,24 +36,27 @@ const ChatbotToggle = () => {
       )}
 
       {/* Chatbot container */}
-      {isOpen && (
-        <div
-          className={`transform transition-all duration-${ANIMATION_DURATION} ease-[cubic-bezier(0.22,1,0.36,1)] z-50
-            ${isOpen ? (isMobile ? 'translate-y-0 opacity-100 scale-100 rounded-t-2xl' : 'translate-y-0 opacity-100 scale-100') : (isMobile ? 'translate-y-full opacity-0 scale-95 pointer-events-none' : 'translate-y-4 opacity-0 scale-95 pointer-events-none')}
-            fixed bottom-0 right-0 left-0 sm:bottom-20 sm:right-6 sm:left-auto
-            w-full sm:w-[400px] md:w-[450px] lg:w-[500px]
-            h-[85vh] sm:h-[600px] md:h-[650px]
-            bg-onyx rounded-t-2xl sm:rounded-2xl lg:rounded-3xl
-            shadow-2xl sm:shadow-3xl overflow-hidden flex flex-col
-            border border-onyx`}
-          style={{
-            maxHeight: 'calc(100vh - 5rem)',
-            ...(isMobile && { width: '100vw', left: 0, right: 0 }),
-          }}
-        >
-          <ChatbotContent isOpen={isOpen} setIsOpen={setIsOpen} />
-        </div>
-      )}
+        {isOpen && (
+      <div
+    className={`transform transition-all duration-${ANIMATION_DURATION} ease-[cubic-bezier(0.22,1,0.36,1)] z-50
+      ${isOpen
+        ? (isMobile ? 'translate-y-0 opacity-100 scale-100 rounded-t-2xl' : 'translate-y-0 opacity-100 scale-100')
+        : 'translate-y-full opacity-0 scale-95 pointer-events-none'
+      }
+      fixed bottom-0 right-0 left-0 sm:bottom-20 sm:right-6 sm:left-auto
+      w-full sm:w-[400px] md:w-[450px] lg:w-[500px]
+      h-[85vh] sm:h-[600px] md:h-[650px]
+      rounded-t-2xl sm:rounded-2xl lg:rounded-3xl
+      overflow-hidden flex flex-col
+        `}
+    style={{
+      maxHeight: 'calc(100vh - 5rem)',
+      ...(isMobile && { width: '100vw', left: 0, right: 0 }),
+    }}
+  >
+    <ChatbotContent isOpen={isOpen} setIsOpen={setIsOpen} />
+  </div>
+        )}
 
       {/* FAB button */}
       <button

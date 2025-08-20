@@ -44,13 +44,20 @@ const Modal = ({ isOpen, onClose, title, message, onConfirm }) => {
           className="relative bg-white dark:bg-onyx rounded-2xl p-6 shadow-xl w-full max-w-sm mx-auto transition-all"
         >
           <div className="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-onyx-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {title}
+            </h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+            >
               <X size={20} />
             </button>
           </div>
           <div className="mt-4">
-            <p className="text-sm text-gray-600 dark:text-gray-300">{message}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              {message}
+            </p>
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <button
@@ -79,11 +86,13 @@ const Notification = ({ show, message, type, onClose }) => {
   if (!show) return null;
 
   const typeStyles = {
-    success: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+    success:
+      "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300",
     error: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300",
   };
 
-  const icon = type === "success" ? <CheckCircle size={20} /> : <AlertCircle size={20} />;
+  const icon =
+    type === "success" ? <CheckCircle size={20} /> : <AlertCircle size={20} />;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -101,7 +110,10 @@ const Notification = ({ show, message, type, onClose }) => {
     >
       {icon}
       <p className="text-sm font-medium">{message}</p>
-      <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-onyx transition-colors">
+      <button
+        onClick={onClose}
+        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-onyx transition-colors"
+      >
         <X size={16} />
       </button>
     </motion.div>
@@ -119,8 +131,16 @@ const AdminResources = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [expandedResourceId, setExpandedResourceId] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [modalContent, setModalContent] = useState({ title: "", message: "", onConfirm: () => {} });
-  const [notification, setNotification] = useState({ show: false, message: "", type: "" });
+  const [modalContent, setModalContent] = useState({
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+  const [notification, setNotification] = useState({
+    show: false,
+    message: "",
+    type: "",
+  });
 
   const limit = 20; // Number of resources per page
 
@@ -175,9 +195,17 @@ const AdminResources = () => {
         try {
           await api.toggleResourceVisibility(resourceId);
           fetchResources(); // Refresh list
-          showNotification("Resource visibility changed successfully.", "success");
+          showNotification(
+            "Resource visibility changed successfully.",
+            "success"
+          );
         } catch (err) {
-          showNotification(`Failed to toggle visibility: ${err.response?.data?.msg || err.message}`, "error");
+          showNotification(
+            `Failed to toggle visibility: ${
+              err.response?.data?.msg || err.message
+            }`,
+            "error"
+          );
         } finally {
           setShowModal(false);
         }
@@ -189,14 +217,20 @@ const AdminResources = () => {
   const handleDeleteResource = async (resourceId) => {
     setModalContent({
       title: "Delete Resource",
-      message: "Are you sure you want to delete this resource permanently? This action is irreversible.",
+      message:
+        "Are you sure you want to delete this resource permanently? This action is irreversible.",
       onConfirm: async () => {
         try {
           await api.deleteResource(resourceId);
           fetchResources(); // Refresh list
           showNotification("Resource deleted successfully.", "success");
         } catch (err) {
-          showNotification(`Failed to delete resource: ${err.response?.data?.msg || err.message}`, "error");
+          showNotification(
+            `Failed to delete resource: ${
+              err.response?.data?.msg || err.message
+            }`,
+            "error"
+          );
         } finally {
           setShowModal(false);
         }
@@ -206,9 +240,12 @@ const AdminResources = () => {
   };
 
   const handleResolveFlags = async (resourceId, actionType) => {
-    const title = actionType === "remove" ? "Remove Flagged Resource" : "Approve Resource";
+    const title =
+      actionType === "remove" ? "Remove Flagged Resource" : "Approve Resource";
     const message = `Are you sure you want to ${
-      actionType === "remove" ? "permanently remove this resource due to flags" : "approve this resource and clear its flags"
+      actionType === "remove"
+        ? "permanently remove this resource due to flags"
+        : "approve this resource and clear its flags"
     }?`;
 
     setModalContent({
@@ -219,11 +256,20 @@ const AdminResources = () => {
           await api.resolveFlags(resourceId, actionType);
           fetchResources(); // Refresh list
           showNotification(
-            `Resource ${actionType === "remove" ? "removed" : "flags resolved and approved"} successfully.`,
+            `Resource ${
+              actionType === "remove"
+                ? "removed"
+                : "flags resolved and approved"
+            } successfully.`,
             "success"
           );
         } catch (err) {
-          showNotification(`Failed to resolve flags: ${err.response?.data?.msg || err.message}`, "error");
+          showNotification(
+            `Failed to resolve flags: ${
+              err.response?.data?.msg || err.message
+            }`,
+            "error"
+          );
         } finally {
           setShowModal(false);
         }
@@ -398,7 +444,9 @@ const AdminResources = () => {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                          {resource.title}
+                          {resource.title.length > 17
+                            ? resource.title.slice(0, 17) + "..."
+                            : resource.title}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-300 truncate">
                           {resource.subject}
@@ -636,7 +684,9 @@ const AdminResources = () => {
                               )}
 
                               <button
-                                onClick={() => handleDeleteResource(resource._id)}
+                                onClick={() =>
+                                  handleDeleteResource(resource._id)
+                                }
                                 className="flex items-center justify-center p-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 dark:bg-red-900/20 dark:text-red-200 dark:hover:bg-red-900/30 transition-colors"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />

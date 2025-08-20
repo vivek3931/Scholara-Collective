@@ -189,7 +189,7 @@ const Settings = () => {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Settings Navigation */}
             <div className="lg:col-span-1">
-              <div className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-lg border border-gray-200/50 dark:border-charcoal/50 p-6 sticky top-24">
+              <div className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl border border-gray-200/50 dark:border-charcoal/50 p-6 sticky top-24 shadow-glow-sm">
                 <h2 className="text-lg font-poppins font-semibold text-gray-800 dark:text-gray-200 mb-4">
                   Quick Settings
                 </h2>
@@ -242,7 +242,7 @@ const Settings = () => {
             {/* Main Settings Panel */}
             <div className="lg:col-span-2 space-y-8">
               {/* Account Settings */}
-              <section className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-lg border border-gray-200/50 dark:border-charcoal/50 p-8">
+              <section className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-glow-sm border border-gray-200/50 dark:border-charcoal/50 p-8">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-400 rounded-lg shadow-glow-sm">
                     <User size={20} className="text-white" />
@@ -303,7 +303,7 @@ const Settings = () => {
                 </form>
               </section>
               {/* Password Settings */}
-              <section className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-lg border border-gray-200/50 dark:border-charcoal/50 p-8">
+              <section className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-glow-sm border border-gray-200/50 dark:border-charcoal/50 p-8">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-400 rounded-lg shadow-glow-sm">
                     <Shield size={20} className="text-white" />
