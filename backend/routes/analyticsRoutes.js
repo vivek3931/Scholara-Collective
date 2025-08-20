@@ -20,11 +20,19 @@ router.get('/public-stats', async (req, res) => {
         const universities = await Resource.distinct('institution');
         const totalUniversities = universities.length;
         
+        // New lines to calculate referral stats
+        const totalReferralCoinsResult = await User.aggregate([{ $group: { _id: null, total: { $sum: '$referralCoins' } } }]);
+        const totalReferralCoins = totalReferralCoinsResult.length > 0 ? totalReferralCoinsResult[0].total : 0;
+        const totalReferrals = await User.countDocuments({ referredBy: { $exists: true } });
+
         res.json({
             resources: totalResources,
             students: totalStudents,
             courses: totalCourses,
-            universities: totalUniversities
+            universities: totalUniversities,
+            // Added referral stats to the response
+            referralCoins: totalReferralCoins,
+            totalReferrals: totalReferrals
         });
     } catch (err) {
         console.error('Public stats route error:', err.message);

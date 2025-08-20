@@ -31,6 +31,8 @@ router.post('/login', authController.login);
 // @access  Private
 router.get('/me', protect, authController.getMe); // 'protect' middleware comes before the controller
 router.patch('/users/profile', protect, authController.updateProfile);
+router.post('/verify-token', authController.verifyToken); 
+
 
 router.post('/change-password', protect, authController.changePassword);
 
