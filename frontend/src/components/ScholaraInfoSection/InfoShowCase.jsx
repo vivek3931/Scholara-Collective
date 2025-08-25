@@ -1,49 +1,71 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Search, BookOpen } from "lucide-react";
-import { useTheme } from "../../context/ThemeProvider/ThemeProvider.jsx";
+import { useTheme } from "../../context/ThemeProvider/ThemeProvider.jsx"; // Assuming this path is correct
 
 export default function InfoShowCaseMobile() {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode } = useTheme(); // isDarkMode is available but not used in the provided snippet
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResult, setSearchResult] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [showZoom, setShowZoom] = useState(false);
-
+  const [hasStartedAnimation, setHasStartedAnimation] = useState(false); // New state to track if animation has begun
+  
+  const componentRef = useRef(null); // Ref for the component's DOM element
   const targetText = "what is Scholara collective";
 
-  // Auto-typing animation
+  // Intersection Observer to start animation when component enters viewport
   useEffect(() => {
-    let timeoutId;
-    const startTyping = () => {
-      setIsTyping(true);
-      let currentIndex = 0;
-
-      const typeCharacter = () => {
-        if (currentIndex <= targetText.length) {
-          setSearchQuery(targetText.slice(0, currentIndex));
-          currentIndex++;
-          timeoutId = setTimeout(typeCharacter, 100);
-        } else {
-          setIsTyping(false);
-          setTimeout(() => {
-            setShowZoom(true);
-            setTimeout(() => {
-              performSearch();
-            }, 800);
-          }, 500);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // If the component is intersecting (visible) and animation hasn't started yet
+        if (entry.isIntersecting && !hasStartedAnimation) {
+          setHasStartedAnimation(true); // Mark animation as started
+          startTypingSequence(); // Begin the animation
+          observer.disconnect(); // Stop observing after animation starts
         }
-      };
+      },
+      {
+        threshold: 0.1, // Trigger when 10% of the component is visible
+      }
+    );
 
-      typeCharacter();
-    };
+    if (componentRef.current) {
+      observer.observe(componentRef.current);
+    }
 
-    const initialDelay = setTimeout(startTyping, 1000);
     return () => {
-      clearTimeout(timeoutId);
-      clearTimeout(initialDelay);
+      if (componentRef.current) {
+        observer.unobserve(componentRef.current);
+      }
+      observer.disconnect();
     };
-  }, []);
+  }, [hasStartedAnimation]); // Rerun if hasStartedAnimation changes to ensure proper cleanup
+
+  // Function to encapsulate the animation sequence
+  const startTypingSequence = () => {
+    let timeoutId;
+    let currentIndex = 0;
+
+    const typeCharacter = () => {
+      if (currentIndex <= targetText.length) {
+        setSearchQuery(targetText.slice(0, currentIndex));
+        currentIndex++;
+        timeoutId = setTimeout(typeCharacter, 100);
+      } else {
+        setIsTyping(false);
+        setTimeout(() => {
+          setShowZoom(true);
+          setTimeout(() => {
+            performSearch();
+          }, 800);
+        }, 500);
+      }
+    };
+
+    setIsTyping(true);
+    typeCharacter(); // Start typing immediately once called
+  };
 
   const performSearch = () => {
     setIsSearching(true);
@@ -60,8 +82,9 @@ export default function InfoShowCaseMobile() {
   };
 
   return (
-    <section className="min-h-full w-full overflow-y-auto px-3 py-10 relative">
-      <section className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-glow-sm border border-gray-200/50 dark:border-charcoal/50 p-6 h-[560px] transition-colors duration-300">
+    // Attach the ref to the outermost element of the component
+    <section ref={componentRef} className="min-h-full w-full overflow-y-auto relative">
+      <section className="bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg rounded-2xl shadow-glow-sm border border-gray-200/50 dark:border-charcoal/50 p-4 lg:p-6 h-auto transition-colors duration-300">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-400 rounded-lg shadow-glow-sm">
@@ -110,8 +133,6 @@ export default function InfoShowCaseMobile() {
               ) : (
                 <Search size={20} />
               )}
-
-              
             </button>
           </div>
         </div>
@@ -145,7 +166,7 @@ export default function InfoShowCaseMobile() {
                 {searchResult.title}
               </h3>
             </div>
-            <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-4 text-md">
+            <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-4 lg:text-md text-sm ">
               {searchResult.content}
             </p>
             <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-medium">

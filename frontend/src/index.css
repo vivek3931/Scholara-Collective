@@ -6,6 +6,8 @@
 @tailwind components;
 @tailwind utilities;
 
+
+
 :root {
   --color-text-primary: 51 51 51; /* charcoal for light mode */
   --color-text-secondary: 51 51 51; /* charcoal for light mode */
@@ -25,6 +27,10 @@
   /* Set a default scrollbar color for light mode */
   scrollbar-color: rgb(var(--color-amber-400)) transparent;
   scrollbar-width: thin;
+}
+
+.mobile-scroll-container{
+  scrollbar-width: none;
 }
 
 .dark {
@@ -176,6 +182,55 @@ body.dark ::-webkit-scrollbar-track {
   }
 }
 
+/* Add these classes to your existing CSS to fix iPhone preview positioning */
+
+/* Prevent layout shift from scrollbar on mobile screens */
+.iphone-preview-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  /* Compensate for potential scrollbar space */
+  padding-right: calc(100vw - 100%);
+  box-sizing: border-box;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 1023px) {
+  .iphone-preview-container {
+    padding-right: 0;
+    padding-left: calc(100vw - 100%);
+  }
+  
+  /* Ensure the iPhone preview is perfectly centered */
+  .iphone-preview-wrapper {
+    transform: translateX(calc((100vw - 100%) / -2));
+  }
+}
+
+/* For very small screens */
+@media (max-width: 640px) {
+  .iphone-preview-container {
+    padding-left: 0;
+    transform: none;
+  }
+  
+  .iphone-preview-wrapper {
+    transform: none;
+    scale: 0.8; /* Slightly smaller on mobile */
+  }
+}
+
+/* Alternative: Force consistent scrollbar space */
+.scrollbar-gutter {
+  scrollbar-gutter: stable;
+}
+
+/* Prevent horizontal overflow */
+.prevent-horizontal-scroll {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 /* Font faces */
 @font-face {
   font-family: 'Playfair Display';
@@ -230,6 +285,8 @@ body.dark ::-webkit-scrollbar-track {
 .custom-warning-modal{
   z-index: 9999999;
 }
+
+
 
 
 /* Prevent white flash on slower devices */

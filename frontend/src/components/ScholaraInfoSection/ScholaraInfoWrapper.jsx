@@ -4,7 +4,7 @@ import InfoShowCaseMobile from "./InfoShowCase";
 
 const ScholaraInfoWrapper = () => {
   return (
-    <div className="flex flex-col-reverse max-w-7xl lg:flex-row items-center justify-center gap-12 mx-auto  ">
+    <div className="flex flex-col-reverse max-w-7xl lg:flex-row items-center justify-center gap-12 mx-auto p-4 ">
       <InfoShowCaseMobile />
       <ScholaraInfoSection />
     </div>
