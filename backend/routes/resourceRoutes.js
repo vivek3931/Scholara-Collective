@@ -2,14 +2,14 @@
 
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');   
+const crypto = require('crypto');
 const cloudinary = require('cloudinary').v2;
 const Resource = require('../models/Resource');
 const { protect, authorize } = require('../middleware/authMiddleware');
-const User = require('../models/User'); 
+const User = require('../models/User');
 const axios = require('axios');
 const mongoose = require('mongoose');
-const pdf = require('pdf-parse');
+const pdf = require('pdf-parse'); // For PDF text extraction
 const Subject = require('../models/Subject')
 
 require('dotenv').config();
@@ -19,23 +19,23 @@ cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
-    timeout: 60000 
+    timeout: 60000
 });
 
 const multer = require('multer');
 const storage = multer.memoryStorage();
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, 
+    limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (file.mimetype === 'application/pdf' ||
             file.mimetype.startsWith('image/') ||
-            file.mimetype === 'application/msword' || 
-            file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
-            file.mimetype === 'application/vnd.ms-excel' || 
-            file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-            file.mimetype === 'application/vnd.ms-powerpoint' || 
-            file.mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
+            file.mimetype === 'application/msword' ||
+            file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+            file.mimetype === 'application/vnd.ms-excel' ||
+            file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+            file.mimetype === 'application/vnd.ms-powerpoint' ||
+            file.mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
         ) {
             cb(null, true);
         } else {
@@ -49,7 +49,14 @@ const getCloudinaryResourceType = (mimetype) => {
     if (mimetype.startsWith('image/')) {
         return 'image';
     }
-    return 'raw';
+    // Cloudinary treats PDFs for thumbnail generation via "page" parameter
+    // effectively like a video resource for extraction purposes, or 'auto'
+    // when using its transformation syntax. However, the initial upload
+    // of a PDF should still be 'raw' for content storage.
+    if (mimetype === 'application/pdf') {
+        return 'raw'; // Store PDF as raw initially
+    }
+    return 'raw'; // Default for other documents
 };
 
 const getFileExtensionFromMime = (mimeType) => {
@@ -168,25 +175,56 @@ router.get('/trending', async (req, res) => {
     }
 });
 
-router.get("resources/:resourceId/thumbnail", async (req, res) => {
-  try {
-    const resource = await Resource.findById(req.params.resourceId); // Your DB logic
-    if (!resource || !resource.filePath) return res.status(404).json({ msg: "Resource not found" });
+// GET thumbnail route (for existing resources)
+router.get('/:id/thumbnail', async (req, res) => {
+    console.log("hit thumbnail route ")
+    try {
+        const resource = await Resource.findById(req.params.id);
+        if (!resource) {
+            return res.status(404).json({ msg: 'Resource not found' });
+        }
 
-    const output = await fromPath(resource.filePath, {
-      density: 100, // Low resolution
-      format: "jpeg",
-      width: 200,
-      height: 300,
-      page: 1,
-    }).bulk(-1);
-    
-    res.set("Content-Type", "image/jpeg");
-    res.send(output[0].buffer);
-  } catch (err) {
-    console.error("Thumbnail generation failed:", err);
-    res.status(500).json({ msg: "Failed to generate thumbnail" });
-  }
+        let thumbnailUrl = null;
+
+        if (resource.fileType === 'pdf') {
+             // For PDFs, use Cloudinary's URL generation with resource_type: 'image' to get a thumbnail of the first page
+            thumbnailUrl = cloudinary.url(resource.cloudinaryPublicId, {
+                resource_type: 'image', // Treat the PDF public_id as an image source for transformation
+                format: 'jpg',
+                page: 1, // Get the first page
+                width: 300,
+                crop: "fit",
+                quality: 'auto',
+                fetch_format: 'auto'
+            });
+        } else if (resource.fileType === 'image') {
+            // For images, generate a transformed URL
+            thumbnailUrl = cloudinary.url(resource.cloudinaryPublicId, {
+                resource_type: 'image',
+                width: 300,
+                crop: "fit",
+                quality: 'auto',
+                fetch_format: 'auto'
+            });
+        } else {
+            // For other document types, return a generic placeholder or null
+            return res.status(400).json({ msg: 'Thumbnail generation is not supported for this file type via this route.' });
+        }
+       
+        console.log("Generated thumbnail URL: ", thumbnailUrl);
+
+        if (thumbnailUrl) {
+            res.redirect(thumbnailUrl);
+        } else {
+            res.status(404).json({ msg: 'Thumbnail not available for this resource type.' });
+        }
+    } catch (err) {
+        console.error('Thumbnail route error:', err.message);
+        if (err.kind === 'ObjectId') {
+            return res.status(404).json({ msg: 'Resource not found' });
+        }
+        res.status(500).json({ msg: 'Server error fetching thumbnail.' });
+    }
 });
 
 // GET /api/resources/community/feed (Specific, and protected)
@@ -524,18 +562,12 @@ router.get('/:id/preview', async (req, res) => {
 router.post('/upload', protect, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({
-                msg: 'No file uploaded.'
-            });
+            return res.status(400).json({ msg: 'No file uploaded.' });
         }
 
-        // Use a quick byte-for-byte hash for exact duplicates
+        // === File Hashing for duplicate detection ===
         const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
-
-        // Check if a resource with the same file hash already exists
-        const existingFileHashResource = await Resource.findOne({
-            fileHash: fileHash
-        });
+        const existingFileHashResource = await Resource.findOne({ fileHash });
         if (existingFileHashResource) {
             return res.status(409).json({
                 msg: 'This resource (exact file) has already been uploaded. Thank you for contributing!',
@@ -552,20 +584,14 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
                 textContent = data.text;
             } catch (err) {
                 console.error("Error extracting text from PDF:", err);
-                return res.status(400).json({
-                    msg: "Failed to process PDF content."
-                });
+                return res.status(400).json({ msg: "Failed to process PDF content." });
             }
         }
 
-        // Generate a hash of the text content
         const textHash = crypto.createHash('sha256').update(textContent).digest('hex');
 
-        // Check if a resource with the same text content hash already exists
         if (isPdf) {
-            const existingTextHashResource = await Resource.findOne({
-                textHash: textHash
-            });
+            const existingTextHashResource = await Resource.findOne({ textHash });
             if (existingTextHashResource) {
                 return res.status(409).json({
                     msg: 'A resource with similar text content has already been uploaded.',
@@ -574,18 +600,9 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
             }
         }
 
-        const {
-            title,
-            subject,
-            year,
-            description,
-            tags,
-            institution,
-            course
-        } = req.body;
+        const { title, subject, year, description, tags, institution, course } = req.body;
 
-        // --- FIX 1: Handle the subject field sent as an object from the frontend ---
-        // This handles cases where the subject is a string or a JSON object.
+        // === Handle subject field (string/object) ===
         let subjectValue;
         if (typeof subject === 'string') {
             try {
@@ -600,60 +617,49 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
             subjectValue = subject;
         }
 
-        // --- NEW LOGIC TO HANDLE SUBJECT CREATION ---
         let finalSubjectName;
         if (subjectValue) {
-            // Trim whitespace and check against the database
             const trimmedSubject = subjectValue.trim();
-            let existingSubject = await Subject.findOne({
-                label: trimmedSubject
-            });
+            let existingSubject = await Subject.findOne({ label: trimmedSubject });
 
             if (!existingSubject) {
-                // If the subject doesn't exist, create a new one
                 existingSubject = new Subject({
-                    value: trimmedSubject.toLowerCase().replace(/\s/g, '-'), // create a slug
+                    value: trimmedSubject.toLowerCase().replace(/\s/g, '-'),
                     label: trimmedSubject,
-                    category: 'User-Generated' // A default category for new subjects
+                    category: 'User-Generated'
                 });
                 await existingSubject.save();
-                console.log(`New subject created: ${existingSubject.label}`);
             }
             finalSubjectName = existingSubject.label;
         }
 
-        // --- FIX 2: Correctly parse the 'year' to a number once ---
         const parsedYear = parseInt(year);
+        const currentYear = new Date().getFullYear();
 
         if (!title || !finalSubjectName || !parsedYear || !institution || !course) {
-            return res.status(400).json({
-                msg: 'Please enter all required fields (Title, Subject, Year, Institution, Course).'
-            });
+            return res.status(400).json({ msg: 'Please enter all required fields (Title, Subject, Year, Institution, Course).' });
         }
         if (title.length < 3 || title.length > 100) {
-            return res.status(400).json({
-                msg: 'Title must be between 3 and 100 characters.'
-            });
+            return res.status(400).json({ msg: 'Title must be between 3 and 100 characters.' });
         }
         if (description && description.length > 500) {
-            return res.status(400).json({
-                msg: 'Description cannot exceed 500 characters.'
-            });
+            return res.status(400).json({ msg: 'Description cannot exceed 500 characters.' });
         }
-        // Use the parsedYear for your validation check
-        const currentYear = new Date().getFullYear();
         if (parsedYear < 1900 || parsedYear > currentYear + 5) {
-            return res.status(400).json({
-                msg: `Invalid year. Must be between 1900 and ${currentYear + 5}.`
-            });
+            return res.status(400).json({ msg: `Invalid year. Must be between 1900 and ${currentYear + 5}.` });
         }
 
+        // === Upload to Cloudinary ===
         const resourceType = getCloudinaryResourceType(req.file.mimetype);
+        // Using 'fileType' to determine if it's an image or document for Cloudinary's initial upload
+        const cloudinaryUploadResourceType = req.file.mimetype.startsWith('image/') ? 'image' : 'raw';
+
         const fileExtension = getFileExtensionFromMime(req.file.mimetype) || getFileExtensionFromUrl(req.file.originalname);
         const originalName = req.file.originalname.replace(/\s/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
+
         const uploadOptions = {
             folder: 'paperpal_resources',
-            resource_type: resourceType,
+            resource_type: cloudinaryUploadResourceType, // Use 'image' for images, 'raw' for documents
             public_id: `paperpal_resources/${Date.now()}_${originalName}`,
             overwrite: false,
         };
@@ -663,65 +669,96 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
             throw new Error('Cloudinary upload failed to return a URL.');
         }
 
+        // === Generate Thumbnail ===
+        let thumbnailUrl = null;
+
+        if (isPdf) {
+            try {
+                // For PDFs, generate a thumbnail using Cloudinary's URL transformation.
+                // We reference the uploaded 'raw' public_id but transform it as an 'image'.
+                thumbnailUrl = cloudinary.url(result.public_id, {
+                    resource_type: 'image', // Treat the PDF public_id as an image source for transformation
+                    format: 'jpg',
+                    page: 1, // Get the first page
+                    width: 300,
+                    crop: "fit",
+                    quality: 'auto',
+                    fetch_format: 'auto'
+                });
+            } catch (e) {
+                console.error("Cloudinary PDF thumbnail generation failed:", e);
+                // Optionally set a default thumbnail here if generation fails
+            }
+        } else if (req.file.mimetype.startsWith("image/")) {
+            // For images, generate a thumbnail by transforming the uploaded image
+            thumbnailUrl = cloudinary.url(result.public_id, {
+                resource_type: 'image', // Already an image
+                width: 300,
+                crop: "fit",
+                quality: 'auto',
+                fetch_format: 'auto'
+            });
+        } else {
+            // For other document types (e.g., Word, Excel), you might have a generic placeholder
+            // For now, it remains null as there's no automatic thumbnail generation for them
+            thumbnailUrl = null; 
+        }
+
+        // === Save Resource ===
         const newResource = new Resource({
             title,
-            subject: finalSubjectName, // Use the extracted subject string
+            subject: finalSubjectName,
             course,
-            year: parsedYear, // Use the parsed integer year
+            year: parsedYear,
             description: description || '',
             tags: tags ? JSON.parse(tags) : [],
             institution,
             uploadedBy: req.user.id,
             cloudinaryUrl: result.secure_url,
             cloudinaryPublicId: result.public_id,
-            fileType: req.file.mimetype.split('/')[0] === 'image' ? 'image' : (fileExtension.substring(1) || 'document'),
+            fileType: req.file.mimetype.split('/')[0] === 'image'
+                ? 'image'
+                : (fileExtension.substring(1) || 'document'),
             visibility: 'public',
-            fileHash: fileHash,
-            textHash: isPdf ? textHash : undefined, // Save text hash only for PDFs
+            fileHash,
+            textHash: isPdf ? textHash : undefined,
+            thumbnailUrl // Save the generated thumbnail URL
         });
 
         const resource = await newResource.save();
 
-        // --- START: Coin System Logic for Upload ---
+        // === Coin System ===
         const user = await User.findById(req.user.id);
         if (user) {
-            user.scholaraCoins += 80; // Award 80 coins for upload
+            user.scholaraCoins += 80;
             await user.save();
         }
-        // --- END: Coin System Logic for Upload ---
 
+        // === Emit updated stats ===
         if (req.io) {
-            const stats = await (async () => {
-                return {
-                    resources: await Resource.countDocuments({
-                        visibility: 'public'
-                    }),
-                    students: await User.countDocuments(),
-                    courses: await Resource.distinct('course').length,
-                    universities: await Resource.distinct('institution').length
-                };
-            })();
+            const stats = {
+                resources: await Resource.countDocuments({ visibility: 'public' }),
+                students: await User.countDocuments(),
+                courses: (await Resource.distinct('course')).length,
+                universities: (await Resource.distinct('institution')).length
+            };
             req.io.emit('statsUpdated', stats);
         }
 
         res.status(201).json(resource);
+
     } catch (err) {
         console.error('Upload route error:', err.message);
         if (err.message === 'Invalid file type.') {
-            return res.status(400).json({
-                msg: 'Invalid file type.'
-            });
+            return res.status(400).json({ msg: 'Invalid file type.' });
         }
         if (err instanceof mongoose.Error.ValidationError) {
-            return res.status(400).json({
-                msg: err.message
-            });
+            return res.status(400).json({ msg: err.message });
         }
-        res.status(500).json({
-            msg: 'Server error during upload. ' + err.message
-        });
+        res.status(500).json({ msg: 'Server error during upload. ' + err.message });
     }
 });
+
 
 // Get comments for a resource
 router.get('/:id/comments', async (req, res) => {

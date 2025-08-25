@@ -6,7 +6,6 @@ const Subject = require('../models/Subject'); // Your Mongoose model
 router.get('/subjects', async (req, res) => {
   try {
     const allSubjects = await Subject.find({});
-        console.log('API is returning:', allSubjects); // ADD THIS LINE
 
     res.json(allSubjects);
   } catch (err) {
