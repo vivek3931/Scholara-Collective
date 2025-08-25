@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useModal } from "../../context/ModalContext/ModalContext";
 import { useAuth } from "../../context/AuthContext/AuthContext";
-import Navbar from "../../components/Navbar/Navbar";
 
 const UploadIcon = () => (
   <svg
@@ -42,8 +41,8 @@ const CheckIcon = () => (
 const UploadPage = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [subject, setSubject] = useState("");
-  const [subjectInput, setSubjectInput] = useState("");
+  const [subject, setSubject] = useState(""); // Stores the *value* of the selected/finalized subject
+  const [subjectInput, setSubjectInput] = useState(""); // Stores the text currently in the input field
   const [fetchedSubjects, setFetchedSubjects] = useState([]);
   const [filteredSubjects, setFilteredSubjects] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -65,7 +64,7 @@ const UploadPage = () => {
   const API_URL = import.meta.env.VITE_API_URL;
 
   const courses = [
-    { value: "", label: "Select Course Type (Optional)" },
+    { value: "", label: "Select Course Type" }, // Changed label to indicate it's required
     { value: "Notes", label: "Notes" },
     { value: "Question Paper", label: "Question Paper" },
     { value: "Book", label: "Book" },
@@ -97,9 +96,17 @@ const UploadPage = () => {
     const value = e.target.value;
     setSubjectInput(value);
     
-    if (subject && !fetchedSubjects.some(subj => subj.label === value)) {
-      setSubject("");
+    // Clear the selected subject if input doesn't match a fetched subject exactly
+    if (!fetchedSubjects.some(subj => subj.label.toLowerCase() === value.toLowerCase())) {
+        setSubject(""); // Unset the official subject if it no longer matches
+    } else {
+        // If it exactly matches an existing subject, set it
+        const matchedSubject = fetchedSubjects.find(subj => subj.label.toLowerCase() === value.toLowerCase());
+        if (matchedSubject) {
+            setSubject(matchedSubject.value);
+        }
     }
+
 
     if (subjectSearchTimeout) {
       clearTimeout(subjectSearchTimeout);
@@ -136,8 +143,8 @@ const UploadPage = () => {
   };
 
   const handleSubjectSelect = (subjectObj) => {
-    setSubjectInput(subjectObj.label);
-    setSubject(subjectObj.value);
+    setSubjectInput(subjectObj.label); // Display the label in the input
+    setSubject(subjectObj.value);     // Set the actual value for submission
     setShowSuggestions(false);
     subjectInputRef.current.focus();
   };
@@ -181,7 +188,6 @@ const UploadPage = () => {
   };
 
 
-
 const handleSubmit = async () => {
   setUploading(true);
 
@@ -197,16 +203,20 @@ const handleSubmit = async () => {
   }
 
   // Determine the final subject value to send
-  const finalSubjectValue = subject || subjectInput.trim();
-  
+  // If a suggestion was selected, 'subject' state will have its value.
+  // If the user typed a new subject, 'subjectInput' will have it.
+  const finalSubjectLabel = subjectInput.trim(); // Use subjectInput for the label
+
   // Construct the subject object to match the backend's expected format
   const finalSubjectObject = {
-    label: finalSubjectValue,
-    value: finalSubjectValue.toLowerCase().replace(/\s/g, "-"),
+    label: finalSubjectLabel,
+    value: (subject || finalSubjectLabel).toLowerCase().replace(/\s/g, "-"), // Use 'subject' if selected, else derive from label
   };
 
-  // Perform client-side validation for all required fields
-  if (!title.trim() || !finalSubjectValue || !year || !institution.trim() || !course.trim()) {
+
+  // --- Client-side validation ---
+  // Now also check if finalSubjectLabel is not empty
+  if (!title.trim() || !finalSubjectLabel || !year || !institution.trim() || !course.trim()) {
     showModal({
       type: "error",
       title: "Validation Error",
@@ -224,6 +234,7 @@ const handleSubmit = async () => {
     formData.append("description", description);
     
     // Append the stringified subject object to FormData
+    // Ensure the subject object sent to backend has a non-empty label
     formData.append("subject", JSON.stringify(finalSubjectObject));
     
     formData.append("course", course);
@@ -302,8 +313,7 @@ const handleSubmit = async () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pearl via-ivory to-cream dark:from-onyx dark:via-charcoal dark:to-onyx text-gray-900 dark:text-gray-100 transition-all duration-300 pt-16">
-      <Navbar />
+    <div className="min-h-screen bg-gradient-to-br from-pearl via-ivory to-cream dark:from-onyx dark:via-charcoal dark:to-onyx text-gray-900 dark:text-gray-100 transition-all duration-300 ">
 
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         <div className="mb-8 pt-16 sm:pt-8">
@@ -533,13 +543,14 @@ const handleSubmit = async () => {
                       htmlFor="course"
                       className="block text-sm font-semibold text-gray-700 dark:text-platinum mb-2"
                     >
-                      Course Type
+                      Course Type <span className="text-orange-500">*</span> {/* Made required */}
                     </label>
                     <select
                       id="course"
                       className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-xl border border-gray-300 dark:border-charcoal bg-white dark:bg-onyx text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 shadow-glow-sm text-sm sm:text-base"
                       value={course}
                       onChange={(e) => setCourse(e.target.value)}
+                      required // Made required
                     >
                       {courses.map((c) => (
                         <option key={c.value} value={c.value}>
@@ -554,7 +565,7 @@ const handleSubmit = async () => {
                       htmlFor="institution"
                       className="block text-sm font-semibold text-gray-700 dark:text-platinum mb-2"
                     >
-                      Institution
+                      Institution <span className="text-orange-500">*</span> {/* Made required */}
                     </label>
                     <input
                       type="text"
@@ -563,6 +574,7 @@ const handleSubmit = async () => {
                       placeholder="e.g., MIT, Delhi University"
                       value={institution}
                       onChange={(e) => setInstitution(e.target.value)}
+                      required // Made required
                     />
                   </div>
 
