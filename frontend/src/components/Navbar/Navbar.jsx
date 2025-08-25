@@ -13,6 +13,8 @@ import {
   LogOut,
   Bookmark,
   LayoutDashboard,
+  Search,
+  ArrowLeft,
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserFriends } from "@fortawesome/free-solid-svg-icons";
@@ -20,7 +22,6 @@ import { useAuth } from "../../context/AuthContext/AuthContext";
 import { useNavigate } from "react-router-dom";
 import logo from '../../assets/logo.svg'
 import coin from '../../assets/coin.svg'
-import axios from 'axios';
 
 // Desktop NavLink component
 const DesktopNavLink = ({ to, text }) => (
@@ -49,41 +50,21 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-  // REMOVE: const [userCoins, setUserCoins] = useState(0); 
-  const { isAuthenticated, user, logout, token } = useAuth(); // user will now contain scholaraCoins
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
+  
+  const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
   const profileDropdownRef = useRef(null);
   const mobileMenuRef = useRef(null);
-  // REMOVE: const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const searchInputRef = useRef(null);
+  const mobileSearchInputRef = useRef(null);
   
   // Check if the user is an admin or superadmin
   const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
 
-  // REMOVE this entire useEffect hook as coins will be managed by AuthContext
-  // useEffect(() => {
-  //   const fetchUserCoins = async () => {
-  //     if (!isAuthenticated || !token) {
-  //       setUserCoins(0);
-  //       return;
-  //     }
-  //     try {
-  //       const config = {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //         },
-  //       };
-  //       const response = await axios.get(`${API_URL}/users/me`, config);
-  //       if (response.data && typeof response.data.scholaraCoins === 'number') {
-  //         setUserCoins(response.data.scholaraCoins);
-  //       }
-  //     } catch (error) {
-  //       console.error("Failed to fetch user coins:", error);
-  //     }
-  //   };
-  //   fetchUserCoins();
-  // }, [isAuthenticated, token, API_URL]);
-
-  // --- Body Scroll Lock Logic ---
+  // Body Scroll Lock Logic
   useEffect(() => {
     const body = document.body;
     if (isMobileMenuOpen) {
@@ -96,7 +77,17 @@ const Navbar = () => {
     };
   }, [isMobileMenuOpen]);
 
-  // --- Mobile Menu Toggle with Animation Control ---
+  // Focus search input when search becomes active
+  useEffect(() => {
+    if (isSearchActive && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+    if (isMobileSearchActive && mobileSearchInputRef.current) {
+      mobileSearchInputRef.current.focus();
+    }
+  }, [isSearchActive, isMobileSearchActive]);
+
+  // Mobile Menu Toggle with Animation Control
   const toggleMobileMenu = () => {
     if (isMobileMenuOpen) {
       setIsAnimating(false);
@@ -105,18 +96,35 @@ const Navbar = () => {
       }, 300);
     } else {
       setIsMobileMenuOpen(true);
+      // Close profile dropdown when opening mobile menu
+      setIsProfileDropdownOpen(false);
       setTimeout(() => {
         setIsAnimating(true);
       }, 10);
     }
   };
 
-  // --- Profile Dropdown Toggle ---
+  // Search Toggle Functions
+  const toggleSearch = () => {
+    setIsSearchActive(!isSearchActive);
+    if (isSearchActive) {
+      setSearchQuery("");
+    }
+  };
+
+  const toggleMobileSearch = () => {
+    setIsMobileSearchActive(!isMobileSearchActive);
+    if (isMobileSearchActive) {
+      setSearchQuery("");
+    }
+  };
+
+  // Profile Dropdown Toggle
   const toggleProfileDropdown = () => {
     setIsProfileDropdownOpen((prev) => !prev);
   };
 
-  // --- Handle Logout ---
+  // Handle Logout
   const handleLogout = () => {
     logout();
     navigate("/");
@@ -124,7 +132,7 @@ const Navbar = () => {
     if (isMobileMenuOpen) toggleMobileMenu();
   };
 
-  // --- Handle NavLink click (closes mobile menu and dropdown) ---
+  // Handle NavLink click (closes mobile menu and dropdown)
   const handleNavLinkClick = () => {
     if (isMobileMenuOpen) {
       toggleMobileMenu();
@@ -132,7 +140,19 @@ const Navbar = () => {
     setIsProfileDropdownOpen(false);
   };
 
-  // --- Close handlers for clicking outside dropdowns/menus ---
+  // Handle Search Submit
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      // Navigate to search results page
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setIsSearchActive(false);
+      setIsMobileSearchActive(false);
+      setSearchQuery("");
+    }
+  };
+
+  // Close handlers for clicking outside dropdowns/menus
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -156,43 +176,136 @@ const Navbar = () => {
     };
   }, [isMobileMenuOpen]);
 
-  // --- Handle Escape Key ---
+  // Handle Escape Key
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === "Escape") {
         if (isMobileMenuOpen) toggleMobileMenu();
         if (isProfileDropdownOpen) setIsProfileDropdownOpen(false);
+        if (isSearchActive) {
+          setIsSearchActive(false);
+          setSearchQuery("");
+        }
+        if (isMobileSearchActive) {
+          setIsMobileSearchActive(false);
+          setSearchQuery("");
+        }
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isMobileMenuOpen, isProfileDropdownOpen]);
+  }, [isMobileMenuOpen, isProfileDropdownOpen, isSearchActive, isMobileSearchActive]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg shadow-lg border-b border-gray-200/50 dark:border-charcoal/50 transition-colors duration-300">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-        <Link to="/" className="flex items-center space-x-2 group">
-          <img src={logo} alt="Scholara Collective Logo" className="h-10 w-auto" />
-        </Link>
-
-        {/* Desktop Navigation Links */}
-        <div className="hidden lg:flex items-center space-x-6">
-          <DesktopNavLink to="/" text="Home" />
-          <DesktopNavLink to="/resources" text="Resources" />
-          {isAuthenticated && (
-            <>
-              <DesktopNavLink to="/saved" text="My Library" />
-              <DesktopNavLink to="/upload" text="Upload" />
-              {isAdmin && <DesktopNavLink to="/admin" text="Admin" />}
-            </>
+        {/* Left Section - Logo */}
+        <div className="flex items-center">
+          {!isSearchActive && !isMobileSearchActive && (
+            <Link to="/" className="flex items-center space-x-2 group">
+              <img src={logo} alt="Scholara Collective Logo" className="h-10 w-auto" />
+            </Link>
           )}
-          <DesktopNavLink to="/about" text="About" />
+          
+          {/* Back Arrow for Search Mode */}
+          {(isSearchActive || isMobileSearchActive) && (
+            <button
+              onClick={isMobileSearchActive ? toggleMobileSearch : toggleSearch}
+              className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+              aria-label="Close search"
+            >
+              <ArrowLeft size={24} />
+            </button>
+          )}
         </div>
 
-        {/* Right side: Auth/Profile, Mobile Menu Button */}
+        {/* Center Section - Navigation Links or Search Bar */}
+        <div className="flex-1 max-w-2xl mx-4">
+          {/* Desktop Search Bar */}
+          <div className="hidden lg:block">
+            {isSearchActive ? (
+              <form onSubmit={handleSearchSubmit} className="w-full">
+                <div className="relative">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search resources..."
+                    className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
+                  />
+                  <Search 
+                    size={18} 
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400" 
+                  />
+                  <button
+                    type="submit"
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200"
+                  >
+                    <Search size={14} />
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex items-center justify-center space-x-6 transition-all duration-300">
+                <DesktopNavLink to="/" text="Home" />
+                <DesktopNavLink to="/resources" text="Resources" />
+                {isAuthenticated && (
+                  <>
+                    <DesktopNavLink to="/saved" text="My Library" />
+                    <DesktopNavLink to="/upload" text="Upload" />
+                    {isAdmin && <DesktopNavLink to="/admin" text="Admin" />}
+                  </>
+                )}
+                <DesktopNavLink to="/about" text="About" />
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Search Bar */}
+          <div className="lg:hidden">
+            {isMobileSearchActive && (
+              <form onSubmit={handleSearchSubmit} className="w-full">
+                <div className="relative">
+                  <input
+                    ref={mobileSearchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search resources..."
+                    className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
+                  />
+                  <Search 
+                    size={18} 
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400" 
+                  />
+                  <button
+                    type="submit"
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200"
+                  >
+                    <Search size={14} />
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+
+        {/* Right Section - Search Icon, Auth/Profile, Mobile Menu Button */}
         <div className="flex items-center space-x-4">
+          {/* Search Icon (Desktop) */}
+          {!isSearchActive && (
+            <button
+              onClick={toggleSearch}
+              className="hidden lg:block p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+              aria-label="Search"
+            >
+              <Search size={20} />
+            </button>
+          )}
+
           {/* User Profile / Auth Buttons (Desktop) */}
-          {isAuthenticated ? (
+          {!isSearchActive && isAuthenticated ? (
             <div className="relative" ref={profileDropdownRef}>
               <button
                 onClick={toggleProfileDropdown}
@@ -213,7 +326,7 @@ const Navbar = () => {
                 />
               </button>
               {isProfileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none">
+                <div className={`absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none ${isMobileMenuOpen ? 'lg:block hidden' : ''}`}>
                   {user && (
                     <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -226,19 +339,20 @@ const Navbar = () => {
                   )}
                   <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
                     <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
-                    <span className="font-medium">{user?.scholaraCoins || 0} Coins</span> {/* USE user?.scholaraCoins */}
+                    <span className="font-medium">{user?.scholaraCoins || 0} Coins</span>
                   </div>
                   <Link
                     to="/referral"
                     onClick={handleNavLinkClick}
                     className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                   >
-<FontAwesomeIcon 
-  icon={faUserFriends} 
-  className="mr-3 text-amber-500 dark:text-amber-400" 
-  size="sm" 
-/>
-Referrals                  </Link>
+                    <FontAwesomeIcon 
+                      icon={faUserFriends} 
+                      className="mr-3 text-amber-500 dark:text-amber-400" 
+                      size="sm" 
+                    />
+                    Referrals
+                  </Link>
                   {isAdmin && (
                     <Link
                       to="/admin"
@@ -272,7 +386,7 @@ Referrals                  </Link>
                 </div>
               )}
             </div>
-          ) : (
+          ) : !isSearchActive && !isAuthenticated ? (
             <div className="hidden lg:flex items-center space-x-3">
               <Link
                 to="/login"
@@ -287,21 +401,35 @@ Referrals                  </Link>
                 Sign Up
               </Link>
             </div>
-          )}
+          ) : null}
 
-          {/* Mobile Menu Button (Hamburger) */}
-          <div className="lg:hidden flex items-center">
-            <button
-              onClick={toggleMobileMenu}
-              className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
-              aria-label="Toggle mobile menu"
-            >
-              {isMobileMenuOpen ? (
-                <X className="w-6 h-6" />
-              ) : (
-                <Menu className="w-6 h-6" />
-              )}
-            </button>
+          {/* Mobile Controls */}
+          <div className="lg:hidden flex items-center space-x-2">
+            {/* Mobile Search Button */}
+            {!isMobileSearchActive && (
+              <button
+                onClick={toggleMobileSearch}
+                className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                aria-label="Search"
+              >
+                <Search size={20} />
+              </button>
+            )}
+
+            {/* Mobile Menu Button (Hamburger) */}
+            {!isMobileSearchActive && (
+              <button
+                onClick={toggleMobileMenu}
+                className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
+                aria-label="Toggle mobile menu"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="w-6 h-6" />
+                ) : (
+                  <Menu className="w-6 h-6" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -408,7 +536,7 @@ Referrals                  </Link>
                     </div>
                     <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
                       <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
-                      <span className="font-medium">{user?.scholaraCoins || 0} Coins</span> {/* USE user?.scholaraCoins */}
+                      <span className="font-medium">{user?.scholaraCoins || 0} Coins</span>
                     </div>
                     <div className="space-y-1">
                       <Link
