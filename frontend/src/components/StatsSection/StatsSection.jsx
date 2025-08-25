@@ -267,6 +267,7 @@ const StatsSection = () => {
                           rounded-2xl shadow-xl dark:shadow-glow-sm
                           border border-silver/30 dark:border-charcoal/60
                           p-8 text-center
+                          
                           transition-all duration-300 ease-out
                           hover:shadow-2xl dark:hover:shadow-glow-lg
                           hover:-translate-y-1"
@@ -411,3 +412,4 @@ const StatsSection = () => {
 };
 
 export default StatsSection;
+ 

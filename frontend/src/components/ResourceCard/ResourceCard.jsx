@@ -1080,17 +1080,12 @@ const ResourceCard = React.memo(
 
     return (
       <div className="bg-white dark:bg-charcoal/95 rounded-2xl overflow-hidden shadow-glow-sm animate-fade-in font-poppins">
-        <div
-          className="h-36 flex items-center justify-center text-white relative"
-          style={{ backgroundColor: genericBgColor }}
-        >
-          <FontAwesomeIcon icon={faFileAlt} size="3x" className="opacity-80" />
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 opacity-20"></div>
-        </div>
         <div className="p-5">
           <div className="flex justify-between items-start mb-3">
             <h3 className="text-xl font-semibold text-gray-900 dark:bg-gradient-to-r dark:from-orange-400 dark:via-amber-500 dark:to-yellow-500 dark:bg-clip-text dark:text-transparent line-clamp-2 font-poppins">
-              {resource.title}
+              {resource.title.length > 17
+                ? resource.title.slice(0, 17) + "..."
+                : resource.title}
             </h3>
             <span
               className={`px-2.5 py-1 rounded-full text-xs font-medium uppercase ${getTypeClasses(

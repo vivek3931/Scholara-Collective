@@ -49,21 +49,13 @@ const features = [
 ];
 
 const About = () => {
-  const handleGoBack = useCallback(() => {
-    window.history.back();
-  }, []);
+  
 
   return (
     <div className="min-h-screen bg-gray-50 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx text-gray-900 dark:text-white transition-colors duration-300">
       
       {/* Fixed Back Button */}
-      <button
-        onClick={handleGoBack}
-        className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-lg hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal"
-      >
-        <FontAwesomeIcon icon={faArrowLeft} className="text-sm"/>
-        <span>Back</span>
-      </button>
+      
 
       {/* Header Section */}
       <div className="bg-white dark:bg-onyx/70 shadow-sm border-b border-gray-200 dark:border-gray-700 pt-16 sm:pt-8">

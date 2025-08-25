@@ -163,18 +163,11 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Back Button */}
-      <button
-        onClick={handleGoBack}
-        className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal"
-      >
-        <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
-        <span>Back</span>
-      </button>
+      
       {/* Animated background */}
       <div className="fixed inset-0 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200 dark:from-onyx dark:via-charcoal dark:to-onyx"></div>
       {/* Main Content */}
-      <main className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-16 flex-1">
+      <main className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
         <div className="max-w-4xl mx-auto animate-fade-in">
           {/* Page Header */}
           <div className="mb-8">
@@ -429,13 +422,7 @@ const Settings = () => {
         </div>
       </main>
       {/* Footer */}
-      <footer className="relative z-10 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg border-t border-gray-200/50 dark:border-charcoal/50 py-6">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400 font-poppins">
-            &copy; 2025 Scholara Collective. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      
     </div>
   );
 };

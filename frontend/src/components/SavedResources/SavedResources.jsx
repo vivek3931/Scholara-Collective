@@ -188,18 +188,9 @@ const SavedResourcesPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200 dark:from-onyx dark:via-charcoal dark:to-onyx">
-      {/* Back Button */}
-      <button
-        onClick={handleGoBack}
-        className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-xl border border-gray-200/50 dark:border-charcoal/50"
-      >
-        <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
-        <span className="font-poppins">Back</span>
-      </button>
-
-      <Navbar />
       
-      <div className="relative z-10 max-w-7xl mx-auto p-4 pt-20 animate-fade-in">
+      
+      <div className="relative z-10 max-w-7xl mx-auto p-4  animate-fade-in">
         {/* Page Header */}
         <div className="flex items-center justify-center gap-3 mb-6 sm:mb-10 sm:pt-8">
           <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-400 rounded-xl shadow-glow-sm">

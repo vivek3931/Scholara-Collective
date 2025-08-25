@@ -273,8 +273,8 @@ const Hero = () => {
   return (
     <section
       ref={heroRef}
-      className="relative py-20 px-4 text-center min-h-screen flex items-center justify-center
-                  rounded-2xl transition-colors duration-500 overflow-hidden"
+      className="relative py-20 px-4 text-center min-h-[90vh] flex items-center justify-center
+                   rounded-2xl transition-colors duration-500 overflow-hidden"
     >
       {/* Enhanced Radial Rays - Outer layer */}
       <div
@@ -344,7 +344,7 @@ const Hero = () => {
       <div className="relative max-w-4xl mx-auto z-10">
         <h1
           className="text-3xl sm:text-4xl lg:text-6xl font-extrabold mb-4 sm:mb-5 leading-tight
-                   text-gray-900 dark:text-white"
+                     text-gray-900 dark:text-white"
         >
           Unlock Your{" "}
           <span className="bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-600 bg-clip-text text-transparent">
@@ -353,7 +353,7 @@ const Hero = () => {
         </h1>
         <p
           className="text-base sm:text-lg lg:text-xl mb-8 sm:mb-10 max-w-2xl mx-auto
-                   text-gray-700 dark:text-gray-300"
+                     text-gray-700 dark:text-gray-300"
         >
           Seamlessly discover, contribute, and organize a wealth of study
           materials – from notes to past papers, all in one place, absolutely
@@ -362,21 +362,21 @@ const Hero = () => {
         <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-lg sm:max-w-none mx-auto">
           <Link to={'/upload'}
             className="flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 font-bold rounded-lg cursor-pointer
-                     transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-0.5
-                     bg-gradient-to-r from-orange-500 to-yellow-500 text-white
-                     hover:from-orange-600 hover:to-yellow-600 text-sm sm:text-base
-                     shadow-lg hover:shadow-xl"
+                       transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-0.5
+                       bg-gradient-to-r from-orange-500 to-yellow-500 text-white
+                       hover:from-orange-600 hover:to-yellow-600 text-sm sm:text-base
+                       shadow-lg hover:shadow-xl"
           >
             <CloudUpload className="w-5 h-5" />
             <span>Upload Your Resources</span>
           </Link>
           <Link to={'/resources'}
             className="flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 font-semibold rounded-lg cursor-pointer
-                     transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-0.5
-                     bg-transparent text-orange-600 border-2 border-orange-500
-                     dark:text-orange-400 dark:border-orange-500
-                     hover:bg-orange-500 hover:text-white hover:border-orange-500
-                     dark:hover:bg-orange-500 dark:hover:text-white text-sm sm:text-base"
+                       transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-0.5
+                       bg-transparent text-orange-600 border-2 border-orange-500
+                       dark:text-orange-400 dark:border-orange-500
+                       hover:bg-orange-500 hover:text-white hover:border-orange-500
+                       dark:hover:bg-orange-500 dark:hover:text-white text-sm sm:text-base"
           >
             <Search className="w-5 h-5" />
             <span>Explore Study Materials</span>

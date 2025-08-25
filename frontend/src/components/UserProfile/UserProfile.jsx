@@ -161,13 +161,7 @@ const Profile = ({ showModal }) => {
   return (
     <section className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-onyx dark:via-charcoal dark:to-onyx transition-all duration-300 animate-fade-in">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <button
-          onClick={handleGoBack}
-          className={`fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal`}
-        >
-          <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
-          <span>Back</span>
-        </button>
+        
         {/* Profile Header */}
         <div className="flex flex-col pt-10 sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
@@ -249,14 +243,14 @@ const Profile = ({ showModal }) => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
             {/* Profile Card */}
             <div className="lg:col-span-1">
-              <div className="bg-white bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx shadow-glow-sm rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl">
+              <div className="bg-white bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx shadow-glow-sm rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl lg:sticky lg:top-6">
                 <div className="p-6">
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center ">
                     <div className="relative mb-4">
-                      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-800/70 flex items-center justify-center shadow-lg">
+                      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-amber-900/50 dark:to-amber-800/70 flex items-center justify-center shadow-lg">
                         <FontAwesomeIcon
                           icon={faUser}
-                          className="text-5xl text-blue-600 dark:text-blue-400"
+                          className="text-5xl text-amber-600 dark:text-amber-400"
                         />
                       </div>
                       {isEditing && (
@@ -321,7 +315,7 @@ const Profile = ({ showModal }) => {
                       </div>
                     ) : (
                       <div className="text-center">
-                        <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent dark:from-blue-400 dark:to-blue-300 mb-2">
+                        <h3 className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-amber-400 bg-clip-text text-transparent dark:from-amber-400 dark:to-amber-300 mb-2">
                           {user.username}
                         </h3>
 
@@ -362,7 +356,7 @@ const Profile = ({ showModal }) => {
 
             {/* Resources Section - now with Tabs */}
             <div className="lg:col-span-2">
-              <div className="bg-white bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx shadow-glow-sm rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl">
+              <div className="bg-white bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx shadow-glow-sm rounded-xl  overflow-hidden transition-all duration-300 hover:shadow-xl">
                 {/* Tab Navigation */}
                 <div className="border-b border-gray-200 dark:border-gray-700">
                   <nav

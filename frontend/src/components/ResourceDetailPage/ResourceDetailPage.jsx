@@ -749,7 +749,9 @@ const BlurredPreview = React.memo(
   }
 );
 
-// Main ResourceDetailPage Component
+// Configure PDF.js worker
+// pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
 const ResourceDetailPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -763,8 +765,6 @@ const ResourceDetailPage = () => {
   const [userRating, setUserRating] = useState(0);
   const [overallRating, setOverallRating] = useState(0);
   const [isRatingLoading, setIsRatingLoading] = useState(false);
-  const [numPages, setNumPages] = useState(null);
-  const [pageNumber, setPageNumber] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
@@ -776,10 +776,15 @@ const ResourceDetailPage = () => {
   const [isPurchased, setIsPurchased] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const pollIntervalRef = useRef(null);
+  const pdfContainerRef = useRef(null);
+  const [visiblePages, setVisiblePages] = useState(new Set([1]));
+  const [numPages, setNumPages] = useState(null);
+  const [pdfDimensions, setPdfDimensions] = useState({ width: 500, height: 700 });
 
   const userId = user?._id;
   const userName = user?.username || "Anonymous User";
   const isAdmin = user?.roles === "admin";
+  
   // Enhanced purchase validation
   const canDownload = useMemo(() => {
     if (!isAuthenticated) return false;
@@ -787,22 +792,6 @@ const ResourceDetailPage = () => {
     return isPurchased;
   }, [isAuthenticated, isAdmin, isPurchased]);
 
-  // Enhanced purchase validation
-  const validateDownload = () => {
-    if (!isAuthenticated) {
-      alert("You need to be logged in to download resources.");
-      return false;
-    }
-
-    if (!canDownload) {
-      alert(
-        `This resource requires purchase (${cost} coins). You currently have ${userCoins} coins.`
-      );
-      return false;
-    }
-
-    return true;
-  };
   const userCoins = user?.scholaraCoins || 0;
   const cost = 30; // Cost of the resource
 
@@ -819,27 +808,66 @@ const ResourceDetailPage = () => {
     );
   }, [resource]);
 
-  // Responsive hook
+  // Responsive hook with debounce
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    let resizeTimeout;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        setIsMobile(window.innerWidth < 768);
+        
+        // Update PDF dimensions on resize
+        if (pdfContainerRef.current) {
+          const containerWidth = pdfContainerRef.current.clientWidth;
+          setPdfDimensions({
+            width: Math.min(containerWidth - 40, 500),
+            height: 700
+          });
+        }
+      }, 100);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial call
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+    };
   }, []);
 
-  // Fetch resource details
+  // Update PDF dimensions when container ref is available
+  useEffect(() => {
+    if (pdfContainerRef.current) {
+      const containerWidth = pdfContainerRef.current.clientWidth;
+      setPdfDimensions({
+        width: Math.min(containerWidth - 40, 500),
+        height: 700
+      });
+    }
+  }, [pdfContainerRef.current, isFullscreen]);
+
+  // Fetch resource details with caching
   useEffect(() => {
     if (!resourceId) {
       setError("No resource ID provided");
       setLoading(false);
       return;
     }
+    
     const loadResource = async () => {
       setLoading(true);
       setError(null);
       try {
         let fetchedResource = initialResourceFromState;
-        if (!fetchedResource || fetchedResource._id !== resourceId) {
+        
+        // Check if we have a cached version
+        const cacheKey = `resource_${resourceId}`;
+        const cachedResource = sessionStorage.getItem(cacheKey);
+        
+        if (cachedResource) {
+          fetchedResource = JSON.parse(cachedResource);
+        } else if (!fetchedResource || fetchedResource._id !== resourceId) {
           const response = await fetch(
             `${API_BASE_URL}/resources/${resourceId}`
           );
@@ -847,7 +875,11 @@ const ResourceDetailPage = () => {
             throw new Error(`Failed to fetch resource: ${response.status}`);
           fetchedResource = await response.json();
           fetchedResource = fetchedResource.resource || fetchedResource;
+          
+          // Cache the resource for future visits
+          sessionStorage.setItem(cacheKey, JSON.stringify(fetchedResource));
         }
+        
         setResource(fetchedResource);
       } catch (err) {
         console.error("Error fetching resource:", err);
@@ -856,6 +888,7 @@ const ResourceDetailPage = () => {
         setLoading(false);
       }
     };
+    
     loadResource();
   }, [resourceId, initialResourceFromState]);
 
@@ -927,7 +960,7 @@ const ResourceDetailPage = () => {
     } finally {
       setIsRatingLoading(false);
     }
-  }, [resourceId, userId, overallRating, userRating]);
+  }, [resourceId, userId]);
 
   useEffect(() => {
     if (resourceId) {
@@ -973,8 +1006,184 @@ const ResourceDetailPage = () => {
         setUserRating(previousRating);
       }
     },
-    [isAuthenticated, resourceId, token, userRating]
+    [isAuthenticated, resourceId, token]
   );
+
+  // PDF Preview functions with optimized rendering
+  const onDocumentLoadSuccess = useCallback(({ numPages }) => {
+    setNumPages(numPages);
+    setPreviewLoading(false);
+    // Initially only render the first page
+    setVisiblePages(new Set([1]));
+  }, []);
+
+  const onDocumentLoadError = useCallback((error) => {
+    console.error("Error loading PDF document:", error);
+    setPreviewError(
+      "Failed to load PDF preview. Please try downloading the file."
+    );
+    setPreviewLoading(false);
+  }, []);
+
+  // Handle PDF page visibility with intersection observer for lazy loading
+  useEffect(() => {
+    if (!previewDataUrl || !numPages || numPages <= 1) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const newVisiblePages = new Set(visiblePages);
+        let shouldUpdate = false;
+        
+        entries.forEach(entry => {
+          const pageNumber = parseInt(entry.target.getAttribute('data-page-number'), 10);
+          
+          if (entry.isIntersecting) {
+            if (!newVisiblePages.has(pageNumber)) {
+              newVisiblePages.add(pageNumber);
+              shouldUpdate = true;
+            }
+          }
+        });
+        
+        if (shouldUpdate) {
+          setVisiblePages(newVisiblePages);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    
+    // Observe all page elements
+    const pageElements = document.querySelectorAll('[data-page-number]');
+    pageElements.forEach(el => observer.observe(el));
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, [previewDataUrl, numPages, visiblePages]);
+
+  const handlePreview = useCallback(async () => {
+    if (!isAuthenticated) {
+      setError("You need to be logged in to preview resources.");
+      return;
+    }
+    
+    // If we already have the preview data, just show it
+    if (previewDataUrl) {
+      return;
+    }
+    
+    setPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/resources/${resourceId}/preview`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (!response.ok) throw new Error("Failed to fetch preview");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setPreviewDataUrl(url);
+    } catch (err) {
+      console.error("Preview failed:", err);
+      setPreviewError(err.message);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [isAuthenticated, resourceId, token, previewDataUrl]);
+
+  const handleZoomIn = useCallback(
+    () => setZoom((prev) => Math.min(prev + 0.1, 3)),
+    []
+  );
+  
+  const handleZoomOut = useCallback(
+    () => setZoom((prev) => Math.max(prev - 0.1, 0.5)),
+    []
+  );
+  
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen((prev) => !prev);
+  }, []);
+
+  // Enhanced download validation
+  const validateDownload = useCallback(() => {
+    if (!isAuthenticated) {
+      alert("You need to be logged in to download resources.");
+      return false;
+    }
+
+    if (!canDownload) {
+      alert(
+        `This resource requires purchase (${cost} coins). You currently have ${userCoins} coins.`
+      );
+      return false;
+    }
+
+    return true;
+  }, [isAuthenticated, canDownload, cost, userCoins]);
+
+  const handleDownload = useCallback(async () => {
+    // Strict validation before any download attempt
+    if (!validateDownload()) {
+      return;
+    }
+
+    try {
+      // Use the same download endpoint as UniversalResourceCard that includes purchase validation
+      const response = await fetch(
+        `${API_BASE_URL}/resources/${resourceId}/download`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "*/*",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.msg || "Download failed due to server error."
+          );
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${resource.title.replace(/[^a-z0-9._-]/gi, "_")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      // Increment download count only after successful download
+      await fetch(
+        `${API_BASE_URL}/resources/${resourceId}/increment-download`,
+        {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+    } catch (err) {
+      console.error("Download failed:", err);
+      setError(`Download failed: ${err.message}`);
+      alert(`Download failed: ${err.message}`);
+    }
+  }, [resourceId, token, resource?.title, validateDownload]);
+
+  // Handle blurred preview errors
+  const handleBlurredPreviewError = useCallback((error) => {
+    setBlurredPreviewError(error.message);
+  }, []);
 
   // Purchase handler
   const handlePurchase = async () => {
@@ -1043,125 +1252,58 @@ const ResourceDetailPage = () => {
     );
   };
 
-  // PDF Preview functions
-  const onDocumentLoadSuccess = useCallback(({ numPages }) => {
-    setNumPages(numPages);
-    setPreviewLoading(false);
-  }, []);
-
-  const onDocumentLoadError = useCallback((error) => {
-    console.error("Error loading PDF document:", error);
-    setPreviewError(
-      "Failed to load PDF preview. Please try downloading the file."
-    );
-    setPreviewLoading(false);
-  }, []);
-
-  const handlePreview = useCallback(async () => {
-    if (!isAuthenticated) {
-      setError("You need to be logged in to preview resources.");
-      return;
-    }
-    setPreviewLoading(true);
-    setPreviewError(null);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/resources/${resourceId}/preview`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!response.ok) throw new Error("Failed to fetch preview");
-      const blob = await response.blob();
-      setPreviewDataUrl(URL.createObjectURL(blob));
-    } catch (err) {
-      console.error("Preview failed:", err);
-      setPreviewError(err.message);
-    } finally {
-      setPreviewLoading(false);
-    }
-  }, [isAuthenticated, resourceId, token]);
-
-  const changePage = useCallback(
-    (offset) => {
-      setPageNumber((prev) => Math.max(1, Math.min(prev + offset, numPages)));
-    },
-    [numPages]
-  );
-
-  const handleZoomIn = useCallback(
-    () => setZoom((prev) => Math.min(prev + 0.1, 3)),
-    []
-  );
-  const handleZoomOut = useCallback(
-    () => setZoom((prev) => Math.max(prev - 0.1, 0.5)),
-    []
-  );
-  const toggleFullscreen = useCallback(
-    () => setIsFullscreen((prev) => !prev),
-    []
-  );
-
-  const handleDownload = useCallback(async () => {
-    // Strict validation before any download attempt
-    if (!validateDownload()) {
-      return;
-    }
-
-    try {
-      // Use the same download endpoint as UniversalResourceCard that includes purchase validation
-      const response = await fetch(
-        `${API_BASE_URL}/resources/${resourceId}/download`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "*/*",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.msg || "Download failed due to server error."
-          );
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+  // Clean up preview data URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (previewDataUrl) {
+        URL.revokeObjectURL(previewDataUrl);
       }
+    };
+  }, [previewDataUrl]);
 
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = `${resource.title.replace(/[^a-z0-9._-]/gi, "_")}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-
-      // Increment download count only after successful download
-      await fetch(
-        `${API_BASE_URL}/resources/${resourceId}/increment-download`,
-        {
-          method: "PUT",
-          headers: { Authorization: `Bearer ${token}` },
-        }
+  // Memoized PDF pages to prevent unnecessary re-renders
+  const renderPdfPages = useMemo(() => {
+    if (!numPages) return null;
+    
+    return Array.from({ length: numPages }, (_, index) => {
+      const pageNumber = index + 1;
+      const isVisible = visiblePages.has(pageNumber);
+      
+      return (
+        <div 
+          key={pageNumber} 
+          data-page-number={pageNumber}
+          className="mb-4 flex justify-center"
+        >
+          {isVisible ? (
+            <Page
+              pageNumber={pageNumber}
+              scale={isMobile ? Math.min(zoom, 1.2) : zoom}
+              width={pdfDimensions.width}
+              className="shadow-xl rounded-lg overflow-hidden"
+              renderTextLayer={false}
+              renderAnnotationLayer={false}
+              loading={
+                <div className="flex items-center justify-center h-96">
+                  <FontAwesomeIcon icon={faSpinner} spin className="text-blue-500 text-2xl" />
+                </div>
+              }
+            />
+          ) : (
+            <div 
+              className="bg-gray-100 dark:bg-charcoal rounded-lg flex items-center justify-center"
+              style={{ 
+                width: pdfDimensions.width, 
+                height: pdfDimensions.width * 1.414 // A4 aspect ratio
+              }}
+            >
+              <FontAwesomeIcon icon={faSpinner} spin className="text-gray-400 text-xl" />
+            </div>
+          )}
+        </div>
       );
-    } catch (err) {
-      console.error("Download failed:", err);
-      setError(`Download failed: ${err.message}`);
-      alert(`Download failed: ${err.message}`);
-    }
-  }, [resourceId, token, resource?.title, validateDownload]);
-
-  // Handle blurred preview errors
-  const handleBlurredPreviewError = useCallback((error) => {
-    setBlurredPreviewError(error.message);
-  }, []);
+    });
+  }, [numPages, visiblePages, zoom, isMobile, pdfDimensions]);
 
   if (loading) {
     return (
@@ -1204,19 +1346,13 @@ const ResourceDetailPage = () => {
     downloads = 0,
   } = resource;
 
-return (
+  return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx py-20 px-4 sm:px-6 lg:px-8"
+      className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx pt-8 px-4 sm:px-6 lg:px-8"
     >
-      <button
-        onClick={() => navigate(-1)}
-        className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal"
-      >
-        <FontAwesomeIcon icon={faArrowLeft} className="text-sm" />
-        <span>Back</span>
-      </button>
+      
 
       {isMobile && isFullscreen && (
         <motion.div
@@ -1234,69 +1370,59 @@ return (
               <FontAwesomeIcon icon={faTimes} />
             </button>
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div 
+            ref={pdfContainerRef}
+            className="flex-1 overflow-auto bg-gray-50 dark:bg-charcoal p-4"
+          >
             {previewDataUrl ? (
-              <div className="h-full flex flex-col">
-                <div className="flex-1 overflow-auto bg-gray-50 dark:bg-charcoal p-4">
-                  <Document
-                    file={previewDataUrl}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    onLoadError={onDocumentLoadError}
-                    loading={
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center text-white">
-                          <FontAwesomeIcon
-                            icon={faSpinner}
-                            spin
-                            size="2x"
-                            className="mb-3 text-blue-400"
-                          />
-                          <p>Loading PDF...</p>
-                        </div>
-                      </div>
-                    }
-                    error={
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center text-white">
-                          <AlertCircle
-                            size={48}
-                            className="mx-auto mb-4 text-red-400"
-                          />
-                          <p className="mb-4">Error loading PDF</p>
-                          <button
-                            onClick={handleDownload}
-                            disabled={!canDownload}
-                            className={`px-4 py-2 rounded-lg hover:scale-105 transition-all duration-200 ${
-                              canDownload
-                                ? "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white"
-                                : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white cursor-not-allowed opacity-50"
-                            }`}
-                          >
-                            <FontAwesomeIcon
-                              icon={faDownload}
-                              className="mr-2"
-                            />
-                            {canDownload
-                              ? "Download File"
-                              : "Purchase Required"}
-                          </button>
-                        </div>
-                      </div>
-                    }
-                  >
-                    <div className="flex justify-center">
-                      <Page
-                        pageNumber={pageNumber}
-                        scale={zoom}
-                        width={Math.min(window.innerWidth - 32, 500)}
-                        className="shadow-2xl rounded-lg overflow-hidden"
-                        renderTextLayer={false}
-                        renderAnnotationLayer={false}
+              <Document
+                file={previewDataUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
+                loading={
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center text-white">
+                      <FontAwesomeIcon
+                        icon={faSpinner}
+                        spin
+                        size="2x"
+                        className="mb-3 text-blue-400"
                       />
+                      <p>Loading PDF...</p>
                     </div>
-                  </Document>
-                </div>
-              </div>
+                  </div>
+                }
+                error={
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center text-white">
+                      <AlertCircle
+                        size={48}
+                        className="mx-auto mb-4 text-red-400"
+                      />
+                      <p className="mb-4">Error loading PDF</p>
+                      <button
+                        onClick={handleDownload}
+                        disabled={!canDownload}
+                        className={`px-4 py-2 rounded-lg hover:scale-105 transition-all duration-200 ${
+                          canDownload
+                            ? "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white"
+                            : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white cursor-not-allowed opacity-50"
+                        }`}
+                      >
+                        <FontAwesomeIcon
+                          icon={faDownload}
+                          className="mr-2"
+                        />
+                        {canDownload
+                          ? "Download File"
+                          : "Purchase Required"}
+                      </button>
+                    </div>
+                  </div>
+                }
+              >
+                {renderPdfPages}
+              </Document>
             ) : previewLoading ? (
               <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
                 <div className="text-center text-gray-700 dark:text-white">
@@ -1348,48 +1474,25 @@ return (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {previewDataUrl && (
-                    <>
-                      <div className="flex items-center gap-1 bg-gray-100 dark:bg-charcoal rounded-lg p-1">
-                        <button
-                          onClick={handleZoomOut}
-                          disabled={zoom <= 0.5}
-                          className="p-2 rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                        >
-                          <ZoomOut size={14} />
-                        </button>
-                        <span className="px-1 text-xs font-medium text-gray-600 dark:text-gray-300 min-w-[40px] text-center">
-                          {Math.round(zoom * 100)}%
-                        </span>
-                        <button
-                          onClick={handleZoomIn}
-                          disabled={zoom >= 2}
-                          className="p-2 rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                        >
-                          <ZoomIn size={14} />
-                        </button>
-                      </div>
-                      {numPages > 1 && (
-                        <div className="flex items-center gap-1 bg-gray-100 dark:bg-charcoal rounded-lg p-1">
-                          <button
-                            onClick={() => changePage(-1)}
-                            disabled={pageNumber <= 1}
-                            className="p-2 rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                          >
-                            <ChevronLeft size={14} />
-                          </button>
-                          <span className="px-2 text-xs font-medium text-gray-600 dark:text-gray-300 min-w-[45px] text-center">
-                            {pageNumber}/{numPages}
-                          </span>
-                          <button
-                            onClick={() => changePage(1)}
-                            disabled={pageNumber >= numPages}
-                            className="p-2 rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                          >
-                            <ChevronRight size={14} />
-                          </button>
-                        </div>
-                      )}
-                    </>
+                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-charcoal rounded-lg p-1">
+                      <button
+                        onClick={handleZoomOut}
+                        disabled={zoom <= 0.5}
+                        className="p-2 rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
+                      >
+                        <ZoomOut size={14} />
+                      </button>
+                      <span className="px-1 text-xs font-medium text-gray-600 dark:text-gray-300 min-w-[40px] text-center">
+                        {Math.round(zoom * 100)}%
+                      </span>
+                      <button
+                        onClick={handleZoomIn}
+                        disabled={zoom >= 2}
+                        className="p-2 rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
+                      >
+                        <ZoomIn size={14} />
+                      </button>
+                    </div>
                   )}
                 </div>
                 {canDownload ? (
@@ -1485,7 +1588,10 @@ return (
 
             {previewDataUrl ? (
               <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-auto scroll-container p-2 sm:p-4 bg-gray-50 dark:bg-charcoal">
+                <div 
+                  ref={pdfContainerRef}
+                  className="flex-1 overflow-auto scroll-container p-2 sm:p-4 bg-gray-50 dark:bg-charcoal"
+                >
                   <Document
                     file={previewDataUrl}
                     onLoadSuccess={onDocumentLoadSuccess}
@@ -1564,18 +1670,7 @@ return (
                       </div>
                     }
                   >
-                    <div className="flex justify-center items-center min-h-full">
-                      <Page
-                        pageNumber={pageNumber}
-                        scale={isMobile ? Math.min(zoom, 1.2) : zoom}
-                        width={
-                          isMobile ? Math.min(window.innerWidth - 40, 400) : 450
-                        }
-                        className="shadow-xl rounded-lg overflow-hidden"
-                        renderTextLayer={false}
-                        renderAnnotationLayer={false}
-                      />
-                    </div>
+                    {renderPdfPages}
                   </Document>
                 </div>
 
@@ -1608,29 +1703,6 @@ return (
                           <ZoomIn size={16} />
                         </button>
                       </div>
-                      {numPages > 1 && (
-                        <div className="flex items-center gap-1 bg-gray-100 dark:bg-charcoal rounded-lg p-1">
-                          <button
-                            onClick={() => changePage(-1)}
-                            disabled={pageNumber <= 1}
-                            className="p-1.5 lg:p-2 rounded-md hover:bg-white dark:hover:bg-gray-600 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                            title="Previous Page"
-                          >
-                            <ChevronLeft size={16} />
-                          </button>
-                          <span className="px-2 lg:px-3 py-0.5 lg:py-1 text-xs lg:text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[60px] lg:min-w-[80px] text-center">
-                            {pageNumber}/{numPages}
-                          </span>
-                          <button
-                            onClick={() => changePage(1)}
-                            disabled={pageNumber >= numPages}
-                            className="p-1.5 lg:p-2 rounded-md hover:bg-white dark:hover:bg-gray-600 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                            title="Next Page"
-                          >
-                            <ChevronRight size={16} />
-                          </button>
-                        </div>
-                      )}
                     </div>
                     <div className="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end">
                       <button
@@ -1721,7 +1793,10 @@ return (
                 {isMobile && !isFullscreen && (
                   <div className="flex items-center justify-between p-3 bg-white dark:bg-onyx/60 border-b border-gray-200 dark:border-charcoal gap-2">
                     <button
-                      onClick={() => setIsFullscreen(true)}
+                      onClick={() => {
+                        handlePreview();
+                        setIsFullscreen(true);
+                      }}
                       className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm flex-1"
                     >
                       <Maximize2 size={16} />
@@ -1871,7 +1946,7 @@ return (
                 <span>{fileType}</span>
               </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 rounded-lg shadow-sm border border-amber-200 dark:border-amber-800/50">
+            <div className="flex items-center gapAinda:2 px-3 py-1.5 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 rounded-lg shadow-sm border border-amber-200 dark:border-amber-800/50">
               <img src={coin} alt="coin" className="w-4 h-4" />
               <span className="text-sm font-bold text-amber-800 dark:text-amber-300">
                 {cost} coins
@@ -2064,7 +2139,6 @@ return (
       </motion.div>
     </motion.div>
   );
-
 };
 
 export default ResourceDetailPage;

@@ -176,13 +176,13 @@ function ReferralPage() {
         variants={containerVariants}
       >
         <div className="relative z-10 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
-          <div className="max-w-6xl w-full">
+          <div className="max-w-6xl w-full ">
             {/* Hero Section */}
             <motion.div
               className="text-center mb-12"
               variants={sectionVariants}
             >
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-6 leading-tight font-poppins">
+              <h1 className="text-4xl sm:text-5xl lg:text-5xl font-black mb-6 leading-tight font-poppins">
                 <span className="bg-gradient-to-r from-amber-500 via-orange-500 to-orange-600 bg-clip-text text-transparent">
                   Empower & Earn
                 </span>
@@ -191,7 +191,7 @@ function ReferralPage() {
                   with Scholara
                 </span>
               </h1>
-              <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
+              <p className="lg:text-lg  text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
                 Share your knowledge, help fellow students succeed, and get
                 rewarded with Scholara Coins. Building the future of
                 collaborative learning, one resource at a time.
@@ -425,11 +425,11 @@ function ReferralPage() {
               >
                 <Link
                   to="/upload"
-                  className="inline-flex items-center justify-center px-12 py-5 bg-gradient-to-r from-amber-500 to-orange-400 text-white rounded-2xl shadow-glow-sm hover:shadow-glow-sm transition-all duration-300 font-bold text-lg group font-poppins"
+                  className="inline-flex items-center justify-center px-8 py-3 lg:px-12 lg:py-5 bg-gradient-to-r from-amber-500 to-orange-400 text-white rounded-2xl shadow-glow-sm hover:shadow-glow-sm transition-all duration-300 font-bold lg:text-lg text-sm group font-poppins"
                 >
                   <UploadCloud
                     size={28}
-                    className="mr-3 group-hover:animate-bounce"
+                    className="mr-3  group-hover:animate-bounce"
                   />
                   Upload Your First Resource
                   <Sparkles

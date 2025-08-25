@@ -1,14 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import useResources from "../../hooks/useResources/useResources";
 import UniversalResourceCard from "../UniversalResourceCard/UniversalResourceCard";
-import {
-  faSearch,
-  faSpinner,
-  faArrowLeft,
-  faMinimize,
-} from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   Search,
   Filter,
@@ -25,25 +19,36 @@ import {
   Atom,
   Bookmark,
   FlaskConical,
-  MoveRight,
   Settings,
-  Wifi,
   WifiOff,
+  TrendingUp,
+  Sparkles,
+  Grid3X3,
+  ChevronLeft,
+  ChevronRight,
+  Star,
+  Eye,
+  Download,
+  Calendar,
+  Users,
+  ArrowRight,
+  Minimize2,
+  Loader2,
 } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { useModal } from "../../context/ModalContext/ModalContext";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext/AuthContext";
 
-// Enhanced Cache Manager
+// Enhanced Cache Manager (keeping your existing implementation)
 class ResourcesCacheManager {
   constructor() {
     this.memoryCache = new Map();
     this.cacheKeys = this.loadCacheKeys();
-    this.CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-    this.STALE_TIME = 30 * 1000; // 30 seconds - data is stale after this
-    this.MAX_CACHE_SIZE = 100; // Maximum number of cached items
-    this.backgroundFetches = new Map(); // Track ongoing background fetches
+    this.CACHE_DURATION = 5 * 60 * 1000;
+    this.STALE_TIME = 30 * 1000;
+    this.MAX_CACHE_SIZE = 100;
+    this.backgroundFetches = new Map();
   }
 
   loadCacheKeys() {
@@ -80,17 +85,13 @@ class ResourcesCacheManager {
 
   get(params) {
     const key = this.generateCacheKey(params);
-    
-    // Try memory cache first
     let cacheEntry = this.memoryCache.get(key);
     
-    // If not in memory, try localStorage
     if (!cacheEntry) {
       try {
         const stored = localStorage.getItem(`resources_cache_${key}`);
         if (stored) {
           cacheEntry = JSON.parse(stored);
-          // Re-populate memory cache
           this.memoryCache.set(key, cacheEntry);
         }
       } catch (error) {
@@ -107,7 +108,6 @@ class ResourcesCacheManager {
       };
     }
 
-    // Clean up expired entry
     this.delete(key);
     return null;
   }
@@ -120,18 +120,14 @@ class ResourcesCacheManager {
       params: { ...params }
     };
 
-    // Store in memory cache
     this.memoryCache.set(key, cacheEntry);
 
-    // Store in localStorage with error handling
     try {
       localStorage.setItem(`resources_cache_${key}`, JSON.stringify(cacheEntry));
       
-      // Update cache keys tracking
       if (!this.cacheKeys.includes(key)) {
         this.cacheKeys.push(key);
         
-        // Implement LRU eviction if cache is too large
         if (this.cacheKeys.length > this.MAX_CACHE_SIZE) {
           const oldestKey = this.cacheKeys.shift();
           this.delete(oldestKey);
@@ -141,7 +137,6 @@ class ResourcesCacheManager {
       }
     } catch (error) {
       console.warn('Failed to save to localStorage cache:', error);
-      // Continue with memory-only caching
     }
   }
 
@@ -169,1364 +164,853 @@ class ResourcesCacheManager {
     this.cacheKeys = [];
     this.backgroundFetches.clear();
   }
-
-  // Prefetch data for common filter combinations
-  prefetch(commonParams, fetchFunction) {
-    commonParams.forEach(params => {
-      const key = this.generateCacheKey(params);
-      if (!this.get(params) && !this.backgroundFetches.has(key)) {
-        this.backgroundFetches.set(key, true);
-        fetchFunction(params).then(data => {
-          this.set(params, data);
-        }).catch(error => {
-          console.warn('Prefetch failed:', error);
-        }).finally(() => {
-          this.backgroundFetches.delete(key);
-        });
-      }
-    });
-  }
-
-  getStats() {
-    const memorySize = this.memoryCache.size;
-    const localStorageSize = this.cacheKeys.length;
-    const validEntries = this.cacheKeys.filter(key => {
-      try {
-        const stored = localStorage.getItem(`resources_cache_${key}`);
-        if (stored) {
-          const entry = JSON.parse(stored);
-          return this.isValidCache(entry);
-        }
-      } catch {
-        return false;
-      }
-      return false;
-    }).length;
-
-    return {
-      memorySize,
-      localStorageSize,
-      validEntries,
-      expiredEntries: localStorageSize - validEntries,
-      backgroundFetches: this.backgroundFetches.size
-    };
-  }
 }
-// Create singleton cache instance
+
 const cacheManager = new ResourcesCacheManager();
 
-// SearchSection Component (keeping existing implementation with refresh prop)
-const SearchSection = ({
-  searchQuery,
-  setSearchQuery,
-  filterType,
-  setFilterType,
-  filterCourse,
-  setFilterCourse,
-  filterSubject,
-  setFilterSubject,
-  handleRefresh,
-  cacheStats, // New prop to show cache info
-  resource, onSave,
-}) => {
-  const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
-  const [suggestions, setSuggestions] = useState([]);
-  const [recentSearches, setRecentSearches] = useState([]);
-  const [isFiltering, setIsFiltering] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [filterSelect , setFilterSelect]= useState(false)
-  
-  const inputRef = useRef(null);
-  const navigate = useNavigate();
-  const { showModal } = useModal();
+// Memoized ResourceCard with consistent dimensions
+const MemoizedResourceCard = React.memo(({ resource }) => (
+  <Link 
+    to={`/resources/${resource._id}`} 
+    state={{ resource }}
+    className="block h-full"
+  >
+    <div 
+      className="h-full w-full"
+      style={{
+        minHeight: '280px',
+        maxHeight: '400px',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
+      <UniversalResourceCard 
+        resource={resource}
+        variant="default"
+        className="h-full flex flex-col"
+      />
+    </div>
+  </Link>
+));
 
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+MemoizedResourceCard.displayName = 'MemoizedResourceCard';
 
-  useEffect(() => {
-    const savedSearches = JSON.parse(localStorage.getItem("recentSearches")) || [];
-    setRecentSearches(savedSearches);
+// Swiper Component for horizontal scrolling
+const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, emptyMessage }) => {
+  const scrollContainerRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
+
+  // Debounce scroll updates to prevent excessive re-renders
+  const updateScrollButtons = useCallback(() => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const newCanScrollLeft = scrollLeft > 0;
+      const newCanScrollRight = scrollLeft < scrollWidth - clientWidth - 1;
+      
+      // Only update state if values actually changed
+      setCanScrollLeft(prev => prev !== newCanScrollLeft ? newCanScrollLeft : prev);
+      setCanScrollRight(prev => prev !== newCanScrollRight ? newCanScrollRight : prev);
+    }
+  }, []);
+
+  // Debounced version of updateScrollButtons
+  const debouncedUpdateScrollButtons = useMemo(() => {
+    let timeoutId;
+    return () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(updateScrollButtons, 10);
+    };
+  }, [updateScrollButtons]);
+
+  // Handle scroll start and end for performance
+  const handleScrollStart = useCallback(() => {
+    setIsScrolling(true);
+  }, []);
+
+  const handleScrollEnd = useCallback(() => {
+    setIsScrolling(false);
   }, []);
 
   useEffect(() => {
-    const getSuggestions = async () => {
-      if (debouncedSearchQuery.trim().length > 1) {
-        setIsLoadingSuggestions(true);
-        try {
-          const response = await fetch(
-            `${API_URL}/resources/suggestions?search=${encodeURIComponent(
-              debouncedSearchQuery
-            )}`
-          );
+    updateScrollButtons();
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', debouncedUpdateScrollButtons, { passive: true });
+      container.addEventListener('scrollstart', handleScrollStart, { passive: true });
+      container.addEventListener('scrollend', handleScrollEnd, { passive: true });
+      window.addEventListener('resize', debouncedUpdateScrollButtons, { passive: true });
+      return () => {
+        container.removeEventListener('scroll', debouncedUpdateScrollButtons);
+        container.removeEventListener('scrollstart', handleScrollStart);
+        container.removeEventListener('scrollend', handleScrollEnd);
+        window.removeEventListener('resize', debouncedUpdateScrollButtons);
+      };
+    }
+  }, [debouncedUpdateScrollButtons, handleScrollStart, handleScrollEnd, resources.length]);
 
-          if (!response.ok) {
-            throw new Error("Failed to fetch suggestions");
-          }
-
-          const data = await response.json();
-          setSuggestions(data || []);
-        } catch (err) {
-          console.error("Error fetching suggestions:", err);
-          setSuggestions([]);
-        } finally {
-          setIsLoadingSuggestions(false);
-        }
-      } else {
-        setSuggestions([]);
-        setIsLoadingSuggestions(false);
-      }
-    };
-
-    getSuggestions();
-  }, [debouncedSearchQuery, API_URL]);
-
-  const handleSearchSubmit = () => {
-    if (searchQuery.trim()) {
-      const updatedSearches = [
-        searchQuery.trim(),
-        ...recentSearches.filter((item) => item !== searchQuery.trim()).slice(0, 4),
-      ];
-      setRecentSearches(updatedSearches);
-      localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
-      navigate("/resources", {
-        state: {
-          searchQuery,
-          filterType,
-          filterCourse,
-          filterSubject,
-          focusInput: true,
-        },
+  const scroll = useCallback((direction) => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 380 + 24; // Updated card width (380px) + gap (24px)
+      const currentScroll = scrollContainerRef.current.scrollLeft;
+      const targetScroll = direction === 'left' 
+        ? Math.max(0, currentScroll - scrollAmount)
+        : currentScroll + scrollAmount;
+      
+      scrollContainerRef.current.scrollTo({
+        left: targetScroll,
+        behavior: 'smooth'
       });
     }
-    setShowSuggestions(false);
-  };
-  
-  
-  
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSearchSubmit();
-    } else if (e.key === "Escape") {
-      setSearchQuery("");
-      setShowSuggestions(false);
-      inputRef.current.blur();
-    }
-  };
+  }, []);
 
-  const handleFullViewClick = (e) => {
-    e.preventDefault();
-    setShowSuggestions(true);
-    navigate("/resources", {
-      state: {
-        searchQuery,
-        filterType,
-        filterCourse,
-        filterSubject,
-        focusInput: true,
-      },
-    });
-  };
-
-  const handleSuggestionClick = (suggestion) => {
-    setSearchQuery(suggestion);
-    const updatedSearches = [
-      suggestion,
-      ...recentSearches.filter((item) => item !== suggestion).slice(0, 4),
-    ];
-    setRecentSearches(updatedSearches);
-    localStorage.setItem("recentSearches", JSON.stringify(updatedSearches));
-    inputRef.current.focus();
-    navigate("/resources", {
-      state: {
-        searchQuery: suggestion,
-        filterType,
-        filterCourse,
-        filterSubject,
-        focusInput: true,
-      },
-    });
-  };
-
-  const handleClearCache = () => {
-    cacheManager.clear();
-    handleRefresh(true); // Force refresh after clearing cache
-    showModal({
-      type: 'success',
-      title: 'Cache Cleared',
-      message: 'All cached data has been cleared and fresh data is being loaded.',
-      confirmText: 'OK',
-    });
-  };
-
-  const typeOptions = [
-    { value: "All", label: "All Types", icon: BookOpen },
-    { value: "Notes", label: "Notes", icon: FileText },
-    { value: "Question Paper", label: "Question Papers", icon: FileQuestion },
-    { value: "Model Answer", label: "Model Answers", icon: FileCheck2 },
-    { value: "Revision Sheet", label: "Revision Sheets", icon: FileText },
-  ];
-
-  const courseOptions = [
-    { value: "All", label: "All Courses", icon: GraduationCap },
-    { value: "B.Sc.", label: "B.Sc.", icon: GraduationCap },
-    { value: "B.Tech", label: "B.Tech", icon: GraduationCap },
-    { value: "B.A.", label: "B.A.", icon: GraduationCap },
-    { value: "M.Sc.", label: "M.Sc.", icon: GraduationCap },
-  ];
-
-  const subjectOptions = [
-    { value: "All", label: "All Subjects", icon: BookOpen },
-    { value: "Mathematics", label: "Math", icon: Calculator },
-    { value: "Physics", label: "Physics", icon: Atom },
-    { value: "Chemistry", label: "Chemistry", icon: FlaskConical },
-    { value: "English", label: "English", icon: Bookmark },
-  ];
-
-  const handleFilterSelect = (setter) => (value) => {
-    setIsFiltering(true);
-    setter(value);
-    setTimeout(() => setIsFiltering(false), 300);
-  };
-
-  const hasActiveFilters =
-    filterType !== "All" || filterCourse !== "All" || filterSubject !== "All";
+  // Memoize the resource cards with increased width (380px = 350px + 30px)
+  const resourceCards = useMemo(() => 
+    resources.map((resource, index) => (
+      <motion.div
+        key={resource._id}
+        initial={{ opacity: 0, x: 50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: index * 0.05 }}
+        className="flex-shrink-0"
+        style={{ 
+          width: '380px', // Increased by 30px (from 350px to 380px)
+          minWidth: '380px', 
+          maxWidth: '380px'
+        }}
+      >
+        <div 
+          className="h-full"
+          style={{ 
+            minHeight: '280px',
+            maxHeight: '400px'
+          }}
+        >
+          <MemoizedResourceCard resource={resource} />
+        </div>
+      </motion.div>
+    )), 
+    [resources]
+  );
 
   return (
     <motion.section
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{
-        duration: 0.5,
-        ease: [0.16, 1, 0.3, 1],
-      }}
-      className="px-1 py-4 w-full flex justify-center"
+      transition={{ duration: 0.6 }}
+      className="mb-12"
     >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white dark:bg-charcoal/95 rounded-2xl shadow-lg p-4 w-full max-w-[1150px]"
-      >
-        {/* Header with cache info */}
-        <div className="flex justify-between items-center mb-4">
-          <motion.h2
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-lg font-bold flex items-center gap-2 font-poppins"
-          >
-            <Search
-              size={20}
-              className="text-amber-600 dark:text-amber-200"
-            />
-            <span>Search</span>
-            {cacheStats && (
-              <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded-full">
-                {cacheStats.validEntries} cached
-              </span>
-            )}
-          </motion.h2>
-          <div className="flex items-center gap-2">
-            
-            {cacheStats && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleClearCache}
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                title="Clear Cache"
-              >
-                Clear Cache
-              </motion.button>
-            )}
+      {/* Section Header */}
+      <div className="flex items-center justify-between mb-6">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center gap-3"
+        >
+          <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
+            <Icon className="text-white" size={24} />
           </div>
-        </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+              {title}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              {resources.length} resources available
+            </p>
+          </div>
+        </motion.div>
 
-        <form className="space-y-4">
-          {/* Search Input */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search
-                className="text-amber-600 dark:text-amber-200"
-                size={20}
+        {/* Beautiful Navigation Buttons with better functionality */}
+        {!isLoading && resources.length > 0 && (
+          <div className="flex gap-3">
+            <motion.button
+              whileHover={{ scale: canScrollLeft ? 1.05 : 1 }}
+              whileTap={{ scale: canScrollLeft ? 0.9 : 1 }}
+              onClick={() => scroll('left')}
+              disabled={!canScrollLeft}
+              className={`group relative p-3 rounded-xl transition-all duration-200 ${
+                canScrollLeft
+                  ? 'bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white shadow-lg hover:shadow-xl hover:from-orange-500 hover:via-amber-600 hover:to-yellow-600'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+              }`}
+            >
+              <ChevronLeft size={20} className="relative z-10" />
+              
+              
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: canScrollRight ? 1.05 : 1 }}
+              whileTap={{ scale: canScrollRight ? 0.9 : 1 }}
+              onClick={() => scroll('right')}
+              disabled={!canScrollRight}
+              className={`group relative p-3 rounded-xl transition-all duration-200 ${
+                canScrollRight
+                  ? 'bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white shadow-lg hover:shadow-xl hover:from-orange-500 hover:via-amber-600 hover:to-yellow-600'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+              }`}
+            >
+              <ChevronRight size={20} className="relative z-10" />
+              
+            </motion.button>
+          </div>
+        )}
+      </div>
+
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="animate-spin text-amber-600 dark:text-amber-400" size={32} />
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && resources.length === 0 && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+            <Search className="text-gray-400 dark:text-gray-500" size={24} />
+          </div>
+          <p className="text-gray-600 dark:text-gray-400">{emptyMessage}</p>
+        </div>
+      )}
+
+      {/* Resources Swiper */}
+      {!isLoading && resources.length > 0 && (
+        <div className="relative">
+          <div
+            ref={scrollContainerRef}
+            className="flex gap-6 overflow-x-auto scrollbar-hide pb-4"
+            style={{ 
+              scrollbarWidth: 'none', 
+              msOverflowStyle: 'none',
+              WebkitOverflowScrolling: 'touch', // Smooth scrolling on mobile
+              minHeight: '300px', // Consistent container height
+              alignItems: 'stretch' // Ensure all cards stretch to same height
+            }}
+          >
+            {resourceCards}
+          </div>
+          
+          {/* Add some CSS to hide scrollbars completely */}
+          <style jsx>{`
+            div::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
+        </div>
+      )}
+    </motion.section>
+  );
+});
+
+ResourceSwiper.displayName = 'ResourceSwiper';
+
+// Memoized Category Button with new beautiful theme
+const CategoryButton = React.memo(({ 
+  category, 
+  index, 
+  selectedCategory, 
+  subjectsByCategory, 
+  onCategorySelect,
+  size = 'normal' // Added size prop for different button sizes
+}) => {
+  const isSelected = selectedCategory?.id === category.id;
+  
+  return (
+    <motion.button
+      key={category.id}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.02 }}
+      whileHover={{ 
+        scale: 1.08,
+        transition: { duration: 0.1 }
+      }}
+      whileTap={{ scale: 0.95 }}
+      onClick={() => onCategorySelect(category)}
+      className={`group relative transition-all duration-200 overflow-hidden ${
+        size === 'large' ? 'p-8 rounded-3xl' : 'p-6 rounded-2xl'
+      } ${
+        isSelected
+          ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 text-white shadow-xl shadow-amber-500/30'
+          : 'bg-white dark:bg-onyx/95 border border-gray-200 dark:border-amber-500 hover:border-transparent hover:shadow-2xl hover:shadow-gray-300/50 dark:hover:shadow-gray-900/50'
+      }`}
+    >
+      {/* Background Gradient Overlay for hover */}
+      {!isSelected && (
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 dark:from-amber-950/20 dark:via-orange-950/20 dark:to-red-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      )}
+      
+      {/* Shine effect on hover */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+      
+      {/* Category Name */}
+      <h3 className={`font-semibold text-sm  mb-2 transition-all duration-300 relative z-10 
+        isSelected
+          ? 'text-white drop-shadow-sm'
+          : 'text-gray-800 dark:text-gray-200   group-hover:text-amber-600 dark:group-hover:text-amber-400'
+      }`}>
+        {category.name}
+      </h3>
+      
+      {/* Subject Count */}
+      {subjectsByCategory[category.name] && (
+        <p className={`transition-all duration-300 relative z-10 ${
+          size === 'large' ? 'text-sm' : 'text-xs'
+        } ${
+          isSelected
+            ? 'text-white/90'
+            : 'text-gray-500 dark:text-gray-400 group-hover:text-amber-500 dark:group-hover:text-amber-300'
+        }`}>
+          {subjectsByCategory[category.name].length} subjects
+        </p>
+      )}
+      
+      {/* Selection indicator */}
+      {isSelected && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="absolute top-2 right-2 w-6 h-6 bg-white/30 rounded-full flex items-center justify-center"
+        >
+          <Star size={12} className="text-white fill-white" />
+        </motion.div>
+      )}
+    </motion.button>
+  );
+});
+
+CategoryButton.displayName = 'CategoryButton';
+
+// Full Page Categories Modal Component
+const CategoriesModal = React.memo(({ 
+  isOpen, 
+  onClose, 
+  categories, 
+  subjectsByCategory, 
+  onCategorySelect, 
+  selectedCategory 
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filter categories based on search term
+  const filteredCategories = useMemo(() => {
+    if (!searchTerm.trim()) return categories;
+    return categories.filter(category =>
+      category.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [categories, searchTerm]);
+
+  // Handle category selection and close modal
+  const handleCategorySelect = useCallback((category) => {
+    onCategorySelect(category);
+    onClose();
+  }, [onCategorySelect, onClose]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      >
+        {/* Modal Content */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          transition={{ 
+            duration: 0.4, 
+            ease: [0.16, 1, 0.3, 1],
+            type: "spring",
+            damping: 25,
+            stiffness: 400
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute inset-4 md:inset-8 bg-white dark:bg-onyx rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+        >
+          {/* Modal Header */}
+          <div className="flex items-center justify-between p-6 md:p-8 border-b border-gray-200 dark:border-charcoal bg-gradient-to-r from-amber-50 via-orange-50 to-red-50 dark:from-amber-950/10 dark:via-orange-950/10 dark:to-red-950/10">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 rounded-2xl shadow-lg">
+                <Grid3X3 className="text-white" size={28} />
+              </div>
+              <div>
+                <h2 className="lg:text-3xl text-xl font-bold bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 bg-clip-text text-transparent">
+                  All Categories
+                </h2>
+                <p className="text-gray-600 text-xs lg:text-sm dark:text-gray-300 mt-1">
+                  Choose from {filteredCategories.length} available categories
+                </p>
+              </div>
+            </div>
+            
+            {/* Minimize Button */}
+            <motion.button
+              whileHover={{ 
+                scale: 1.1,
+                rotate: 5,
+              }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onClose}
+              className="group relative overflow-hidden p-3 bg-gray-100 dark:bg-charcoal hover:bg-red-500 dark:hover:bg-red-500 rounded-xl transition-all duration-200"
+            >
+              <X size={24} className="text-gray-600 dark:text-gray-400 group-hover:text-white transition-colors relative z-10" />
+              
+              {/* Hover effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-red-400 to-red-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+            </motion.button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="p-6 md:p-8 border-b border-gray-200 dark:border-charcoal">
+            <div className="relative max-w-md">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search categories..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-charcoal border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-gray-800 dark:text-gray-200"
               />
             </div>
-            <motion.div
-              whileFocus={{
-                boxShadow: "0 0 0 2px rgba(245, 158, 11, 0.5)",
-                scale: 1.01,
-              }}
-              transition={{ type: "spring", stiffness: 400, damping: 15 }}
-            >
-              <input
-                ref={inputRef}
-                type="text"
-                className="pl-10 pr-10 py-3 w-full rounded-xl border border-gray-300 dark:border-onyx bg-white dark:bg-onyx/90 text-gray-700 dark:text-gray-200 placeholder-gray-500 dark:placeholder-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-200 transition-all duration-200 shadow-glow-sm"
-                placeholder="Search by title, subject..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              />
-            </motion.div>
-            {searchQuery && (
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              >
-                <X
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-amber-200"
-                  size={20}
+          </div>
+
+          {/* Categories Grid - Scrollable */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-2">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+              {filteredCategories.map((category, index) => (
+                <CategoryButton
+                  key={category.id}
+                  category={category}
+                  index={index}
+                  selectedCategory={selectedCategory}
+                  subjectsByCategory={subjectsByCategory}
+                  onCategorySelect={handleCategorySelect}
+                  size="large"
                 />
-              </motion.button>
-            )}
-
-            {/* Suggestions Dropdown */}
-            {showSuggestions && (
+              ))}
+            </div>
+            
+            {/* No Results Message */}
+            {filteredCategories.length === 0 && searchTerm && (
               <motion.div
-                initial={{ opacity: 0, y: 5, scale: 0.98 }}
-                animate={{ opacity: 1, y: 10, scale: 1 }}
-                exit={{ opacity: 0, y: 5 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 30,
-                }}
-                className="absolute z-[9999] mt-1 w-full bg-white dark:bg-onyx rounded-lg shadow-xl border border-gray-200 dark:border-onyx max-h-60 overflow-auto scroll-container"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center py-12"
               >
-                {isLoadingSuggestions ? (
-                  <div className="px-4 py-2 flex items-center justify-center gap-2">
-                    <FontAwesomeIcon
-                      icon={faSpinner}
-                      spin
-                      className="text-amber-600 dark:text-amber-200"
-                    />
-                    <span className="text-sm dark:text-gray-200">
-                      Loading suggestions...
-                    </span>
-                  </div>
-                ) : (
-                  <>
-                    {suggestions.length > 0 && (
-                      <>
-                        <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-amber-200 border-b border-gray-100 dark:border-onyx">
-                          Suggestions
-                        </div>
-                        {suggestions.map((item) => (
-                          <motion.div
-                            key={item._id}
-                            whileHover={{
-                              backgroundColor: "rgba(249, 250, 251, 0.5)",
-                            }}
-                            whileTap={{ scale: 0.98 }}
-                            className="px-4 py-2 hover:bg-gray-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
-                            onMouseDown={() =>
-                              handleSuggestionClick(item.title)
-                            }
-                          >
-                            <Search
-                              size={16}
-                              className="text-amber-600 dark:text-amber-200"
-                            />
-                            <span className="dark:text-gray-200">
-                              {item.title}
-                            </span>
-                          </motion.div>
-                        ))}
-                      </>
-                    )}
-
-                    {recentSearches.length > 0 && (
-                      <>
-                        <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-amber-200 border-b border-gray-100 dark:border-onyx">
-                          Recent Searches
-                        </div>
-                        {recentSearches.map((search, index) => (
-                          <motion.div
-                            key={index}
-                            whileHover={{
-                              backgroundColor: "rgba(249, 250, 251, 0.5)",
-                            }}
-                            whileTap={{ scale: 0.98 }}
-                            className="px-4 py-2 hover:bg-gray-50 dark:hover:bg-amber-950/40 cursor-pointer flex items-center gap-2"
-                            onMouseDown={() => handleSuggestionClick(search)}
-                          >
-                            <Clock
-                              size={16}
-                              className="text-amber-600 dark:text-amber-200"
-                            />
-                            <span className="dark:text-gray-200">{search}</span>
-                          </motion.div>
-                        ))}
-                      </>
-                    )}
-
-                    {!isLoadingSuggestions &&
-                      suggestions.length === 0 &&
-                      recentSearches.length === 0 && (
-                        <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                          {searchQuery.trim().length > 0
-                            ? "No suggestions found"
-                            : "Type to search for resources"}
-                        </div>
-                      )}
-                  </>
-                )}
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                  <Search className="text-gray-400 dark:text-gray-500" size={24} />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+                  No categories found
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Try searching with different keywords
+                </p>
               </motion.div>
             )}
           </div>
 
-          {/* Filter Toggle and Refresh Button */}
-          <div className="flex items-center justify-between">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="button"
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-200 ${
-                hasActiveFilters
-                  ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-200"
-                  : "border-gray-300 dark:border-onyx bg-white dark:bg-onyx/90 text-gray-700 dark:text-gray-200"
-              }`}
-            >
-              <Settings
-                size={16}
-                className={
-                  hasActiveFilters
-                    ? "text-amber-600 dark:text-amber-200"
-                    : "text-gray-500 dark:text-gray-400"
-                }
-              />
-              <span className="text-sm">Filters</span>
-              {hasActiveFilters && (
-                <span className="bg-amber-600 dark:bg-amber-200 text-white dark:text-amber-900 text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
-                  {[filterType !== "All", filterCourse !== "All", filterSubject !== "All"].filter(Boolean).length}
-                </span>
-              )}
-              <ChevronDown
-                className={`transition-transform duration-200 ${
-                  showFilters ? "rotate-180" : ""
-                } ${
-                  hasActiveFilters
-                    ? "text-amber-600 dark:text-amber-200"
-                    : "text-gray-500 dark:text-gray-400"
-                }`}
-                size={16}
-              />
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="button"
-              onClick={() => handleRefresh()}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-onyx rounded-lg shadow-sm text-sm font-medium bg-white dark:bg-onyx/90 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-amber-950/40 transition-colors duration-200"
-            >
-              <RefreshCcw
-                size={16}
-                className="text-amber-600 dark:text-amber-200"
-              />
-              <span className="hidden sm:inline">Refresh</span>
-            </motion.button>
-          </div>
-
-          {/* Collapsible Filters */}
-          {showFilters && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="pt-2 lg:flex lg:flex-row lg:space-x-4 lg:space-y-0 space-y-3 block"
-            >
-              <div className="lg:flex-1">
-                <Dropdown
-                  label="Filter by type"
-                  icon={Filter}
-                  options={typeOptions}
-                  selectedValue={filterType}
-                  onSelect={handleFilterSelect(setFilterType)}
-                  loading={isFiltering}
-                />
-              </div>
-              <div className="lg:flex-1">
-                <Dropdown
-                  label="Filter by course"
-                  icon={GraduationCap}
-                  options={courseOptions}
-                  selectedValue={filterCourse}
-                  onSelect={handleFilterSelect(setFilterCourse)}
-                  loading={isFiltering}
-                />
-              </div>
-              <div className="lg:flex-1">
-                <Dropdown
-                  label="Filter by subject"
-                  icon={Bookmark}
-                  options={subjectOptions}
-                  selectedValue={filterSubject}
-                  onSelect={handleFilterSelect(setFilterSelect)}
-                  loading={isFiltering}
-                />
-              </div>
-            </motion.div>
-          )}
-        </form>
-
-        {/* Recent Searches */}
-        {recentSearches.length > 0 && (
-          <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mt-4 flex items-center gap-2 flex-wrap max-w-full overflow-x-auto pb-2 scroll-container"
-          >
-            <span className="text-sm text-gray-500 dark:text-amber-200 min-w-max">
-              Recent:
-            </span>
-            <div className="flex gap-2">
-              {recentSearches.slice(0, window.innerWidth < 768 ? 3 : recentSearches.length).map((search, index) => (
-                <motion.button
-                  key={index}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.1 * index }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => handleSuggestionClick(search)}
-                  className="text-xs px-3 py-1 bg-gray-100 dark:bg-amber-950/40 hover:bg-gray-200 dark:hover:bg-amber-950/60 rounded-full flex items-center gap-1 whitespace-nowrap"
-                >
-                  {search.length > 15 && window.innerWidth < 768
-                    ? `${search.substring(0, 15)}...`
-                    : search}
-                </motion.button>
-              ))}
+          {/* Modal Footer */}
+          <div className="p-6 md:p-8 border-t border-gray-200 dark:border-charcoal bg-gray-50 dark:bg-charcoal/50">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {filteredCategories.length} of {categories.length} categories shown
+              </p>
+              
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onClose}
+                className="px-6 py-2 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white font-medium rounded-xl hover:shadow-lg transition-all duration-200"
+              >
+                Done
+              </motion.button>
             </div>
-          </motion.div>
-        )}
+          </div>
+        </motion.div>
       </motion.div>
-    </motion.section>
+    </AnimatePresence>
   );
-};
+});
 
-// Dropdown Component (keeping existing implementation)
-const Dropdown = ({
-  label,
-  icon: Icon,
-  options,
-  selectedValue,
-  onSelect,
-  className,
-  loading,
+CategoriesModal.displayName = 'CategoriesModal';
+
+// Categories Grid Component (Updated)
+const CategoriesGrid = React.memo(({ 
+  categories, 
+  subjectsByCategory, 
+  onCategorySelect, 
+  selectedCategory 
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  const selectedOption =
-    options.find((option) => option.value === selectedValue) || {
-      label: "All",
-      icon: BookOpen,
-    };
-
-  const toggleDropdown = () => !loading && setIsOpen(!isOpen);
-
-  const handleSelect = (value) => {
-    onSelect(value);
-    setIsOpen(false);
-  };
+  const [showCategoriesModal, setShowCategoriesModal] = useState(false);
   
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", handleOutsideClick);
-    return () => window.removeEventListener("mousedown", handleOutsideClick);
+  // Show only first 8 categories in the main grid
+  const displayedCategories = useMemo(() => 
+    categories.slice(0, 8),
+    [categories]
+  );
+
+  const openCategoriesModal = useCallback(() => {
+    setShowCategoriesModal(true);
+  }, []);
+
+  const closeCategoriesModal = useCallback(() => {
+    setShowCategoriesModal(false);
   }, []);
 
   return (
-    <div className={`relative ${className}`} ref={dropdownRef}>
-      <motion.button
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
-        type="button"
-        className={`px-4 py-3 w-full rounded-xl border transition-all duration-200 flex items-center justify-between shadow-glow-sm
-          ${
-            loading
-              ? "cursor-not-allowed opacity-70"
-              : "cursor-pointer hover:border-amber-400 dark:hover:border-amber-200"
-          }
-          border-gray-300 dark:border-onyx bg-white hover:bg-gray-50 dark:bg-onyx/90 text-gray-700 dark:text-gray-200
-          focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-200 scroll-container`}
-        onClick={toggleDropdown}
-        disabled={loading}
+    <>
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="mb-12"
       >
-        <span className="flex items-center gap-2">
-          {loading ? (
-            <FontAwesomeIcon
-              icon={faSpinner}
-              spin
-              className="text-amber-600 dark:text-amber-200"
-              />
-            ) : (
-            Icon && (
-              <Icon className="text-amber-600 dark:text-amber-200" size={20} />
-            )
-          )}
-          <span className="truncate">{selectedOption.label}</span>
-        </span>
-        <ChevronDown
-          className={`text-amber-600 dark:text-amber-200 transition-transform duration-200 flex-shrink-0 ${
-            isOpen ? "rotate-180" : ""
-          }`}
-          size={20}
-        />
-      </motion.button>
-
-      {isOpen && (
-        <motion.ul
-          initial={{ opacity: 0, y: -5, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -5 }}
-          transition={{
-            type: "spring",
-            stiffness: 500,
-            damping: 30,
-          }}
-          className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-onyx/90 rounded-xl shadow-xl border border-gray-200 dark:border-onyx z-[9999] max-h-60 overflow-auto scroll-container"
+        {/* Section Header */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center justify-between mb-6 flex-wrap gap-3"
         >
-          {options.map((option) => (
-            <motion.li
-              key={option.value}
-              whileHover={{
-                backgroundColor:
-                option.value === selectedValue
-                    ? "rgba(253, 230, 138, 0.5)"
-                    : "rgba(249, 250, 251, 0.5)",
-                dark: {
-                  backgroundColor:
-                    option.value === selectedValue
-                      ? "rgba(120, 53, 15, 0.7)"
-                      : "rgba(68, 64, 60, 0.4)",
-                },
-              }}
-              whileTap={{ scale: 0.98 }}
-              className={`flex items-center gap-2 px-4 py-3 cursor-pointer transition-colors font-poppins
-                ${
-                  option.value === selectedValue
-                    ? "bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-200"
-                    : "hover:bg-gray-50 dark:hover:bg-amber-950/40 text-gray-700 dark:text-gray-200"
-                }`}
-              onClick={() => handleSelect(option.value)}
-            >
-              {option.icon && (
-                <option.icon
-                  size={16}
-                  className="min-w-4 text-amber-600 dark:text-amber-200 flex-shrink-0"
-                />
-              )}
-              <span className="truncate">{option.label}</span>
-            </motion.li>
-          ))}
-        </motion.ul>
-      )}
-    </div>
-  );
-};
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 rounded-xl shadow-lg">
+              <Grid3X3 className="text-white" size={24} />
+            </div>
+            <div>
+              <h2 className="lg:text-2xl text-lg font-bold text-gray-800 dark:text-white">
+                Browse by Category
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Explore {categories.length} different subject categories
+              </p>
+            </div>
+          </div>
 
-// Enhanced ResourcesSection Component
-const ResourcesSection = ({
-  searchQuery: propSearchQuery,
-  filterType: propFilterType,
-  filterCourse: propFilterCourse,
-  filterSubject: propFilterSubject,
-  sortBy: propSortBy,
-  setSortBy: propSetSortBy,
+                {categories.length > 8 && (
+                <motion.button
+                  whileHover={{ 
+                  scale: 1.05,
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={openCategoriesModal}
+                  className="group text-sm relative overflow-hidden flex justify-center items-center gap-3 px-6 py-3 bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white font-medium rounded-xl shadow-lg lg:text-base transition-all duration-200 w-full sm:w-auto"
+                >
+                  {/* Animated background */}
+              <div className="absolute inset-0 bg-gradient-to-r from-orange-500 via-amber-600 to-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              
+             
+              <span className="relative z-10 font-medium">
+                View All Categories
+              </span>
+              
+              <motion.div
+                className="relative z-10"
+                animate={{ x: 0 }}
+                whileHover={{ x: 3 }}
+              >
+                <ArrowRight size={18} />
+              </motion.div>
+            </motion.button>
+          )}
+        </motion.div>
+
+        {/* Categories Grid - Show only first 8 */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-8 gap-6">
+          {displayedCategories.map((category, index) => (
+            <CategoryButton
+              key={category.id}
+              category={category}
+              index={index}
+              selectedCategory={selectedCategory}
+              subjectsByCategory={subjectsByCategory}
+              onCategorySelect={onCategorySelect}
+            />
+          ))}
+        </div>
+      </motion.section>
+
+      {/* Categories Modal */}
+      <CategoriesModal
+        isOpen={showCategoriesModal}
+        onClose={closeCategoriesModal}
+        categories={categories}
+        subjectsByCategory={subjectsByCategory}
+        onCategorySelect={onCategorySelect}
+        selectedCategory={selectedCategory}
+      />
+    </>
+  );
+});
+
+CategoriesGrid.displayName = 'CategoriesGrid';
+
+// Main Enhanced Resources Section Component
+const EnhancedResourcesSection = React.memo(({
   isFullPage = false,
   showSearchControls = false,
-  fetchSuggestions,
-  recentSearches = [],
-  addRecentSearch,
-   onSave , onFlag
 }) => {
-  const [resources, setResources] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [isStaleData, setIsStaleData] = useState(false);
-  const location = useLocation();
   const navigate = useNavigate();
-  const [localSearchQuery, setLocalSearchQuery] = useState("");
-  const [localFilterType, setLocalFilterType] = useState("All");
-  const [localFilterCourse, setLocalFilterCourse] = useState("All");
-  const [localFilterSubject, setLocalFilterSubject] = useState("All");
-  const [localSortBy, setLocalSortBy] = useState("recent");
-  const initialLoadDone = useRef(false);
-  const lastFetchParams = useRef(null);
-  const backgroundFetchRef = useRef(null);
-  const [cacheStats, setCacheStats] = useState(null);
-  const {isAuthenticated , token} = useAuth();
-  const [saving, setSaving] = useState(false);
-  const [flagging, setFlagging] = useState(false);
-  
-  // New state to control exit animation
-  const [isExiting, setIsExiting] = useState(false);
-  
-  const {
-    searchQuery = propSearchQuery || "",
-    filterType = propFilterType || "All",
-    filterCourse = propFilterCourse || "All",
-    filterSubject = propFilterSubject || "All",
-    sortBy = propSortBy || "recent",
-    focusInput = false,
-  } = location.state || {};
-
-  useEffect(() => {
-    setLocalSearchQuery(searchQuery);
-    setLocalFilterType(filterType);
-    setLocalFilterCourse(filterCourse);
-    setLocalFilterSubject(filterSubject);
-    setLocalSortBy(sortBy);
-    if (focusInput) {
-      // Focus handling would be in SearchSection
-    }
-  }, [searchQuery, filterType, filterCourse, filterSubject, sortBy, focusInput]);
-  
-  const handleSave = async () => {
-      if (!isAuthenticated) {
-        showModal({
-          type: "warning",
-          title: "Authentication Required",
-          message:
-            "You need to be logged in to save resources to your library. Please log in or create an account.",
-          confirmText: "Go to Login",
-          onConfirm: () => (window.location.href = "/login"),
-          cancelText: "Cancel",
-          isDismissible: true,
-        });
-        return;
-      }
-      setSaving(true);
-      try {
-        const response = await fetch(
-          `${API_URL}/resources/${resources._id}/save`,
-          {
-            method: "PUT",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-  
-        const data = await response.json();
-        if (response.ok) {
-          showModal({
-            type: "success",
-            title: "Resource Saved!",
-            message:
-              "This resource has been successfully added to your library!",
-            confirmText: "Great!",
-          });
-          onSave?.(resources._id);
-        } else {
-          showModal({
-            type: "error",
-            title: "Failed to Save",
-            message: `Could not save resource: ${data.msg || "Unknown error"}`,
-            confirmText: "OK",
-          });
-        }
-      } catch (error) {
-        console.error("Save error:", error);
-        showModal({
-          type: "error",
-          title: "Save Error",
-          message:
-            "An unexpected error occurred while saving the resource. Please try again.",
-          confirmText: "OK",
-        });
-      } finally {
-        setSaving(false);
-      }
-    };
-  
-    const handleFlag = async () => {
-      if (!isAuthenticated) {
-        showModal({
-          type: "warning",
-          title: "Authentication Required",
-          message:
-            "You need to be logged in to flag resources. Please log in or create an account.",
-          confirmText: "Go to Login",
-          onConfirm: () => (window.location.href = "/login"),
-          cancelText: "Cancel",
-          isDismissible: true,
-        });
-        return;
-      }
-  
-      showModal({
-        type: "info",
-        title: "Confirm Flagging",
-        message:
-          "Are you sure you want to flag this resource for review? This action cannot be undone.",
-        confirmText: "Flag",
-        onConfirm: async () => {
-          setFlagging(true);
-          try {
-            const response = await fetch(
-              `${API_URL}/resources/${resources._id}/flag`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ reason: "Reported by user" }),
-              }
-            );
-  
-            const data = await response.json();
-            if (response.ok) {
-              showModal({
-                type: "success",
-                title: "Resource Flagged",
-                message:
-                  "This resource has been flagged for review. Thank you for helping us maintain content quality!",
-                confirmText: "Got It",
-              });
-              onFlag?.(resources._id);
-            } else {
-              showModal({
-                type: "error",
-                title: "Failed to Flag",
-                message: `Could not flag resource: ${
-                  data.msg || "Unknown error"
-                }`,
-                confirmText: "OK",
-              });
-            }
-          } catch (error) {
-            console.error("Flag error:", error);
-            showModal({
-              type: "error",
-              title: "Flagging Error",
-              message:
-                "An unexpected error occurred while flagging the resource. Please try again.",
-              confirmText: "OK",
-            });
-          } finally {
-            setFlagging(false);
-          }
-        },
-        cancelText: "Cancel",
-        isDismissible: true,
-      });
-    };
-  const setSortBy = propSetSortBy || setLocalSortBy;
   const { showModal } = useModal();
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
-  // Update cache stats
-  useEffect(() => {
-    const updateCacheStats = () => {
-      setCacheStats(cacheManager.getStats());
-    };
-    
-    updateCacheStats();
-    const interval = setInterval(updateCacheStats, 5000); // Update every 5 seconds
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  const createFetchParams = useCallback(
-    (searchQuery, filterType, filterCourse, filterSubject, sortBy) => {
-      return {
-        searchQuery: searchQuery || "",
-        filterType: filterType || "All",
-        filterCourse: filterCourse || "All",
-        filterSubject: filterSubject || "All",
-        sortBy: sortBy || "recent",
-      };
-    },
-    []
-  );
-
-  const shouldSkipFetch = useMemo(() => {
-    const currentParams = createFetchParams(
-      localSearchQuery,
-      localFilterType,
-      localFilterCourse,
-      localFilterSubject,
-      localSortBy
-    );
-
-    const paramsString = JSON.stringify(currentParams);
-    const lastParamsString = JSON.stringify(lastFetchParams.current);
-
-    return paramsString === lastParamsString && initialLoadDone.current;
-  }, [localSearchQuery, localFilterType, localFilterCourse, localFilterSubject, localSortBy, createFetchParams]);
-
-  const fetchFromAPI = useCallback(async (params) => {
-    const queryParams = new URLSearchParams();
-    if (params.searchQuery) queryParams.append("search", params.searchQuery);
-    if (params.filterType && params.filterType !== "All")
-      queryParams.append("type", params.filterType);
-    if (params.filterCourse && params.filterCourse !== "All")
-      queryParams.append("course", params.filterCourse);
-    if (params.filterSubject && params.filterSubject !== "All")
-      queryParams.append("subject", params.filterSubject);
-    if (params.sortBy === "popular") queryParams.append("sortBy", "downloads");
-    if (params.sortBy === "rating") queryParams.append("sortBy", "averageRating");
-    if (params.sortBy === "recent") queryParams.append("sortBy", "createdAt");
-
-    const url = `${API_URL}/resources?${queryParams.toString()}`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    let resourcesData = [];
-
-    if (Array.isArray(data)) {
-      resourcesData = data;
-    } else if (data && Array.isArray(data.resources)) {
-      resourcesData = data.resources;
-    } else {
-      console.error("API response format is not as expected:", data);
-      resourcesData = [];
-    }
-
-    return resourcesData;
-  }, [API_URL]);
-
-  const fetchResources = useCallback(
-    async (isRefresh = false, showLoadingState = true) => {
-      const currentParams = createFetchParams(
-        localSearchQuery,
-        localFilterType,
-        localFilterCourse,
-        localFilterSubject,
-        localSortBy
-      );
-
-      if (shouldSkipFetch && !isRefresh) {
-        return;
-      }
-
-      // Cancel any ongoing background fetch
-      if (backgroundFetchRef.current) {
-        backgroundFetchRef.current.abort();
-        backgroundFetchRef.current = null;
-      }
-
-      // Try to get from cache first (unless force refresh)
-      if (!isRefresh) {
-        const cached = cacheManager.get(currentParams);
-        if (cached) {
-          setResources(cached.data);
-          setError(null);
-          setIsStaleData(cached.isStale);
-          initialLoadDone.current = true;
-
-          // If data is stale, fetch fresh data in background
-          if (cached.isStale) {
-            console.log("Using stale cached data, fetching fresh data in background...");
-            
-            // Create abort controller for background fetch
-            const abortController = new AbortController();
-            backgroundFetchRef.current = abortController;
-            
-            try {
-              const freshData = await fetchFromAPI(currentParams);
-              
-              // Only update if this fetch wasn't cancelled
-              if (!abortController.signal.aborted) {
-                cacheManager.set(currentParams, freshData);
-                setResources(freshData);
-                setIsStaleData(false);
-                console.log("Background refresh completed");
-              }
-            } catch (err) {
-              if (!abortController.signal.aborted) {
-                console.warn("Background refresh failed:", err);
-              }
-            } finally {
-              if (backgroundFetchRef.current === abortController) {
-                backgroundFetchRef.current = null;
-              }
-            }
-          }
-
-          return cached.data;
-        }
-      }
-
-      // No cache hit or force refresh - show loading and fetch
-      lastFetchParams.current = currentParams;
-
-      if (showLoadingState) {
-        setLoading(true);
-      }
-      setError(null);
-
-      try {
-        const freshData = await fetchFromAPI(currentParams);
-        
-        // Update cache and state
-        cacheManager.set(currentParams, freshData);
-        setResources(freshData);
-        setIsStaleData(false);
-        setError(null);
-        initialLoadDone.current = true;
-
-        // Prefetch common filter combinations
-        const commonParams = [
-          { ...currentParams, filterType: "Notes" },
-          { ...currentParams, filterType: "Question Paper" },
-          { ...currentParams, sortBy: "popular" },
-        ];
-        
-        // Don't wait for prefetch
-        setTimeout(() => {
-          cacheManager.prefetch(commonParams, fetchFromAPI);
-        }, 1000);
-
-        return freshData;
-      } catch (err) {
-        console.error("Failed to fetch resources:", err);
-        setError("Failed to load resources. Please try again.");
-        setResources([]);
-        setIsStaleData(false);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [
-      localSearchQuery,
-      localFilterType,
-      localFilterCourse,
-      localFilterSubject,
-      localSortBy,
-      createFetchParams,
-      shouldSkipFetch,
-      fetchFromAPI,
-    ]
-  );
-
-  useEffect(() => {
-    if (!initialLoadDone.current) {
-      fetchResources();
-    }
-  }, []);
-
-  useEffect(() => {
-    if (initialLoadDone.current) {
-      fetchResources();
-    }
-  }, [localSearchQuery, localFilterType, localFilterCourse, localFilterSubject, localSortBy, fetchResources]);
-
-  const handleRefresh = useCallback((forceClear = false) => {
-    if (forceClear) {
-      cacheManager.clear();
-    }
-    fetchResources(true, true); // Force refresh with loading state
-  }, [fetchResources]);
-
-  const displayedResources = useMemo(() => resources, [resources]);
-
-  const showLoadingState = loading && (!initialLoadDone.current || resources.length === 0);
-
-  // New logic for the minimize/exit animation
-  const handleMinimize = () => {
-    setIsExiting(true);
-  };
+  const { isAuthenticated, token } = useAuth();
   
+  // Using your actual useResources hook
+  const {
+    resources,
+    categories,
+    subjectsByCategory,
+    isLoading,
+    error,
+    fetchResources,
+    fetchTrendingResources,
+    fetchRecentlyAddedResources
+  } = useResources();
+
+  // State management with proper initialization
+  const [state, setState] = useState({
+    trendingResources: [],
+    recentResources: [],
+    selectedCategory: null,
+    categoryResources: [],
+    loadingTrending: true,
+    loadingRecent: true,
+    loadingCategory: false,
+    isExiting: false
+  });
+
+  // Memoized fetch functions to prevent recreation on every render
+  const fetchTrendingMemo = useCallback(async () => {
+    try {
+      setState(prev => ({ ...prev, loadingTrending: true }));
+      const trending = await fetchTrendingResources();
+      setState(prev => ({ 
+        ...prev, 
+        trendingResources: trending, 
+        loadingTrending: false 
+      }));
+    } catch (err) {
+      console.error('Error loading trending resources:', err);
+      setState(prev => ({ ...prev, loadingTrending: false }));
+    }
+  }, [fetchTrendingResources]);
+
+  const fetchRecentMemo = useCallback(async () => {
+    try {
+      setState(prev => ({ ...prev, loadingRecent: true }));
+      const recent = await fetchRecentlyAddedResources();
+      setState(prev => ({ 
+        ...prev, 
+        recentResources: recent, 
+        loadingRecent: false 
+      }));
+    } catch (err) {
+      console.error('Error loading recent resources:', err);
+      setState(prev => ({ ...prev, loadingRecent: false }));
+    }
+  }, [fetchRecentlyAddedResources]);
+
+  // Fetch data only once on mount
   useEffect(() => {
-    if (isExiting) {
+    let mounted = true;
+    
+    const loadData = async () => {
+      await Promise.all([
+        fetchTrendingMemo(),
+        fetchRecentMemo()
+      ]);
+    };
+
+    loadData();
+
+    return () => {
+      mounted = false;
+    };
+  }, []); // Empty dependency array - only run once
+
+  // Handle category selection with proper memoization
+  const handleCategorySelect = useCallback(async (category) => {
+    if (category.id === 'trending') {
+      setState(prev => ({
+        ...prev,
+        selectedCategory: category,
+        categoryResources: prev.trendingResources
+      }));
+      return;
+    }
+
+    try {
+      setState(prev => ({ 
+        ...prev, 
+        loadingCategory: true, 
+        selectedCategory: category 
+      }));
+      
+      const resources = await fetchResources(category.id);
+      
+      setState(prev => ({ 
+        ...prev, 
+        categoryResources: resources, 
+        loadingCategory: false 
+      }));
+    } catch (err) {
+      console.error('Error loading category resources:', err);
+      setState(prev => ({ ...prev, loadingCategory: false }));
+      showModal({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load resources for this category.',
+        confirmText: 'OK'
+      });
+    }
+  }, [fetchResources, showModal]);
+
+  // Handle minimize/exit
+  const handleMinimize = useCallback(() => {
+    setState(prev => ({ ...prev, isExiting: true }));
+  }, []);
+
+  useEffect(() => {
+    if (state.isExiting) {
       const timer = setTimeout(() => {
         navigate("/");
-      }, 500); // Duration of the exit animation
+      }, 500);
       return () => clearTimeout(timer);
     }
-  }, [isExiting, navigate]);
-  
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (backgroundFetchRef.current) {
-        backgroundFetchRef.current.abort();
-      }
-    };
-  }, []);
+  }, [state.isExiting, navigate]);
 
   return (
     <AnimatePresence>
-      {!isExiting && (
-        <motion.section
+      {!state.isExiting && (
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 0.8, y: 100 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className={`px-4 py-8 max-w-full mx-auto min-h-screen transition-all duration-300 ${
+          className={`min-h-screen transition-all duration-300 ${
             isFullPage
               ? "bg-gradient-to-br from-pearl via-ivory to-cream dark:bg-gradient-to-br pt-16 dark:from-onyx dark:via-charcoal dark:to-onyx dark:text-white text-gray-500"
               : "bg-transparent"
           }`}
         >
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleMinimize}
-            className={`fixed ${
-              isFullPage ? "visible" : "hidden"
-            } top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-glow-sm hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal`}
-          >
-            <FontAwesomeIcon icon={faMinimize} className="text-sm" />
-            <span>Minimize</span>
-          </motion.button>
+          
 
-          {showSearchControls && (
-            <SearchSection
-              searchQuery={localSearchQuery}
-              setSearchQuery={setLocalSearchQuery}
-              filterType={localFilterType}
-              setFilterType={setLocalFilterType}
-              filterCourse={localFilterCourse}
-              setFilterCourse={setLocalFilterCourse}
-              filterSubject={localFilterSubject}
-              setFilterSubject={setLocalFilterSubject}
-              handleRefresh={handleRefresh}
-              cacheStats={cacheStats}
+          <div className="max-w-7xl mx-auto px-4 ">
+            {/* Page Header */}
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-12"
+            >
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 bg-clip-text text-transparent mb-4">
+                Discover Learning Resources
+              </h1>
+              <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+                Explore thousands of educational materials across multiple categories and subjects
+              </p>
+            </motion.div>
+
+            {/* Categories Grid */}
+            <CategoriesGrid
+              categories={categories}
+              subjectsByCategory={subjectsByCategory}
+              onCategorySelect={handleCategorySelect}
+              selectedCategory={state.selectedCategory}
             />
-          )}
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 max-w-6xl mx-auto"
-          >
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-semibold dark:text-white font-poppins">
-                Popular Resources{" "}
-                {loading && initialLoadDone.current && (
-                  <FontAwesomeIcon
-                    icon={faSpinner}
-                    spin
-                    className="ml-2 text-amber-600 dark:text-amber-200"
-                    size="sm"
-                  />
-                )}
-              </h2>
-              
-              {/* Connection and Cache Status */}
-              <div className="flex items-center gap-2">
-                {isStaleData && (
-                  <span className="flex items-center gap-1 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded-full">
-                    <WifiOff size={12} />
-                    Cached
-                  </span>
-                )}
-                {backgroundFetchRef.current && (
-                  <span className="flex items-center gap-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
-                    <RefreshCcw size={12} className="animate-spin" />
-                    Updating
-                  </span>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 dark:text-platinum font-poppins">
-                Sort by:
-              </span>
-              <div className="relative">
-                <motion.select
-                  whileHover={{ scale: 1.02 }}
-                  whileFocus={{ scale: 1.02 }}
-                  className="p-2 pr-8 border rounded-lg bg-white text-gray-700 border-gray-300 hover:border-gray-400 dark:bg-onyx/80 dark:text-platinum dark:border-onyx font-poppins focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:focus:ring-amber-200 dark:focus:border-amber-200 shadow-glow-sm"
-                  value={localSortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                >
-                  <option value="recent">Most Recent</option>
-                  <option value="popular">Most Popular</option>
-                  <option value="rating">Highest Rated</option>
-                </motion.select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                  <svg
-                    className="w-4 h-4 text-gray-500 dark:text-amber-200"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </motion.div>
+            {/* Selected Category Resources */}
+            {state.selectedCategory && (
+              <ResourceSwiper
+                resources={state.categoryResources}
+                title={`${state.selectedCategory.name} Resources`}
+                icon={BookOpen}
+                isLoading={state.loadingCategory}
+                emptyMessage={`No resources found in ${state.selectedCategory.name}`}
+              />
+            )}
 
-          {showLoadingState && (
+            {/* Trending Resources */}
+            <ResourceSwiper
+              resources={state.trendingResources}
+              title="Trending Resources"
+              icon={TrendingUp}
+              isLoading={state.loadingTrending}
+              emptyMessage="No trending resources at the moment"
+            />
+
+            {/* Recently Added Resources */}
+            <ResourceSwiper
+              resources={state.recentResources}
+              title="Recently Added"
+              icon={Sparkles}
+              isLoading={state.loadingRecent}
+              emptyMessage="No recent resources found"
+            />
+
+            {/* Beautiful Browse All Resources Button */}
+          {!isFullPage && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="text-center py-12 flex flex-col items-center justify-center text-gray-600 dark:text-platinum font-poppins"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+              className="text-center mt-12"
             >
-              <motion.div
-                animate={{
-                  rotate: 360,
-                }}
-                transition={{
-                  rotate: {
-                    repeat: Infinity,
-                    duration: 1.5,
-                    ease: "linear",
-                  },
-                }}
-              >
-                <FontAwesomeIcon
-                  icon={faSpinner}
-                  size="2x"
-                  className="mb-4 text-amber-600 dark:text-amber-200"
-                />
-              </motion.div>
-              <motion.p
-                animate={{
-                  opacity: [0.6, 1, 0.6],
-                }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 2,
-                }}
-              >
-                Loading resources...
-              </motion.p>
-            </motion.div>
-          )}
-
-          {error && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="text-center py-12 text-red-600 dark:text-amber-300 font-poppins"
-            >
-              <div className="max-w-md mx-auto">
-                <div className="text-lg mb-2">⚠️ Error</div>
-                <p className="mb-4">{error}</p>
+              <Link to="/resources">
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleRefresh(false)}
-                  className="px-4 py-2 bg-amber-600 dark:bg-amber-200 text-white dark:text-amber-900 rounded-lg hover:bg-amber-700 dark:hover:bg-amber-300 transition-colors"
-                >
-                  Try Again
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-
-          {!showLoadingState && !error && displayedResources.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="text-center py-12"
-            >
-              <div className="max-w-md mx-auto">
-                <motion.div
-                  animate={{
-                    y: [0, -5, 0],
-                    transition: { repeat: Infinity, duration: 2 },
+                  whileHover={{ 
+                    scale: 1.05,
                   }}
-                  className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-charcoal flex items-center justify-center shadow-glow-sm"
+                  whileTap={{ scale: 0.95 }}
+                  className="group relative overflow-hidden inline-flex items-center gap-4 px-4 lg:px-10 py-3 lg:py-5 bg-gradient-to-r from-orange-500 via-amber-600 to-yellow-600 text-white font-semibold rounded-2xl shadow-2xl transition-all lg:text-lg text-xs duration-300"
                 >
-                  <FontAwesomeIcon
-                    icon={faSearch}
-                    className="text-2xl text-amber-600 dark:text-amber-200"
-                  />
-                </motion.div>
-                <h3 className="text-xl font-medium bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 bg-clip-text text-transparent font-poppins mb-2">
-                  No resources found
-                </h3>
-                <p className="text-gray-600 dark:text-platinum font-poppins">
-                  Try adjusting your search terms or filters.
-                </p>
-              </div>
+                  {/* Animated background */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-orange-600 via-amber-700 to-red-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+
+                  <Search size={22} className="relative z-10 group -hover:rotate-12 transition-transform duration-300" />
+                  <span className="relative z-10 text-lg">Browse All Resources</span>
+                  <motion.div
+                    className="relative z-10"
+                    animate={{ x: 0 }}
+                    initial={{ x: 20 }}
+                  >
+                    <ArrowRight size={22} />
+                  </motion.div>
+                </motion.button>
+              </Link>
             </motion.div>
           )}
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+);
+});
 
-          <motion.div
-            className="max-w-6xl grid grid-cols-1 md:grid-cols-2  lg:grid-cols-3 mx-auto gap-8"
-            initial="hidden"
-            animate="visible"
-            variants={{
-              hidden: { opacity: 0 },
-              visible: {
-                opacity: 1,
-                transition: {
-                  when: "beforeChildren",
-                  staggerChildren: 0.1,
-                  staggerDirection: 1,
-                },
-              },
-            }}
-          >
-            {displayedResources.map((resource) => (
-              <motion.div
-                key={resource._id}
-                variants={{
-                  hidden: { opacity: 0, y: 20, scale: 0.95 },
-                  visible: {
-                    opacity: 1,
-                    y: 0,
-                    scale: 1,
-                    transition: {
-                      type: "spring",
-                      stiffness: 300,
-                      damping: 20,
-                    },
-                  
-                  },
-                }}
-              >
-                <Link
-                  to={`/resources/${resource._id}`}
-                  state={{ resource: resource }}
-                >
-                  <UniversalResourceCard 
-        key={resource._id}
-        resource={resource}
-        variant="default"
-        // onSave={handleSave}
-        // onFlag={handleFlag}
-      />
-                </Link>
-              </motion.div>
-            ))}
-          </motion.div>
-        </motion.section>
-      )}
-    </AnimatePresence>
-  );
-};
+EnhancedResourcesSection.displayName = 'EnhancedResourcesSection';
 
-export default ResourcesSection;
+export default EnhancedResourcesSection;
