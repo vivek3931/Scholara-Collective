@@ -25,11 +25,11 @@ const flagSchema = new mongoose.Schema({
 // Main resource schema
 const resourceSchema = new mongoose.Schema({
     title: { type: String, required: true, trim: true },
-    fileHash: { 
-        type: String, 
-        required: true, 
-        unique: true, 
-        index: true 
+    fileHash: {
+        type: String,
+        required: true,
+        unique: true,
+        index: true
     },
     textHash: {
         type: String,
@@ -46,7 +46,7 @@ const resourceSchema = new mongoose.Schema({
     course: {
         type: String,
         required: true,
-        enum: ['Notes', 'Question Paper', 'Book', 'Presentation', 'Syllabus', 'Other']
+        enum: ['Notes', 'Question Paper', 'Book', 'Presentation','Mock Test' , 'Previous Year Paper' , 'Syllabus', 'Study Guide', 'Other']
     },
     year: { type: Number, required: true },
     institution: { type: String, required: true },
@@ -57,6 +57,8 @@ const resourceSchema = new mongoose.Schema({
     flags: [flagSchema],
     visibility: { type: String, enum: ['public', 'private'], default: 'public' },
     downloads: { type: Number, default: 0 },
+    thumbnailUrl: { type: String, default: null },
+
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
