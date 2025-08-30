@@ -275,11 +275,7 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: index * 0.05 }}
         className="flex-shrink-0"
-        style={{ 
-          width: '380px', // Increased by 30px (from 350px to 380px)
-          minWidth: '380px', 
-          maxWidth: '380px'
-        }}
+        style={{ width: '350px' }} // Updated width to 380px (350px + 30px)
       >
         <div 
           className="h-full"

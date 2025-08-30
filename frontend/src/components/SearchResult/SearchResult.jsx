@@ -274,17 +274,21 @@ const SearchResults = () => {
     return () => clearTimeout(debounceTimer);
   }, [searchQuery]);
 
-
+  const handleBackClick = () => {
+    navigate(-1);
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
-      
 
       {/* Animated background */}
       <div className="fixed inset-0 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200 dark:from-onyx dark:via-charcoal dark:to-onyx"></div>
 
       {/* Main Content */}
-      <main className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+      <main className="relative z-10 container mx-auto px-4 pt-16 lg:px-8 py-8 flex-1">
+        <button onClick={handleBackClick}  className="mb-4 fixed top-4 left-4 bg-white dark:bg-charcoal dark:hover:bg-onyx shadow-glow-sm duration-200 rounded-md hover:scale-105 px-4 py-2 z-20 flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100">
+          <FontAwesomeIcon icon={faArrowLeft} /> Back
+      </button>
         <div className="max-w-7xl mx-auto">
           {/* Search Header */}
           <div className="mb-8 animate-fade-in">
@@ -470,7 +474,7 @@ const SearchResults = () => {
                 >
                   {/* Thumbnail/Icon */}
                   <div
-                    className={`relative flex-shrink-0 flex items-center justify-center w-24 sm:w-32 lg:min-h-full h-auto  p-2 ${getFileTypeBackground(
+                    className={`relative flex-shrink-0 flex items-center justify-center w-24 sm:w-32 lg:min-h-full h-auto  ${getFileTypeBackground(
                       resource.fileType
                     )}`}
                   >

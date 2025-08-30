@@ -33,6 +33,7 @@ import {
   faArrowLeft,
   faTimes,
   faDownload,
+  faImage
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faRegularStar } from "@fortawesome/free-regular-svg-icons";
 import { useAuth } from "../../context/AuthContext/AuthContext";
@@ -562,1171 +563,1126 @@ const ResourceCommentsSection = React.memo(
   }
 );
 
-// Optimized BlurredPreview Component
-const BlurredPreview = React.memo(
-  ({ resourceId, fileUrl, token, isAuthenticated, onError }) => {
-    const [blurredPreviewUrl, setBlurredPreviewUrl] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
+
+
+  const ResourceDetailPage = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { resourceId } = useParams();
+    const { user, token, isAuthenticated, updateUser } = useAuth();
+    const { resource: initialResourceFromState } = location.state || {};
+
+    const [resource, setResource] = useState(initialResourceFromState);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [userRating, setUserRating] = useState(0);
+    const [overallRating, setOverallRating] = useState(0);
+    const [isRatingLoading, setIsRatingLoading] = useState(false);
+    const [zoom, setZoom] = useState(1);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewError, setPreviewError] = useState(null);
+    const [previewDataUrl, setPreviewDataUrl] = useState(null);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [isPurchased, setIsPurchased] = useState(false);
+    const [purchasing, setPurchasing] = useState(false);
+    const pollIntervalRef = useRef(null);
+    const pdfContainerRef = useRef(null);
+    const [visiblePages, setVisiblePages] = useState(new Set([1]));
+    const [numPages, setNumPages] = useState(null);
+    const [pdfDimensions, setPdfDimensions] = useState({ width: 500, height: 700 });
+    const [currentPage, setCurrentPage] = useState(1); // New state for current page tracking
 
-    // Abort controller for canceling requests
-    const abortControllerRef = useRef(null);
+    const userId = user?._id;
+    const userName = user?.username || "Anonymous User";
+    const isAdmin = user?.roles === "admin";
+    
+    const canDownload = useMemo(() => {
+      if (!isAuthenticated) return false;
+      if (isAdmin) return true;
+      return isPurchased;
+    }, [isAuthenticated, isAdmin, isPurchased]);
 
-    // Optimized thumbnail generation with smaller scale and quality
-    const generateThumbnail = useCallback(async (fullFileUrl) => {
-      try {
-        const loadingTask = pdfjs.getDocument({
-          url: fullFileUrl,
-          cMapUrl: `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/cmaps/`,
-          cMapPacked: true,
-        });
+    const userCoins = user?.scholaraCoins || 0;
+    const cost = 30;
 
-        const pdf = await loadingTask.promise;
-        const page = await pdf.getPage(1);
+    const fileUrl = useMemo(() => {
+      if (!resource) return null;
+      return (
+        resource.fileUrl ||
+        resource.filePath ||
+        resource.file ||
+        resource.url ||
+        resource.downloadUrl ||
+        resource.cloudinaryUrl
+      );
+    }, [resource]);
 
-        // Much smaller scale for faster generation
-        const viewport = page.getViewport({ scale: 0.2 });
-
-        const canvas = document.createElement("canvas");
-        const context = canvas.getContext("2d");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-
-        await page.render({
-          canvasContext: context,
-          viewport: viewport,
-        }).promise;
-
-        // Lower quality for faster processing
-        return canvas.toDataURL("image/jpeg", 0.4);
-      } catch (err) {
-        console.error("Error generating thumbnail:", err);
-        return null;
-      }
+    useEffect(() => {
+      let resizeTimeout;
+      const handleResize = () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          setIsMobile(window.innerWidth < 768);
+          if (pdfContainerRef.current) {
+            const containerWidth = pdfContainerRef.current.clientWidth;
+            setPdfDimensions({
+              width: Math.min(containerWidth - 40, 500),
+              height: 700
+            });
+          }
+        }, 100);
+      };
+      
+      window.addEventListener('resize', handleResize);
+      handleResize();
+      
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        clearTimeout(resizeTimeout);
+      };
     }, []);
 
-    // Optimized preview fetching with better error handling
-    const fetchBlurredPreview = useCallback(async () => {
-      if (!fileUrl || !resourceId) return;
-
-      setIsLoading(true);
-      setError(null);
-
-      // Cancel any ongoing request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      abortControllerRef.current = new AbortController();
-
-      try {
-        // Get the full file URL
-        let fullFileUrl = fileUrl;
-        if (fileUrl.startsWith("/")) {
-          fullFileUrl = `${API_BASE_URL}${fileUrl}`;
-        } else if (!fileUrl.startsWith("http")) {
-          fullFileUrl = `${API_BASE_URL}/${fileUrl}`;
-        }
-
-        // Try server-side thumbnail first (with timeout)
-        if (isAuthenticated && token) {
-          try {
-            const response = await Promise.race([
-              fetch(`${API_BASE_URL}/resources/${resourceId}/thumbnail`, {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  Accept: "image/jpeg",
-                },
-                signal: abortControllerRef.current.signal,
-              }),
-              new Promise((_, reject) =>
-                setTimeout(
-                  () => reject(new Error("Server thumbnail timeout")),
-                  3000
-                )
-              ),
-            ]);
-
-            if (response.ok) {
-              const blob = await response.blob();
-              const url = URL.createObjectURL(blob);
-              setBlurredPreviewUrl(url);
-              return;
-            }
-          } catch (serverError) {
-            console.log("Server thumbnail failed:", serverError.message);
-          }
-        }
-
-        // Fallback to client-side generation (with timeout)
-        const clientThumbnail = await Promise.race([
-          generateThumbnail(fullFileUrl),
-          new Promise((_, reject) =>
-            setTimeout(
-              () => reject(new Error("Client thumbnail timeout")),
-              5000
-            )
-          ),
-        ]);
-
-        if (clientThumbnail && !abortControllerRef.current.signal.aborted) {
-          setBlurredPreviewUrl(clientThumbnail);
-        }
-      } catch (err) {
-        if (err.name !== "AbortError") {
-          console.error("Failed to fetch blurred preview:", err);
-          setError(err.message);
-          onError?.(err);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    }, [
-      fileUrl,
-      resourceId,
-      token,
-      isAuthenticated,
-      generateThumbnail,
-      onError,
-    ]);
-
-    // Fetch preview on mount with delay to prevent blocking
     useEffect(() => {
-      const timer = setTimeout(() => {
-        fetchBlurredPreview();
-      }, 100); // Small delay to let main content render first
+      if (pdfContainerRef.current) {
+        const containerWidth = pdfContainerRef.current.clientWidth;
+        setPdfDimensions({
+          width: Math.min(containerWidth - 40, 500),
+          height: 700
+        });
+      }
+    }, [pdfContainerRef.current, isFullscreen]);
 
-      return () => {
-        clearTimeout(timer);
-        if (abortControllerRef.current) {
-          abortControllerRef.current.abort();
-        }
-        // Cleanup blob URLs
-        if (blurredPreviewUrl && blurredPreviewUrl.startsWith("blob:")) {
-          URL.revokeObjectURL(blurredPreviewUrl);
+    useEffect(() => {
+      if (!resourceId) {
+        setError("No resource ID provided");
+        setLoading(false);
+        return;
+      }
+      
+      const loadResource = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          let fetchedResource = initialResourceFromState;
+          
+          const cacheKey = `resource_${resourceId}`;
+          const cachedResource = sessionStorage.getItem(cacheKey);
+          
+          if (cachedResource) {
+            fetchedResource = JSON.parse(cachedResource);
+          } else if (!fetchedResource || fetchedResource._id !== resourceId) {
+            const response = await fetch(
+              `${API_BASE_URL}/resources/${resourceId}`
+            );
+            if (!response.ok)
+              throw new Error(`Failed to fetch resource: ${response.status}`);
+            fetchedResource = await response.json();
+            fetchedResource = fetchedResource.resource || fetchedResource;
+            
+            sessionStorage.setItem(cacheKey, JSON.stringify(fetchedResource));
+          }
+          
+          setResource(fetchedResource);
+        } catch (err) {
+          console.error("Error fetching resource:", err);
+          setError(`Failed to load resource: ${err.message}`);
+        } finally {
+          setLoading(false);
         }
       };
-    }, [fetchBlurredPreview]);
+      
+      loadResource();
+    }, [resourceId, initialResourceFromState]);
 
-    if (isLoading) {
-      return (
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center">
-          <div className="text-center">
-            <FontAwesomeIcon
-              icon={faSpinner}
-              spin
-              size="2x"
-              className="mb-2 text-blue-500"
-            />
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Loading preview...
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    if (error || !blurredPreviewUrl) {
-      return (
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20" />
-      );
-    }
-
-    return (
-      <>
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: `url(${blurredPreviewUrl})`,
-            filter: "blur(8px) brightness(0.7)",
-            transform: "scale(1.1)",
-            zIndex: 1,
-          }}
-        />
-        <div className="absolute inset-0 bg-black/30 z-2" />
-      </>
-    );
-  }
-);
-
-// Configure PDF.js worker
-// pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
-const ResourceDetailPage = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { resourceId } = useParams();
-  const { user, token, isAuthenticated, updateUser } = useAuth();
-  const { resource: initialResourceFromState } = location.state || {};
-
-  const [resource, setResource] = useState(initialResourceFromState);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [userRating, setUserRating] = useState(0);
-  const [overallRating, setOverallRating] = useState(0);
-  const [isRatingLoading, setIsRatingLoading] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState(null);
-  const [previewDataUrl, setPreviewDataUrl] = useState(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [blurredPreviewError, setBlurredPreviewError] = useState(null);
-  // Purchase system states
-  const [isPurchased, setIsPurchased] = useState(false);
-  const [purchasing, setPurchasing] = useState(false);
-  const pollIntervalRef = useRef(null);
-  const pdfContainerRef = useRef(null);
-  const [visiblePages, setVisiblePages] = useState(new Set([1]));
-  const [numPages, setNumPages] = useState(null);
-  const [pdfDimensions, setPdfDimensions] = useState({ width: 500, height: 700 });
-
-  const userId = user?._id;
-  const userName = user?.username || "Anonymous User";
-  const isAdmin = user?.roles === "admin";
-  
-  // Enhanced purchase validation
-  const canDownload = useMemo(() => {
-    if (!isAuthenticated) return false;
-    if (isAdmin) return true;
-    return isPurchased;
-  }, [isAuthenticated, isAdmin, isPurchased]);
-
-  const userCoins = user?.scholaraCoins || 0;
-  const cost = 30; // Cost of the resource
-
-  // Get file URL with better property checking
-  const fileUrl = useMemo(() => {
-    if (!resource) return null;
-    return (
-      resource.fileUrl ||
-      resource.filePath ||
-      resource.file ||
-      resource.url ||
-      resource.downloadUrl ||
-      resource.cloudinaryUrl
-    );
-  }, [resource]);
-
-  // Responsive hook with debounce
-  useEffect(() => {
-    let resizeTimeout;
-    const handleResize = () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
-        setIsMobile(window.innerWidth < 768);
-        
-        // Update PDF dimensions on resize
-        if (pdfContainerRef.current) {
-          const containerWidth = pdfContainerRef.current.clientWidth;
-          setPdfDimensions({
-            width: Math.min(containerWidth - 40, 500),
-            height: 700
-          });
+    useEffect(() => {
+      const fetchPurchaseStatus = async () => {
+        if (!isAuthenticated || !token || !user || !resource?._id) {
+          setIsPurchased(false);
+          return;
         }
-      }, 100);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    handleResize(); // Initial call
-    
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(resizeTimeout);
-    };
-  }, []);
 
-  // Update PDF dimensions when container ref is available
-  useEffect(() => {
-    if (pdfContainerRef.current) {
-      const containerWidth = pdfContainerRef.current.clientWidth;
-      setPdfDimensions({
-        width: Math.min(containerWidth - 40, 500),
-        height: 700
-      });
-    }
-  }, [pdfContainerRef.current, isFullscreen]);
+        if (isAdmin) {
+          setIsPurchased(true);
+          return;
+        }
 
-  // Fetch resource details with caching
-  useEffect(() => {
-    if (!resourceId) {
-      setError("No resource ID provided");
-      setLoading(false);
-      return;
-    }
-    
-    const loadResource = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        let fetchedResource = initialResourceFromState;
-        
-        // Check if we have a cached version
-        const cacheKey = `resource_${resourceId}`;
-        const cachedResource = sessionStorage.getItem(cacheKey);
-        
-        if (cachedResource) {
-          fetchedResource = JSON.parse(cachedResource);
-        } else if (!fetchedResource || fetchedResource._id !== resourceId) {
+        try {
           const response = await fetch(
-            `${API_BASE_URL}/resources/${resourceId}`
+            `${API_BASE_URL}/resources/${resource._id}/purchase-status`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
           );
-          if (!response.ok)
-            throw new Error(`Failed to fetch resource: ${response.status}`);
-          fetchedResource = await response.json();
-          fetchedResource = fetchedResource.resource || fetchedResource;
-          
-          // Cache the resource for future visits
-          sessionStorage.setItem(cacheKey, JSON.stringify(fetchedResource));
-        }
-        
-        setResource(fetchedResource);
-      } catch (err) {
-        console.error("Error fetching resource:", err);
-        setError(`Failed to load resource: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadResource();
-  }, [resourceId, initialResourceFromState]);
 
-  // Check purchase status with more robust validation
-  useEffect(() => {
-    const fetchPurchaseStatus = async () => {
-      if (!isAuthenticated || !token || !user || !resource?._id) {
-        setIsPurchased(false);
-        return;
-      }
-
-      if (isAdmin) {
-        setIsPurchased(true); // Admin and owner have full access
-        return;
-      }
-
-      // Double-check with backend for purchase status
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/resources/${resource._id}/purchase-status`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
+          if (response.ok) {
+            const data = await response.json();
+            setIsPurchased(data.isPurchased || false);
+          } else {
+            const purchased =
+              user.purchasedResources?.includes(resource._id) || false;
+            setIsPurchased(purchased);
           }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          setIsPurchased(data.isPurchased || false);
-        } else {
-          // Fallback to local check if endpoint doesn't exist
+        } catch (error) {
           const purchased =
             user.purchasedResources?.includes(resource._id) || false;
           setIsPurchased(purchased);
         }
-      } catch (error) {
-        // Fallback to local check on error
-        const purchased =
-          user.purchasedResources?.includes(resource._id) || false;
-        setIsPurchased(purchased);
+      };
+
+      fetchPurchaseStatus();
+    }, [
+      isAuthenticated,
+      token,
+      user?.purchasedResources,
+      resource?._id,
+      user,
+      isAdmin,
+    ]);
+
+    const refreshRatings = useCallback(async () => {
+      if (!resourceId) return;
+      setIsRatingLoading(true);
+      try {
+        const url = `${API_BASE_URL}/resources/${resourceId}/ratings${
+          userId ? `?userId=${userId}` : ""
+        }`;
+        const response = await fetch(url);
+        if (!response.ok)
+          throw new Error(`Failed to fetch ratings: ${response.status}`);
+        const data = await response.json();
+        setOverallRating(data.overallRating ?? overallRating);
+        if (userId) setUserRating(data.userRating ?? userRating);
+      } catch (err) {
+        console.error("Error fetching ratings:", err);
+      } finally {
+        setIsRatingLoading(false);
       }
-    };
+    }, [resourceId, userId]);
 
-    fetchPurchaseStatus();
-  }, [
-    isAuthenticated,
-    token,
-    user?.purchasedResources,
-    resource?._id,
-    user,
-    isAdmin,
-  ]);
+    useEffect(() => {
+      if (resourceId) {
+        refreshRatings();
+        pollIntervalRef.current = setInterval(refreshRatings, 30000);
+        return () => clearInterval(pollIntervalRef.current);
+      }
+    }, [resourceId, refreshRatings]);
 
-  // Fetch and poll ratings
-  const refreshRatings = useCallback(async () => {
-    if (!resourceId) return;
-    setIsRatingLoading(true);
-    try {
-      const url = `${API_BASE_URL}/resources/${resourceId}/ratings${
-        userId ? `?userId=${userId}` : ""
-      }`;
-      const response = await fetch(url);
-      if (!response.ok)
-        throw new Error(`Failed to fetch ratings: ${response.status}`);
-      const data = await response.json();
-      setOverallRating(data.overallRating ?? overallRating);
-      if (userId) setUserRating(data.userRating ?? userRating);
-    } catch (err) {
-      console.error("Error fetching ratings:", err);
-    } finally {
-      setIsRatingLoading(false);
-    }
-  }, [resourceId, userId]);
+    const handleRate = useCallback(
+      async (value) => {
+        if (!isAuthenticated || !resourceId) {
+          setError("Please login to rate");
+          return;
+        }
+        const previousRating = userRating;
+        setUserRating(value);
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/resources/${resourceId}/rate`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ value }),
+            }
+          );
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(
+              errorData.message || `Rating failed: ${response.status}`
+            );
+          }
+          const data = await response.json();
+          setUserRating(data.userRating);
+          setOverallRating(data.overallRating);
+        } catch (e) {
+          console.error("Rating error:", e);
+          setError(e.message);
+          setUserRating(previousRating);
+        }
+      },
+      [isAuthenticated, resourceId, token]
+    );
 
-  useEffect(() => {
-    if (resourceId) {
-      refreshRatings();
-      pollIntervalRef.current = setInterval(refreshRatings, 30000);
-      return () => clearInterval(pollIntervalRef.current);
-    }
-  }, [resourceId, refreshRatings]);
+    const onDocumentLoadSuccess = useCallback(({ numPages }) => {
+      setNumPages(numPages);
+      setPreviewLoading(false);
+      setVisiblePages(new Set([1]));
+      setCurrentPage(1);
+    }, []);
 
-  // Handle rating submission
-  const handleRate = useCallback(
-    async (value) => {
-      if (!isAuthenticated || !resourceId) {
-        setError("Please login to rate");
+    const onDocumentLoadError = useCallback((error) => {
+      console.error("Error loading PDF document:", error);
+      setPreviewError(
+        "Failed to load PDF preview. Please try downloading the file."
+      );
+      setPreviewLoading(false);
+    }, []);
+
+    // Enhanced intersection observer for better current page tracking
+    useEffect(() => {
+      if (!previewDataUrl || !numPages || numPages <= 1) return;
+      
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const newVisiblePages = new Set(visiblePages);
+          let shouldUpdate = false;
+          let topMostVisiblePage = currentPage;
+          let maxIntersectionRatio = 0;
+          
+          entries.forEach(entry => {
+            const pageNumber = parseInt(entry.target.getAttribute('data-page-number'), 10);
+            
+            if (entry.isIntersecting) {
+              if (!newVisiblePages.has(pageNumber)) {
+                newVisiblePages.add(pageNumber);
+                shouldUpdate = true;
+              }
+              
+              // Track the page with highest intersection ratio as current page
+              if (entry.intersectionRatio > maxIntersectionRatio) {
+                maxIntersectionRatio = entry.intersectionRatio;
+                topMostVisiblePage = pageNumber;
+              }
+            }
+          });
+          
+          if (shouldUpdate) {
+            setVisiblePages(newVisiblePages);
+          }
+          
+          // Update current page if it changed
+          if (topMostVisiblePage !== currentPage) {
+            setCurrentPage(topMostVisiblePage);
+          }
+        },
+        { 
+          threshold: [0.1, 0.5, 0.9],
+          rootMargin: '-50px 0px -50px 0px' // Better detection of which page is most visible
+        }
+      );
+      
+      const pageElements = document.querySelectorAll('[data-page-number]');
+      pageElements.forEach(el => observer.observe(el));
+      
+      return () => {
+        observer.disconnect();
+      };
+    }, [previewDataUrl, numPages, visiblePages, currentPage]);
+
+    const handlePreview = useCallback(async () => {
+      if (!isAuthenticated) {
+        setError("You need to be logged in to preview resources.");
         return;
       }
-      const previousRating = userRating;
-      setUserRating(value);
+      
+      if (previewDataUrl) {
+        return;
+      }
+      
+      setPreviewLoading(true);
+      setPreviewError(null);
       try {
         const response = await fetch(
-          `${API_BASE_URL}/resources/${resourceId}/rate`,
+          `${API_BASE_URL}/resources/${resourceId}/preview`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (!response.ok) throw new Error("Failed to fetch preview");
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        setPreviewDataUrl(url);
+      } catch (err) {
+        console.error("Preview failed:", err);
+        setPreviewError(err.message);
+      } finally {
+        setPreviewLoading(false);
+      }
+    }, [isAuthenticated, resourceId, token, previewDataUrl]);
+
+    const handleZoomIn = useCallback(
+      () => setZoom((prev) => Math.min(prev + 0.1, 3)),
+      []
+    );
+    
+    const handleZoomOut = useCallback(
+      () => setZoom((prev) => Math.max(prev - 0.1, 0.5)),
+      []
+    );
+    
+    const toggleFullscreen = useCallback(() => {
+      setIsFullscreen((prev) => !prev);
+    }, []);
+
+    // Improved mobile fullscreen handler - prevents conflicts
+    const handleMobileFullscreen = useCallback(async () => {
+      if (!isAuthenticated) {
+        setError("You need to be logged in to preview resources.");
+        return;
+      }
+      
+      // If preview isn't loaded, load it first
+      if (!previewDataUrl && !previewLoading) {
+        setPreviewLoading(true);
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/resources/${resourceId}/preview`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          if (!response.ok) throw new Error("Failed to fetch preview");
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          setPreviewDataUrl(url);
+        } catch (err) {
+          console.error("Preview failed:", err);
+          setPreviewError(err.message);
+          setPreviewLoading(false);
+          return;
+        }
+        setPreviewLoading(false);
+      }
+      
+      // Then go fullscreen
+      setIsFullscreen(true);
+    }, [isAuthenticated, resourceId, token, previewDataUrl, previewLoading]);
+
+    const validateDownload = useCallback(() => {
+      if (!isAuthenticated) {
+        alert("You need to be logged in to download resources.");
+        return false;
+      }
+
+      if (!canDownload) {
+        alert(
+          `This resource requires purchase (${cost} coins). You currently have ${userCoins} coins.`
+        );
+        return false;
+      }
+
+      return true;
+    }, [isAuthenticated, canDownload, cost, userCoins]);
+
+    const handleDownload = useCallback(async () => {
+      if (!validateDownload()) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/resources/${resourceId}/download`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "*/*",
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errorData = await response.json();
+            throw new Error(
+              errorData.msg || "Download failed due to server error."
+            );
+          } else {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = `${resource.title.replace(/[^a-z0-9._-]/gi, "_")}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+
+        await fetch(
+          `${API_BASE_URL}/resources/${resourceId}/increment-download`,
+          {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      } catch (err) {
+        console.error("Download failed:", err);
+        setError(`Download failed: ${err.message}`);
+        alert(`Download failed: ${err.message}`);
+      }
+    }, [resourceId, token, resource?.title, validateDownload]);
+
+    const handlePurchase = async () => {
+      if (!isAuthenticated) {
+        setError("You need to be logged in to purchase resources.");
+        return;
+      }
+
+      if (userCoins < cost) {
+        showInsufficientCoinsModal();
+        return;
+      }
+
+      setPurchasing(true);
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/resources/${resourceId}/purchase`,
           {
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
             },
-            body: JSON.stringify({ value }),
+            body: JSON.stringify({ cost }),
           }
         );
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.message || `Rating failed: ${response.status}`
-          );
-        }
+
         const data = await response.json();
-        setUserRating(data.userRating);
-        setOverallRating(data.overallRating);
-      } catch (e) {
-        console.error("Rating error:", e);
-        setError(e.message);
-        setUserRating(previousRating);
-      }
-    },
-    [isAuthenticated, resourceId, token]
-  );
 
-  // PDF Preview functions with optimized rendering
-  const onDocumentLoadSuccess = useCallback(({ numPages }) => {
-    setNumPages(numPages);
-    setPreviewLoading(false);
-    // Initially only render the first page
-    setVisiblePages(new Set([1]));
-  }, []);
+        if (response.ok && data.success) {
+          setIsPurchased(true);
 
-  const onDocumentLoadError = useCallback((error) => {
-    console.error("Error loading PDF document:", error);
-    setPreviewError(
-      "Failed to load PDF preview. Please try downloading the file."
-    );
-    setPreviewLoading(false);
-  }, []);
-
-  // Handle PDF page visibility with intersection observer for lazy loading
-  useEffect(() => {
-    if (!previewDataUrl || !numPages || numPages <= 1) return;
-    
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const newVisiblePages = new Set(visiblePages);
-        let shouldUpdate = false;
-        
-        entries.forEach(entry => {
-          const pageNumber = parseInt(entry.target.getAttribute('data-page-number'), 10);
-          
-          if (entry.isIntersecting) {
-            if (!newVisiblePages.has(pageNumber)) {
-              newVisiblePages.add(pageNumber);
-              shouldUpdate = true;
-            }
+          if (updateUser && data.user) {
+            updateUser(data.user);
+          } else if (updateUser) {
+            updateUser({
+              ...user,
+              scholaraCoins: data.scholaraCoins,
+              purchasedResources: data.purchasedResources || [
+                ...(user.purchasedResources || []),
+                resourceId,
+              ],
+            });
           }
-        });
-        
-        if (shouldUpdate) {
-          setVisiblePages(newVisiblePages);
-        }
-      },
-      { threshold: 0.1 }
-    );
-    
-    // Observe all page elements
-    const pageElements = document.querySelectorAll('[data-page-number]');
-    pageElements.forEach(el => observer.observe(el));
-    
-    return () => {
-      observer.disconnect();
-    };
-  }, [previewDataUrl, numPages, visiblePages]);
 
-  const handlePreview = useCallback(async () => {
-    if (!isAuthenticated) {
-      setError("You need to be logged in to preview resources.");
-      return;
-    }
-    
-    // If we already have the preview data, just show it
-    if (previewDataUrl) {
-      return;
-    }
-    
-    setPreviewLoading(true);
-    setPreviewError(null);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/resources/${resourceId}/preview`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!response.ok) throw new Error("Failed to fetch preview");
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setPreviewDataUrl(url);
-    } catch (err) {
-      console.error("Preview failed:", err);
-      setPreviewError(err.message);
-    } finally {
-      setPreviewLoading(false);
-    }
-  }, [isAuthenticated, resourceId, token, previewDataUrl]);
-
-  const handleZoomIn = useCallback(
-    () => setZoom((prev) => Math.min(prev + 0.1, 3)),
-    []
-  );
-  
-  const handleZoomOut = useCallback(
-    () => setZoom((prev) => Math.max(prev - 0.1, 0.5)),
-    []
-  );
-  
-  const toggleFullscreen = useCallback(() => {
-    setIsFullscreen((prev) => !prev);
-  }, []);
-
-  // Enhanced download validation
-  const validateDownload = useCallback(() => {
-    if (!isAuthenticated) {
-      alert("You need to be logged in to download resources.");
-      return false;
-    }
-
-    if (!canDownload) {
-      alert(
-        `This resource requires purchase (${cost} coins). You currently have ${userCoins} coins.`
-      );
-      return false;
-    }
-
-    return true;
-  }, [isAuthenticated, canDownload, cost, userCoins]);
-
-  const handleDownload = useCallback(async () => {
-    // Strict validation before any download attempt
-    if (!validateDownload()) {
-      return;
-    }
-
-    try {
-      // Use the same download endpoint as UniversalResourceCard that includes purchase validation
-      const response = await fetch(
-        `${API_BASE_URL}/resources/${resourceId}/download`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "*/*",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.msg || "Download failed due to server error."
-          );
+          alert("Resource unlocked successfully! You can now download it.");
         } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(data.message || "Purchase failed.");
         }
-      }
-
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = `${resource.title.replace(/[^a-z0-9._-]/gi, "_")}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-
-      // Increment download count only after successful download
-      await fetch(
-        `${API_BASE_URL}/resources/${resourceId}/increment-download`,
-        {
-          method: "PUT",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-    } catch (err) {
-      console.error("Download failed:", err);
-      setError(`Download failed: ${err.message}`);
-      alert(`Download failed: ${err.message}`);
-    }
-  }, [resourceId, token, resource?.title, validateDownload]);
-
-  // Handle blurred preview errors
-  const handleBlurredPreviewError = useCallback((error) => {
-    setBlurredPreviewError(error.message);
-  }, []);
-
-  // Purchase handler
-  const handlePurchase = async () => {
-    if (!isAuthenticated) {
-      setError("You need to be logged in to purchase resources.");
-      return;
-    }
-
-    if (userCoins < cost) {
-      showInsufficientCoinsModal();
-      return;
-    }
-
-    setPurchasing(true);
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/resources/${resourceId}/purchase`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ cost }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        // Immediately update local state
-        setIsPurchased(true);
-
-        // Update user context with the returned user data from backend
-        if (updateUser && data.user) {
-          updateUser(data.user);
-        } else if (updateUser) {
-          // Fallback: manual update if backend doesn't return full user object
-          updateUser({
-            ...user,
-            scholaraCoins: data.scholaraCoins,
-            purchasedResources: data.purchasedResources || [
-              ...(user.purchasedResources || []),
-              resourceId,
-            ],
-          });
-        }
-
-        alert("Resource unlocked successfully! You can now download it.");
-      } else {
-        throw new Error(data.message || "Purchase failed.");
-      }
-    } catch (error) {
-      console.error("Purchase failed:", error);
-      setIsPurchased(false);
-      setError("Purchase failed. Please try again.");
-    } finally {
-      setPurchasing(false);
-    }
-  };
-
-  const showInsufficientCoinsModal = () => {
-    alert(
-      `You need ${cost} ScholaraCoins to purchase this resource. You currently have ${userCoins} coins. Earn more coins by uploading resources or referring friends!`
-    );
-  };
-
-  // Clean up preview data URL when component unmounts
-  useEffect(() => {
-    return () => {
-      if (previewDataUrl) {
-        URL.revokeObjectURL(previewDataUrl);
+      } catch (error) {
+        console.error("Purchase failed:", error);
+        setIsPurchased(false);
+        setError("Purchase failed. Please try again.");
+      } finally {
+        setPurchasing(false);
       }
     };
-  }, [previewDataUrl]);
 
-  // Memoized PDF pages to prevent unnecessary re-renders
-  const renderPdfPages = useMemo(() => {
-    if (!numPages) return null;
-    
-    return Array.from({ length: numPages }, (_, index) => {
-      const pageNumber = index + 1;
-      const isVisible = visiblePages.has(pageNumber);
+    const showInsufficientCoinsModal = () => {
+      alert(
+        `You need ${cost} ScholaraCoins to purchase this resource. You currently have ${userCoins} coins. Earn more coins by uploading resources or referring friends!`
+      );
+    };
+
+    useEffect(() => {
+      return () => {
+        if (previewDataUrl) {
+          URL.revokeObjectURL(previewDataUrl);
+        }
+      };
+    }, [previewDataUrl]);
+
+    const renderPdfPages = useMemo(() => {
+      if (!numPages) return null;
+      
+      return Array.from({ length: numPages }, (_, index) => {
+        const pageNumber = index + 1;
+        const isVisible = visiblePages.has(pageNumber);
+        
+        return (
+          <div 
+            key={pageNumber} 
+            data-page-number={pageNumber}
+            className="mb-4 flex justify-center"
+          >
+            {isVisible ? (
+              <Page
+                pageNumber={pageNumber}
+                scale={isMobile ? Math.min(zoom, 1.2) : zoom}
+                width={pdfDimensions.width}
+                className="shadow-xl rounded-lg overflow-hidden"
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+                loading={
+                  <div className="flex items-center justify-center h-96">
+                    <FontAwesomeIcon icon={faSpinner} spin className="text-blue-500 text-2xl" />
+                  </div>
+                }
+              />
+            ) : (
+              <div 
+                className="bg-gray-100 dark:bg-charcoal rounded-lg flex items-center justify-center"
+                style={{ 
+                  width: pdfDimensions.width, 
+                  height: pdfDimensions.width * 1.414
+                }}
+              >
+                <FontAwesomeIcon icon={faSpinner} spin className="text-gray-400 text-xl" />
+              </div>
+            )}
+          </div>
+        );
+      });
+    }, [numPages, visiblePages, zoom, isMobile, pdfDimensions]);
+
+    // Page indicator component
+    const PageIndicator = ({ className = "" }) => {
+      if (!numPages || numPages <= 1) return null;
       
       return (
-        <div 
-          key={pageNumber} 
-          data-page-number={pageNumber}
-          className="mb-4 flex justify-center"
-        >
-          {isVisible ? (
-            <Page
-              pageNumber={pageNumber}
-              scale={isMobile ? Math.min(zoom, 1.2) : zoom}
-              width={pdfDimensions.width}
-              className="shadow-xl rounded-lg overflow-hidden"
-              renderTextLayer={false}
-              renderAnnotationLayer={false}
-              loading={
-                <div className="flex items-center justify-center h-96">
-                  <FontAwesomeIcon icon={faSpinner} spin className="text-blue-500 text-2xl" />
-                </div>
-              }
-            />
-          ) : (
-            <div 
-              className="bg-gray-100 dark:bg-charcoal rounded-lg flex items-center justify-center"
-              style={{ 
-                width: pdfDimensions.width, 
-                height: pdfDimensions.width * 1.414 // A4 aspect ratio
-              }}
-            >
-              <FontAwesomeIcon icon={faSpinner} spin className="text-gray-400 text-xl" />
-            </div>
-          )}
+        <div className={`flex items-center gap-2 px-3 py-1.5 bg-black/70 text-white rounded-lg backdrop-blur-sm ${className}`}>
+          <span className="text-sm font-medium">
+            Page {currentPage} of {numPages}
+          </span>
         </div>
       );
-    });
-  }, [numPages, visiblePages, zoom, isMobile, pdfDimensions]);
+    };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-onyx">
-        <FontAwesomeIcon
-          icon={faSpinner}
-          spin
-          size="3x"
-          className="text-blue-500"
-        />
-      </div>
-    );
-  }
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-onyx">
+          <FontAwesomeIcon
+            icon={faSpinner}
+            spin
+            size="3x"
+            className="text-blue-500"
+          />
+        </div>
+      );
+    }
 
-  if (error || !resource) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center bg-gray-50 dark:bg-onyx">
-        <h2 className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">
-          Error
-        </h2>
-        <p className="text-lg mb-6 text-gray-700 dark:text-gray-300">
-          {error || "Resource not found"}
-        </p>
-        <button
-          onClick={() => navigate("/")}
-          className="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600"
-        >
-          Go to Home
-        </button>
-      </div>
-    );
-  }
-
-  const {
-    title,
-    description,
-    fileType,
-    course,
-    subject,
-    downloads = 0,
-  } = resource;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx pt-8 px-4 sm:px-6 lg:px-8"
-    >
-      
-
-      {isMobile && isFullscreen && (
-        <motion.div
-          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[9999] flex flex-col"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <div className="flex items-center justify-between p-4 bg-white/10 backdrop-blur-md border-b border-white/20">
-            <h3 className="text-white font-semibold truncate">{title}</h3>
-            <button
-              onClick={toggleFullscreen}
-              className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
-            >
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          </div>
-          <div 
-            ref={pdfContainerRef}
-            className="flex-1 overflow-auto bg-gray-50 dark:bg-charcoal p-4"
+    if (error || !resource) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center bg-gray-50 dark:bg-onyx">
+          <h2 className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">
+            Error
+          </h2>
+          <p className="text-lg mb-6 text-gray-700 dark:text-gray-300">
+            {error || "Resource not found"}
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600"
           >
-            {previewDataUrl ? (
-              <Document
-                file={previewDataUrl}
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={onDocumentLoadError}
-                loading={
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center text-white">
-                      <FontAwesomeIcon
-                        icon={faSpinner}
-                        spin
-                        size="2x"
-                        className="mb-3 text-blue-400"
-                      />
-                      <p>Loading PDF...</p>
-                    </div>
-                  </div>
-                }
-                error={
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center text-white">
-                      <AlertCircle
-                        size={48}
-                        className="mx-auto mb-4 text-red-400"
-                      />
-                      <p className="mb-4">Error loading PDF</p>
-                      <button
-                        onClick={handleDownload}
-                        disabled={!canDownload}
-                        className={`px-4 py-2 rounded-lg hover:scale-105 transition-all duration-200 ${
-                          canDownload
-                            ? "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white"
-                            : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white cursor-not-allowed opacity-50"
-                        }`}
-                      >
-                        <FontAwesomeIcon
-                          icon={faDownload}
-                          className="mr-2"
-                        />
-                        {canDownload
-                          ? "Download File"
-                          : "Purchase Required"}
-                      </button>
-                    </div>
-                  </div>
-                }
-              >
-                {renderPdfPages}
-              </Document>
-            ) : previewLoading ? (
-              <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
-                <div className="text-center text-gray-700 dark:text-white">
-                  <FontAwesomeIcon
-                    icon={faSpinner}
-                    spin
-                    size="2x"
-                    className="mb-3 text-blue-500"
-                  />
-                  <p>Loading preview...</p>
-                </div>
+            Go to Home
+          </button>
+        </div>
+      );
+    }
+
+    const {
+      title,
+      description,
+      fileType,
+      course,
+      subject,
+      downloads = 0,
+      thumbnailUrl,
+    } = resource;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx pt-8 px-4 sm:px-6 lg:px-8"
+      >
+        {/* Mobile Fullscreen Modal */}
+        {isMobile && isFullscreen && (
+          <motion.div
+            className="fixed inset-0 bg-black/95 backdrop-blur-sm z-[9999] flex flex-col"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 bg-white/10 backdrop-blur-md border-b border-white/20">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-white font-semibold truncate">{title}</h3>
               </div>
-            ) : previewError ? (
-              <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
-                <div className="text-center text-gray-700 dark:text-white p-6">
-                  <AlertCircle
-                    size={48}
-                    className="mx-auto mb-4 text-red-500"
-                  />
-                  <p className="mb-4">{previewError}</p>
-                  <button
-                    onClick={handlePreview}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                  >
-                    Retry Preview
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
-                <div className="text-center text-gray-700 dark:text-white p-6">
-                  <div className="w-24 h-24 mx-auto mb-4 text-blue-500">
-                    {getIconForType(fileType, 48)}
-                  </div>
-                  <p className="mb-4">Click preview to view this resource</p>
-                  <button
-                    onClick={handlePreview}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 mx-auto"
-                  >
-                    <Eye size={16} />
-                    Preview Resource
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="fixed bottom-4 left-4 right-4 z-[10000]">
-            <div className="bg-white/90 dark:bg-onyx/60 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {previewDataUrl && (
-                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-charcoal rounded-lg p-1">
-                      <button
-                        onClick={handleZoomOut}
-                        disabled={zoom <= 0.5}
-                        className="p-2 rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                      >
-                        <ZoomOut size={14} />
-                      </button>
-                      <span className="px-1 text-xs font-medium text-gray-600 dark:text-gray-300 min-w-[40px] text-center">
-                        {Math.round(zoom * 100)}%
-                      </span>
-                      <button
-                        onClick={handleZoomIn}
-                        disabled={zoom >= 2}
-                        className="p-2 rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                      >
-                        <ZoomIn size={14} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {canDownload ? (
-                  <button
-                    onClick={handleDownload}
-                    className="px-4 py-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-lg shadow-lg transition-all flex items-center gap-2"
-                  >
-                    <Download size={16} />
-                    <span className="hidden sm:inline">Download</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={
-                      userCoins < cost
-                        ? showInsufficientCoinsModal
-                        : handlePurchase
-                    }
-                    disabled={purchasing}
-                    className={`px-4 py-2 rounded-lg shadow-lg transition-all flex items-center gap-2 ${
-                      userCoins < cost
-                        ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
-                        : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                    } text-white`}
-                  >
-                    {purchasing ? (
-                      <FontAwesomeIcon icon={faSpinner} spin size={16} />
-                    ) : (
-                      <>
-                        <img src={coin} alt="coin" className="w-4 h-4" />
-                        <span className="hidden sm:inline">
-                          {userCoins < cost ? "Need Coins" : `Buy (${cost})`}
-                        </span>
-                      </>
-                    )}
-                  </button>
-                )}
+              <div className="flex items-center gap-3 ml-4">
+                <PageIndicator />
+                <button
+                  onClick={toggleFullscreen}
+                  className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+                >
+                  <FontAwesomeIcon icon={faTimes} />
+                </button>
               </div>
             </div>
-          </div>
-        </motion.div>
-      )}
-
-      <div className="max-w-6xl mx-auto bg-white dark:bg-onyx/60 rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row relative min-h-[600px]">
-        <motion.div
-          className="relative overflow-hidden"
-          animate={{
-            width: isFullscreen ? "100%" : isMobile ? "100%" : "50%",
-            height:
-              isMobile && isFullscreen ? "100vh" : isMobile ? "60vh" : "auto",
-          }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-          style={{
-            minHeight: isMobile ? (isFullscreen ? "100vh" : "400px") : "600px",
-          }}
-        >
-          <div className="absolute inset-0 flex flex-col">
-            {/* Optimized Blurred Preview Background */}
-            {!previewDataUrl && !previewLoading && fileUrl && (
-              <BlurredPreview
-                resourceId={resourceId}
-                fileUrl={fileUrl}
-                token={token}
-                isAuthenticated={isAuthenticated}
-                onError={handleBlurredPreviewError}
-              />
-            )}
-
-            {isMobile && !previewDataUrl && !previewLoading && isAuthenticated && (
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-sm flex items-center justify-center z-10 p-4">
-                <motion.button
-                  onClick={() => {
-                    handlePreview();
-                    setIsFullscreen(true);
-                  }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="bg-white/90 dark:bg-black/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/20 max-w-xs w-full"
-                >
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 text-blue-500 flex items-center justify-center">
-                      {getIconForType(fileType, 64)}
+            
+            {/* PDF Content */}
+            <div 
+              ref={pdfContainerRef}
+              className="flex-1 overflow-auto bg-gray-50 dark:bg-charcoal p-4  "
+            >
+              {previewDataUrl ? (
+                <Document
+                  file={previewDataUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={onDocumentLoadError}
+                  loading={
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center text-white">
+                        <FontAwesomeIcon
+                          icon={faSpinner}
+                          spin
+                          size="2x"
+                          className="mb-3 text-blue-400"
+                        />
+                        <p>Loading PDF...</p>
+                      </div>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
-                      Preview Resource
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Tap to view in fullscreen
-                    </p>
-                  </div>
-                </motion.button>
-              </div>
-            )}
-
-            {previewDataUrl ? (
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <div 
-                  ref={pdfContainerRef}
-                  className="flex-1 overflow-auto scroll-container p-2 sm:p-4 bg-gray-50 dark:bg-charcoal"
-                >
-                  <Document
-                    file={previewDataUrl}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    onLoadError={onDocumentLoadError}
-                    loading={
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
+                  }
+                  error={
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center text-white">
+                        <AlertCircle
+                          size={48}
+                          className="mx-auto mb-4 text-red-400"
+                        />
+                        <p className="mb-4">Error loading PDF</p>
+                        <button
+                          onClick={handleDownload}
+                          disabled={!canDownload}
+                          className={`px-4 py-2 rounded-lg hover:scale-105 transition-all duration-200 ${
+                            canDownload
+                              ? "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white"
+                              : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white cursor-not-allowed opacity-50"
+                          }`}
+                        >
                           <FontAwesomeIcon
-                            icon={faSpinner}
-                            spin
-                            size="2x"
-                            className="mb-3 text-blue-500"
+                            icon={faDownload}
+                            className="mr-2"
                           />
-                          <p className="text-gray-700 dark:text-gray-300">
-                            Loading PDF...
-                          </p>
-                        </div>
+                          {canDownload
+                            ? "Download File"
+                            : "Purchase Required"}
+                        </button>
                       </div>
-                    }
-                    error={
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
-                          <AlertCircle
-                            size={48}
-                            className="mx-auto mb-4 text-red-500"
-                          />
-                          <p className="text-gray-700 dark:text-gray-300 mb-4">
-                            Error loading PDF
-                          </p>
-                          {canDownload ? (
-                            <button
-                              onClick={handleDownload}
-                              className="px-4 py-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-lg"
-                            >
-                              <FontAwesomeIcon
-                                icon={faDownload}
-                                className="mr-2"
-                              />
-                              Download File
-                            </button>
-                          ) : (
-                            <button
-                              onClick={
-                                userCoins < cost
-                                  ? showInsufficientCoinsModal
-                                  : handlePurchase
-                              }
-                              disabled={purchasing}
-                              className={`px-4 py-2 rounded-lg ${
-                                userCoins < cost
-                                  ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
-                                  : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                              } text-white`}
-                            >
-                              {purchasing ? (
-                                <FontAwesomeIcon
-                                  icon={faSpinner}
-                                  spin
-                                  className="mr-2"
-                                />
-                              ) : (
-                                <img
-                                  src={coin}
-                                  alt="coin"
-                                  className="w-4 h-4 inline mr-2"
-                                />
-                              )}
-                              {purchasing
-                                ? "Processing..."
-                                : userCoins < cost
-                                ? "Need More Coins"
-                                : `Purchase (${cost} coins)`}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    }
-                  >
-                    {renderPdfPages}
-                  </Document>
+                    </div>
+                  }
+                >
+                  {renderPdfPages}
+                </Document>
+              ) : previewLoading ? (
+                <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
+                  <div className="text-center text-gray-700 dark:text-white">
+                    <FontAwesomeIcon
+                      icon={faSpinner}
+                      spin
+                      size="2x"
+                      className="mb-3 text-blue-500"
+                    />
+                    <p>Loading preview...</p>
+                  </div>
                 </div>
-
-                {!isMobile && (
-                  <motion.div
-                    className="flex flex-col lg:flex-row items-center justify-between gap-3 lg:gap-0 p-4 bg-white dark:bg-onyx/60 border-t border-gray-200 dark:border-charcoal"
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    <div className="flex items-center gap-2 lg:gap-3 w-full lg:w-auto justify-center lg:justify-start">
+              ) : previewError ? (
+                <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
+                  <div className="text-center text-gray-700 dark:text-white p-6">
+                    <AlertCircle
+                      size={48}
+                      className="mx-auto mb-4 text-red-500"
+                    />
+                    <p className="mb-4">{previewError}</p>
+                    <button
+                      onClick={handlePreview}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                    >
+                      Retry Preview
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
+                  <div className="text-center text-gray-700 dark:text-white p-6">
+                    <div className="w-24 h-24 mx-auto mb-4 text-blue-500">
+                      {getIconForType(fileType, 48)}
+                    </div>
+                    <p className="mb-4">Click preview to view this resource</p>
+                    <button
+                      onClick={handlePreview}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 mx-auto"
+                    >
+                      <Eye size={16} />
+                      Preview Resource
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Bottom Controls */}
+            <div className="fixed bottom-4 left-4 right-4 z-[10000]">
+              <div className="bg-white/90 dark:bg-onyx/60 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {previewDataUrl && (
                       <div className="flex items-center gap-1 bg-gray-100 dark:bg-charcoal rounded-lg p-1">
                         <button
                           onClick={handleZoomOut}
                           disabled={zoom <= 0.5}
-                          className="p-1.5 lg:p-2 rounded-md hover:bg-white dark:hover:bg-gray-600 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                          title="Zoom Out"
+                          className="p-2 rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
                         >
-                          <ZoomOut size={16} />
+                          <ZoomOut size={14} />
                         </button>
-                        <span className="px-1.5 lg:px-2 text-xs lg:text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[45px] lg:min-w-[50px] text-center">
+                        <span className="px-1 text-xs font-medium text-gray-600 dark:text-gray-300 min-w-[40px] text-center">
                           {Math.round(zoom * 100)}%
                         </span>
                         <button
                           onClick={handleZoomIn}
-                          disabled={zoom >= 3}
-                          className="p-1.5 lg:p-2 rounded-md hover:bg-white dark:hover:bg-gray-600 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                          title="Zoom In"
+                          disabled={zoom >= 2}
+                          className="p-2 rounded-md hover:bg-white dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
                         >
-                          <ZoomIn size={16} />
+                          <ZoomIn size={14} />
                         </button>
                       </div>
+                    )}
+                  </div>
+                  {canDownload ? (
+                    <button
+                      onClick={handleDownload}
+                      className="px-4 py-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-lg shadow-lg transition-all flex items-center gap-2"
+                    >
+                      <Download size={16} />
+                      <span className="hidden sm:inline">Download</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={
+                        userCoins < cost
+                          ? showInsufficientCoinsModal
+                          : handlePurchase
+                      }
+                      disabled={purchasing}
+                      className={`px-4 py-2 rounded-lg shadow-lg transition-all flex items-center gap-2 ${
+                        userCoins < cost
+                          ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
+                          : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                      } text-white`}
+                    >
+                      {purchasing ? (
+                        <FontAwesomeIcon icon={faSpinner} spin size={16} />
+                      ) : (
+                        <>
+                          <img src={coin} alt="coin" className="w-4 h-4" />
+                          <span className="hidden sm:inline">
+                            {userCoins < cost ? "Need Coins" : `Buy (${cost})`}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Main Content */}
+        <div className="max-w-6xl mx-auto bg-white dark:bg-onyx/60 rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row relative min-h-[600px]">
+          {/* PDF Preview Section */}
+          <motion.div
+            className="relative overflow-hidden"
+            animate={{
+              width: isFullscreen ? "100%" : isMobile ? "100%" : "50%",
+              height:
+                isMobile && isFullscreen ? "100vh" : isMobile ? "60vh" : "auto",
+            }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            style={{
+              minHeight: isMobile ? (isFullscreen ? "100vh" : "400px") : "600px",
+            }}
+          >
+            <div className="absolute inset-0 flex flex-col">
+                    {!previewDataUrl && !previewLoading && thumbnailUrl && (
+                      <div className="absolute inset-0 bg-gray-50 dark:bg-charcoal">
+                      <img
+                        src={thumbnailUrl}
+                        alt={`${title} thumbnail`}
+                        className="w-full h-full object-cover filter blur-sm scale-105 transition-all duration-300"
+                        onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling?.classList.remove('hidden');
+                        }}
+                      />
+                      <div className="hidden absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-charcoal">
+                        <div className="text-center text-gray-700 dark:text-gray-300">
+                        <FontAwesomeIcon icon={faImage} size="2x" className="mb-3 text-gray-400" />
+                        <p>Thumbnail unavailable</p>
+                        </div>
+                      </div>
+                      </div>
+                    )}
+
+                    {/* Mobile Overlay - Only show when NOT in preview mode and user is authenticated */}
+              {isMobile && !previewDataUrl && !previewLoading && !previewError && isAuthenticated && (
+                <div 
+                  className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 p-4 cursor-pointer"
+                  onClick={handleMobileFullscreen}
+                >
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="bg-white/90 dark:bg-black/90 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/20 max-w-xs w-full pointer-events-none"
+                  >
+                    <div className="text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 text-blue-500 flex items-center justify-center">
+                        {getIconForType(fileType, 64)}
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+                        Preview Resource
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                        Tap anywhere to view in fullscreen
+                      </p>
+                      <div className="flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400">
+                        <Maximize2 size={16} />
+                        <span className="text-sm font-medium">Fullscreen Mode</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end">
-                      <button
-                        onClick={toggleFullscreen}
-                        className="p-1.5 lg:p-2 rounded-md bg-gray-100 dark:bg-charcoal text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                        title={
-                          isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"
-                        }
-                      >
-                        {isFullscreen ? (
-                          <Minimize2 size={16} />
+                  </motion.div>
+                </div>
+              )}
+
+              {previewDataUrl ? (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {/* Page Indicator for Desktop */}
+                  {!isMobile && numPages > 1 && (
+                    <div className="absolute top-4 right-4 z-20">
+                      <PageIndicator />
+                    </div>
+                  )}
+                  
+                  <div 
+                    ref={pdfContainerRef}
+                    className="flex-1 overflow-auto scroll-container p-2 sm:p-4 bg-gray-50 dark:bg-charcoal"
+                  >
+                    <Document
+                      file={previewDataUrl}
+                      onLoadSuccess={onDocumentLoadSuccess}
+                      onLoadError={onDocumentLoadError}
+                      loading={
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center">
+                            <FontAwesomeIcon
+                              icon={faSpinner}
+                              spin
+                              size="2x"
+                              className="mb-3 text-blue-500"
+                            />
+                            <p className="text-gray-700 dark:text-gray-300">
+                              Loading PDF...
+                            </p>
+                          </div>
+                        </div>
+                      }
+                      error={
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center">
+                            <AlertCircle
+                              size={48}
+                              className="mx-auto mb-4 text-red-500"
+                            />
+                            <p className="text-gray-700 dark:text-gray-300 mb-4">
+                              Error loading PDF
+                            </p>
+                            {canDownload ? (
+                              <button
+                                onClick={handleDownload}
+                                className="px-4 py-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-lg"
+                              >
+                                <FontAwesomeIcon
+                                  icon={faDownload}
+                                  className="mr-2"
+                                />
+                                Download File
+                              </button>
+                            ) : (
+                              <button
+                                onClick={
+                                  userCoins < cost
+                                    ? showInsufficientCoinsModal
+                                    : handlePurchase
+                                }
+                                disabled={purchasing}
+                                className={`px-4 py-2 rounded-lg ${
+                                  userCoins < cost
+                                    ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
+                                    : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                                } text-white`}
+                              >
+                                {purchasing ? (
+                                  <FontAwesomeIcon
+                                    icon={faSpinner}
+                                    spin
+                                    className="mr-2"
+                                  />
+                                ) : (
+                                  <img
+                                    src={coin}
+                                    alt="coin"
+                                    className="w-4 h-4 inline mr-2"
+                                  />
+                                )}
+                                {purchasing
+                                  ? "Processing..."
+                                  : userCoins < cost
+                                  ? "Need More Coins"
+                                  : `Purchase (${cost} coins)`}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      }
+                    >
+                      {renderPdfPages}
+                    </Document>
+                  </div>
+
+                  {/* Desktop Controls */}
+                  {!isMobile && (
+                    <motion.div
+                      className="flex flex-col lg:flex-row items-center justify-between gap-3 lg:gap-0 p-4 bg-white dark:bg-onyx/60 border-t border-gray-200 dark:border-charcoal"
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      <div className="flex items-center gap-2 lg:gap-3 w-full lg:w-auto justify-center lg:justify-start">
+                        <div className="flex items-center gap-1 bg-gray-100 dark:bg-charcoal rounded-lg p-1">
+                          <button
+                            onClick={handleZoomOut}
+                            disabled={zoom <= 0.5}
+                            className="p-1.5 lg:p-2 rounded-md hover:bg-white dark:hover:bg-gray-600 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
+                            title="Zoom Out"
+                          >
+                            <ZoomOut size={16} />
+                          </button>
+                          <span className="px-1.5 lg:px-2 text-xs lg:text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[45px] lg:min-w-[50px] text-center">
+                            {Math.round(zoom * 100)}%
+                          </span>
+                          <button
+                            onClick={handleZoomIn}
+                            disabled={zoom >= 3}
+                            className="p-1.5 lg:p-2 rounded-md hover:bg-white dark:hover:bg-gray-600 transition-colors text-gray-600 dark:text-gray-300 disabled:opacity-50"
+                            title="Zoom In"
+                          >
+                            <ZoomIn size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end">
+                        <button
+                          onClick={toggleFullscreen}
+                          className="p-1.5 lg:p-2 rounded-md bg-gray-100 dark:bg-charcoal text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                          title={
+                            isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"
+                          }
+                        >
+                          {isFullscreen ? (
+                            <Minimize2 size={16} />
+                          ) : (
+                            <Maximize2 size={16} />
+                          )}
+                        </button>
+                        {canDownload ? (
+                          <button
+                            onClick={handleDownload}
+                            className="px-3 lg:px-4 py-1.5 lg:py-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-lg flex items-center gap-1.5 lg:gap-2 transition-colors text-sm lg:text-base shadow-lg"
+                          >
+                            <Download size={14} className="lg:hidden" />
+                            <Download size={16} className="hidden lg:block" />
+                            <span className="hidden md:inline">Download</span>
+                            <span className="md:hidden">DL</span>
+                          </button>
                         ) : (
-                          <Maximize2 size={16} />
+                          <button
+                            onClick={
+                              userCoins < cost
+                                ? showInsufficientCoinsModal
+                                : handlePurchase
+                            }
+                            disabled={purchasing}
+                            className={`px-3 lg:px-4 py-1.5 lg:py-2 rounded-lg flex items-center gap-1.5 lg:gap-2 transition-colors text-sm lg:text-base shadow-lg ${
+                              userCoins < cost
+                                ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
+                                : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                            } text-white`}
+                          >
+                            {purchasing ? (
+                              <FontAwesomeIcon
+                                icon={faSpinner}
+                                spin
+                                size={14}
+                                className="lg:hidden"
+                              />
+                            ) : (
+                              <img
+                                src={coin}
+                                alt="coin"
+                                className="w-3.5 h-3.5 lg:w-4 lg:h-4"
+                              />
+                            )}
+                            {isPurchased ? (
+                              <FontAwesomeIcon
+                                icon={faSpinner}
+                                spin
+                                size={16}
+                                className="hidden lg:block"
+                              />
+                            ) : (
+                              <img
+                                src={coin}
+                                alt="coin"
+                                className="w-4 h-4 hidden lg:block"
+                              />
+                            )}
+                            <span className="hidden md:inline">
+                              {purchasing
+                                ? "Processing..."
+                                : userCoins < cost
+                                ? "Need Coins"
+                                : `Buy (${cost})`}
+                            </span>
+                            <span className="md:hidden">
+                              {purchasing
+                                ? "..."
+                                : userCoins < cost
+                                ? "Need"
+                                : "Buy"}
+                            </span>
+                          </button>
                         )}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Mobile Controls - Only show when preview is loaded and NOT in fullscreen */}
+                  {isMobile && !isFullscreen && (
+                    <div className="flex items-center justify-between p-3 bg-white dark:bg-onyx/60 border-t border-gray-200 dark:border-charcoal gap-2">
+                      <button
+                        onClick={handleMobileFullscreen}
+                        className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm flex-1"
+                      >
+                        <Maximize2 size={16} />
+                        Fullscreen
                       </button>
                       {canDownload ? (
                         <button
                           onClick={handleDownload}
-                          className="px-3 lg:px-4 py-1.5 lg:py-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-lg flex items-center gap-1.5 lg:gap-2 transition-colors text-sm lg:text-base shadow-lg"
+                          className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-lg text-sm flex-1"
                         >
-                          <Download size={14} className="lg:hidden" />
-                          <Download size={16} className="hidden lg:block" />
-                          <span className="hidden md:inline">Download</span>
-                          <span className="md:hidden">DL</span>
+                          <Download size={16} />
+                          Download
                         </button>
                       ) : (
                         <button
@@ -1736,409 +1692,347 @@ const ResourceDetailPage = () => {
                               : handlePurchase
                           }
                           disabled={purchasing}
-                          className={`px-3 lg:px-4 py-1.5 lg:py-2 rounded-lg flex items-center gap-1.5 lg:gap-2 transition-colors text-sm lg:text-base shadow-lg ${
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm flex-1 ${
                             userCoins < cost
                               ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
                               : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
                           } text-white`}
                         >
                           {purchasing ? (
-                            <FontAwesomeIcon
-                              icon={faSpinner}
-                              spin
-                              size={14}
-                              className="lg:hidden"
-                            />
+                            <FontAwesomeIcon icon={faSpinner} spin size={16} />
                           ) : (
-                            <img
-                              src={coin}
-                              alt="coin"
-                              className="w-3.5 h-3.5 lg:w-4 lg:h-4"
-                            />
+                            <img src={coin} alt="coin" className="w-4 h-4" />
                           )}
-                          {isPurchased ? (
-                            <FontAwesomeIcon
-                              icon={faSpinner}
-                              spin
-                              size={16}
-                              className="hidden lg:block"
-                            />
-                          ) : (
-                            <img
-                              src={coin}
-                              alt="coin"
-                              className="w-4 h-4 hidden lg:block"
-                            />
-                          )}
-                          <span className="hidden md:inline">
-                            {purchasing
-                              ? "Processing..."
-                              : userCoins < cost
-                              ? "Need Coins"
-                              : `Buy (${cost})`}
-                          </span>
-                          <span className="md:hidden">
-                            {purchasing
-                              ? "..."
-                              : userCoins < cost
-                              ? "Need"
-                              : "Buy"}
-                          </span>
+                          {purchasing
+                            ? "Processing..."
+                            : userCoins < cost
+                            ? "Need Coins"
+                            : `Buy (${cost})`}
                         </button>
                       )}
                     </div>
-                  </motion.div>
-                )}
-
-                {isMobile && !isFullscreen && (
-                  <div className="flex items-center justify-between p-3 bg-white dark:bg-onyx/60 border-b border-gray-200 dark:border-charcoal gap-2">
+                  )}
+                </div>
+              ) : previewLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <FontAwesomeIcon
+                      icon={faSpinner}
+                      spin
+                      size="2x"
+                      className="mb-3 text-blue-500"
+                    />
+                    <p className="text-gray-700 dark:text-gray-300">
+                      Loading preview...
+                    </p>
+                  </div>
+                </div>
+              ) : previewError ? (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                  <AlertCircle
+                    size={48}
+                    className="text-red-500 dark:text-red-400 mb-4"
+                  />
+                  <p className="text-gray-700 dark:text-gray-300 mb-4 max-w-md">
+                    {previewError}
+                  </p>
+                  <button
+                    onClick={handlePreview}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    Retry Preview
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6 z-0 relative">
+                  <div className="w-32 h-32  flex items-center justify-center text-blue-500 dark:text-blue-400 mb-4">
+                    {getIconForType(fileType, 64)}
+                  </div>
+                  {isAuthenticated ? (
+                    <p className={`text-gray-600 dark:text-gray-600  font-medium mb-6 max-w-md ${isMobile ? "hidden" : "visible  "}`}>
+                      {isMobile
+                        ? "Tap the preview area above to view in fullscreen"
+                        : "Click the preview button to view this resource"}
+                    </p>
+                  ) : (
+                    <p className="text-gray-600 dark:text-gray-300 font-medium mb-6 max-w-md">
+                      Please login to preview this resource
+                    </p>
+                  )}
+                  {!isMobile && isAuthenticated && (
                     <button
-                      onClick={() => {
-                        handlePreview();
-                        setIsFullscreen(true);
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm flex-1"
+                      onClick={handlePreview}
+                      className="px-4 py-2 rounded-lg flex items-center gap-2 transition-colors bg-blue-500 text-white hover:bg-blue-600"
                     >
-                      <Maximize2 size={16} />
-                      Fullscreen
+                      <Eye size={16} />
+                      Preview Resource
                     </button>
-                    {canDownload ? (
-                      <button
-                        onClick={handleDownload}
-                        className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-lg text-sm flex-1"
-                      >
-                        <Download size={16} />
-                        Download
-                      </button>
-                    ) : (
-                      <button
-                        onClick={
-                          userCoins < cost
-                            ? showInsufficientCoinsModal
-                            : handlePurchase
-                        }
-                        disabled={purchasing}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm flex-1 ${
-                          userCoins < cost
-                            ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
-                            : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                        } text-white`}
-                      >
-                        {purchasing ? (
-                          <FontAwesomeIcon icon={faSpinner} spin size={16} />
-                        ) : (
-                          <img src={coin} alt="coin" className="w-4 h-4" />
-                        )}
-                        {purchasing
-                          ? "Processing..."
-                          : userCoins < cost
-                          ? "Need Coins"
-                          : `Buy (${cost})`}
-                      </button>
+                  )}
+                  {!isAuthenticated && (
+                    <div className="px-4 py-2 rounded-lg bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                      <Eye size={16} />
+                      Login Required
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Resource Details Section */}
+          <motion.div
+            className="p-4 sm:p-6 md:p-8 bg-white dark:bg-onyx/60 overflow-y-auto"
+            style={{
+              position: isFullscreen ? "absolute" : "relative",
+              right: 0,
+              top: isMobile ? "auto" : 0,
+              bottom: isMobile && !isFullscreen ? 0 : "auto",
+              width: isMobile ? "100%" : "50%",
+              height: isMobile && !isFullscreen ? "40vh" : "100%",
+              minHeight: isMobile ? "300px" : "600px",
+            }}
+            animate={{
+              x: isFullscreen ? "100%" : 0,
+              y: isFullscreen && isMobile ? "100%" : 0,
+              opacity: isFullscreen ? 0 : 1,
+            }}
+            transition={{
+              duration: 0.3,
+              ease: "easeInOut",
+              opacity: {
+                duration: isFullscreen ? 0.1 : 0.3,
+                delay: isFullscreen ? 0 : 0.1,
+              },
+            }}
+          >
+            <motion.h1
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white mb-4"
+            >
+              {title}
+            </motion.h1>
+
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full text-sm">
+                  <GraduationCap size={14} />
+                  <span>{course}</span>
+                </div>
+                <div className="flex items-center gap-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded-full text-sm">
+                  {getIconForSubject(subject, 14)}
+                  <span>{subject}</span>
+                </div>
+                <div className="flex items-center gap-1 bg-gray-100 dark:bg-charcoal text-gray-800 dark:text-gray-200 px-2 py-1 rounded-full text-sm uppercase">
+                  <span>{fileType}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 rounded-lg shadow-sm border border-amber-200 dark:border-amber-800/50">
+                <img src={coin} alt="coin" className="w-4 h-4" />
+                <span className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                  {cost} coins
+                </span>
+              </div>
+            </div>
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-gray-700 dark:text-gray-300 mb-6 leading-relaxed"
+            >
+              {description || "No description provided for this resource."}
+            </motion.p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+              <motion.div
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                className="flex items-center gap-3 bg-white dark:bg-charcoal p-4 rounded-xl shadow-inner"
+              >
+                <Star size={24} className="text-yellow-500" />
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">
+                    Overall Rating
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {overallRating.toFixed(1)} / 5
+                    </p>
+                    {isRatingLoading && (
+                      <FontAwesomeIcon
+                        icon={faSpinner}
+                        spin
+                        size="sm"
+                        className="text-blue-500"
+                      />
                     )}
                   </div>
-                )}
-              </div>
-            ) : previewLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <FontAwesomeIcon
-                    icon={faSpinner}
-                    spin
-                    size="2x"
-                    className="mb-3 text-blue-500"
-                  />
-                  <p className="text-gray-700 dark:text-gray-300">
-                    Loading preview...
+                </div>
+              </motion.div>
+              <motion.div
+                initial={{ x: 20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                className="flex items-center gap-3 bg-white dark:bg-charcoal p-4 rounded-xl shadow-inner"
+              >
+                <Download size={24} className="text-green-500" />
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">
+                    Downloads
+                  </p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                    {downloads.toLocaleString()}
                   </p>
                 </div>
-              </div>
-            ) : previewError ? (
-              <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                <AlertCircle
-                  size={48}
-                  className="text-red-500 dark:text-red-400 mb-4"
-                />
-                <p className="text-gray-700 dark:text-gray-300 mb-4 max-w-md">
-                  {previewError}
-                </p>
-                <button
+              </motion.div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              {!isMobile && (
+                <motion.button
                   onClick={handlePreview}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                >
-                  Retry Preview
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-6 z-10 relative">
-                <div className="w-32 h-32 flex items-center justify-center text-blue-500 dark:text-blue-400 mb-4">
-                  {getIconForType(fileType, 64)}
-                </div>
-                <p className="text-gray-600 dark:text-gray-300 font-medium mb-6 max-w-md">
-                  {isAuthenticated
-                    ? isMobile
-                      ? "Tap to view in fullscreen"
-                      : "Click the preview button to view this resource"
-                    : "Please login to preview this resource"}
-                </p>
-                <button
-                  onClick={isMobile ? () => { handlePreview(); setIsFullscreen(true); } : handlePreview}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
                   disabled={!isAuthenticated}
-                  className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+                  className={`flex-1 py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${
                     isAuthenticated
                       ? "bg-blue-500 text-white hover:bg-blue-600"
                       : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   }`}
                 >
-                  <Eye size={16} />
-                  {isMobile ? "Preview Fullscreen" : "Preview Resource"}
-                </button>
-              </div>
-            )}
-          </div>
-        </motion.div>
+                  <Eye size={20} />
+                  {previewDataUrl ? "Refresh Preview" : "Preview Resource"}
+                </motion.button>
+              )}
+              {isMobile && (
+                <motion.button
+                  onClick={handleMobileFullscreen}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  disabled={!isAuthenticated}
+                  className={`flex-1 py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${
+                    isAuthenticated
+                      ? "bg-blue-500 text-white hover:bg-blue-600"
+                      : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  }`}
+                >
+                  <Maximize2 size={20} />
+                  Preview Fullscreen
+                </motion.button>
+              )}
+              {fileUrl && (
+                <>
+                  {canDownload ? (
+                    <motion.button
+                      onClick={handleDownload}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={!isAuthenticated}
+                      className={`flex-1 py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${
+                        isAuthenticated
+                          ? "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white"
+                          : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                      }`}
+                    >
+                      <Download size={20} />
+                      Download
+                    </motion.button>
+                  ) : (
+                    <motion.button
+                      onClick={
+                        userCoins < cost
+                          ? showInsufficientCoinsModal
+                          : handlePurchase
+                      }
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={!isAuthenticated || userCoins < cost || purchasing}
+                      className={`flex-1 py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${
+                        !isAuthenticated
+                          ? "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                          : userCoins < cost
+                          ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white"
+                          : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                      }`}
+                    >
+                      {purchasing ? (
+                        <FontAwesomeIcon icon={faSpinner} spin size="lg" />
+                      ) : (
+                        <img src={coin} alt="coin" className="w-5 h-5" />
+                      )}
+                      {purchasing
+                        ? "Processing..."
+                        : userCoins < cost
+                        ? `Need ${cost - userCoins} More Coins`
+                        : `Purchase (${cost} coins)`}
+                    </motion.button>
+                  )}
+                </>
+              )}
+            </div>
 
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700"
+            >
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                Rate This Resource
+              </h2>
+              {isAuthenticated ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-gray-50 dark:bg-charcoal rounded-lg">
+                    <p className="text-gray-700 dark:text-gray-300 mb-2">
+                      Logged in as:{" "}
+                      <span className="font-semibold text-blue-500 dark:text-blue-400">
+                        {userName}
+                      </span>
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <StarRating
+                        rating={userRating}
+                        onRate={handleRate}
+                        editable={true}
+                        starSize={20}
+                        showValue={true}
+                        isLoading={isRatingLoading}
+                      />
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                      {userRating > 0
+                        ? "Click stars to change your rating"
+                        : "Click stars to rate this resource"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <p className="text-gray-600 dark:text-gray-400 text-center">
+                    Please log in to rate this resource and share your feedback.
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        </div>
+
+        {/* Comments Section */}
         <motion.div
-          className="p-4 sm:p-6 md:p-8 bg-white dark:bg-onyx/60 overflow-y-auto"
-          style={{
-            position: isFullscreen ? "absolute" : "relative",
-            right: 0,
-            top: isMobile ? "auto" : 0,
-            bottom: isMobile && !isFullscreen ? 0 : "auto",
-            width: isMobile ? "100%" : "50%",
-            height: isMobile && !isFullscreen ? "40vh" : "100%",
-            minHeight: isMobile ? "300px" : "600px",
-          }}
-          animate={{
-            x: isFullscreen ? "100%" : 0,
-            y: isFullscreen && isMobile ? "100%" : 0,
-            opacity: isFullscreen ? 0 : 1,
-          }}
+          className="max-w-6xl p-4 lg:p-8 mx-auto bg-white dark:bg-onyx/60 rounded-2xl shadow-xl overflow-hidden mt-4 sm:mt-8"
+          animate={{ opacity: isFullscreen ? 0 : 1, y: isFullscreen ? 50 : 0 }}
           transition={{
             duration: 0.3,
             ease: "easeInOut",
-            opacity: {
-              duration: isFullscreen ? 0.1 : 0.3,
-              delay: isFullscreen ? 0 : 0.1,
-            },
+            opacity: { duration: isFullscreen ? 0.1 : 0.3 },
           }}
         >
-          <motion.h1
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white mb-4"
-          >
-            {title}
-          </motion.h1>
-
-          {/* Coins Display Section */}
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full text-sm">
-                <GraduationCap size={14} />
-                <span>{course}</span>
-              </div>
-              <div className="flex items-center gap-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded-full text-sm">
-                {getIconForSubject(subject, 14)}
-                <span>{subject}</span>
-              </div>
-              <div className="flex items-center gap-1 bg-gray-100 dark:bg-charcoal text-gray-800 dark:text-gray-200 px-2 py-1 rounded-full text-sm uppercase">
-                <span>{fileType}</span>
-              </div>
-            </div>
-            <div className="flex items-center gapAinda:2 px-3 py-1.5 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 rounded-lg shadow-sm border border-amber-200 dark:border-amber-800/50">
-              <img src={coin} alt="coin" className="w-4 h-4" />
-              <span className="text-sm font-bold text-amber-800 dark:text-amber-300">
-                {cost} coins
-              </span>
-            </div>
-          </div>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-gray-700 dark:text-gray-300 mb-6 leading-relaxed"
-          >
-            {description || "No description provided for this resource."}
-          </motion.p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-            <motion.div
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              className="flex items-center gap-3 bg-white dark:bg-charcoal p-4 rounded-xl shadow-inner"
-            >
-              <Star size={24} className="text-yellow-500" />
-              <div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  Overall Rating
-                </p>
-                <div className="flex items-center gap-2">
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">
-                    {overallRating.toFixed(1)} / 5
-                  </p>
-                  {isRatingLoading && (
-                    <FontAwesomeIcon
-                      icon={faSpinner}
-                      spin
-                      size="sm"
-                      className="text-blue-500"
-                    />
-                  )}
-                </div>
-              </div>
-            </motion.div>
-            <motion.div
-              initial={{ x: 20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              className="flex items-center gap-3 bg-white dark:bg-charcoal p-4 rounded-xl shadow-inner"
-            >
-              <Download size={24} className="text-green-500" />
-              <div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  Downloads
-                </p>
-                <p className="text-lg font-bold text-gray-900 dark:text-white">
-                  {downloads.toLocaleString()}
-                </p>
-              </div>
-            </motion.div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4 mb-8">
-            <motion.button
-              onClick={() => {
-                if (isMobile) {
-                  if (!previewDataUrl) handlePreview();
-                  setIsFullscreen(true);
-                } else {
-                  handlePreview();
-                }
-              }}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              disabled={!isAuthenticated}
-              className={`flex-1 py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${
-                isAuthenticated
-                  ? "bg-blue-500 text-white hover:bg-blue-600"
-                  : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-              }`}
-            >
-              <Eye size={20} />
-              {isMobile
-                ? "Preview Fullscreen"
-                : previewDataUrl
-                ? "Refresh Preview"
-                : "Preview Resource"}
-            </motion.button>
-            {fileUrl && (
-              <>
-                {canDownload ? (
-                  <motion.button
-                    onClick={handleDownload}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.98 }}
-                    disabled={!isAuthenticated}
-                    className={`flex-1 py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${
-                      isAuthenticated
-                        ? "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white"
-                        : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                    }`}
-                  >
-                    <Download size={20} />
-                    Download
-                  </motion.button>
-                ) : (
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.98 }}
-                    disabled={!isAuthenticated || userCoins < cost || purchasing}
-                    className={`flex-1 py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors ${
-                      !isAuthenticated
-                        ? "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                        : userCoins < cost
-                        ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white"
-                        : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
-                    }`}
-                  >
-                    {purchasing ? (
-                      <FontAwesomeIcon icon={faSpinner} spin size="lg" />
-                    ) : (
-                      <img src={coin} alt="coin" className="w-5 h-5" />
-                    )}
-                    {purchasing
-                      ? "Processing..."
-                      : userCoins < cost
-                      ? `Need ${cost - userCoins} More Coins`
-                      : `Purchase (${cost} coins)`}
-                  </motion.button>
-                )}
-              </>
-            )}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700"
-          >
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Rate This Resource
-            </h2>
-            {isAuthenticated ? (
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-50 dark:bg-charcoal rounded-lg">
-                  <p className="text-gray-700 dark:text-gray-300 mb-2">
-                    Logged in as:{" "}
-                    <span className="font-semibold text-blue-500 dark:text-blue-400">
-                      {userName}
-                    </span>
-                  </p>
-                  <div className="flex items-center gap-4">
-                    <StarRating
-                      rating={userRating}
-                      onRate={handleRate}
-                      editable={true}
-                      starSize={20}
-                      showValue={true}
-                      isLoading={isRatingLoading}
-                    />
-                  </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                    {userRating > 0
-                      ? "Click stars to change your rating"
-                      : "Click stars to rate this resource"}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <p className="text-gray-600 dark:text-gray-400 text-center">
-                  Please log in to rate this resource and share your feedback.
-                </p>
-              </div>
-            )}
-          </motion.div>
+          <ResourceCommentsSection
+            resourceId={resourceId}
+            currentUserId={userId}
+            userName={userName}
+          />
         </motion.div>
-      </div>
-
-      <motion.div
-        className="max-w-6xl p-4 lg:p-8 mx-auto bg-white dark:bg-onyx/60 rounded-2xl shadow-xl overflow-hidden mt-4 sm:mt-8"
-        animate={{ opacity: isFullscreen ? 0 : 1, y: isFullscreen ? 50 : 0 }}
-        transition={{
-          duration: 0.3,
-          ease: "easeInOut",
-          opacity: { duration: isFullscreen ? 0.1 : 0.3 },
-        }}
-      >
-        <ResourceCommentsSection
-          resourceId={resourceId}
-          currentUserId={userId}
-          userName={userName}
-        />
       </motion.div>
-    </motion.div>
-  );
-};
+    );
+  };
 
-export default ResourceDetailPage;
+  export default ResourceDetailPage;

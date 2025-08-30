@@ -758,8 +758,8 @@ const UniversalResourceCard = React.memo(
     if (isDeleted) return null;
 
     return (
-      <div className={`${getCardClasses()} ${className} group`}>
-        <div className="h-full flex flex-col relative p-2 overflow-visible">
+      // <div className={`${getCardClasses()} ${className} group`}>
+        <div className="flex flex-col relative overflow-visible h-full w-full dark:bg-onyx bg-white shadow-md dark:shadow-glow-sm  rounded-2xl p-4 ">
           {/* Subtle gradient overlay for depth */}
           <div className="absolute inset-0 bg-light-subtle dark:bg-gradient-to-br dark:from-transparent dark:via-transparent dark:to-charcoal/30 pointer-events-none rounded-xl" />
 
@@ -959,7 +959,7 @@ const UniversalResourceCard = React.memo(
                             className="w-3 h-3 sm:w-4 sm:h-4"
                           />
                           <span className="text-xs sm:text-sm">
-                            {userCoins < cost ? "Need Coins" : "Buy Now"}
+                            {userCoins < cost ? "Need Coins" : "Buy"}
                           </span>
                         </>
                       )}
@@ -1069,7 +1069,7 @@ const UniversalResourceCard = React.memo(
             </div>
           </div>
         </div>
-      </div>
+      // </div>
     );
   }
 );

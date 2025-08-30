@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink  } from "react-router-dom";
 import {
   Menu,
   X,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserFriends } from "@fortawesome/free-solid-svg-icons";
+// Restored original imports from your project structure
 import { useAuth } from "../../context/AuthContext/AuthContext";
 import { useNavigate } from "react-router-dom";
 import logo from '../../assets/logo.svg'
@@ -46,21 +47,21 @@ const MobileNavLink = ({ to, icon, text, onClick }) => (
   </Link>
 );
 
-const Navbar = () => {
+const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
-  
+
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
   const profileDropdownRef = useRef(null);
   const mobileMenuRef = useRef(null);
   const searchInputRef = useRef(null);
   const mobileSearchInputRef = useRef(null);
-  
+
   // Check if the user is an admin or superadmin
   const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
 
@@ -96,7 +97,7 @@ const Navbar = () => {
       }, 300);
     } else {
       setIsMobileMenuOpen(true);
-      // Close profile dropdown when opening mobile menu
+      // Ensure profile dropdown is closed when opening mobile menu
       setIsProfileDropdownOpen(false);
       setTimeout(() => {
         setIsAnimating(true);
@@ -107,6 +108,10 @@ const Navbar = () => {
   // Search Toggle Functions
   const toggleSearch = () => {
     setIsSearchActive(!isSearchActive);
+    // Ensure the profile dropdown is closed when desktop search is activated
+    if (!isSearchActive) {
+      setIsProfileDropdownOpen(false);
+    }
     if (isSearchActive) {
       setSearchQuery("");
     }
@@ -114,6 +119,11 @@ const Navbar = () => {
 
   const toggleMobileSearch = () => {
     setIsMobileSearchActive(!isMobileSearchActive);
+    // Ensure the mobile menu and dropdown are closed
+    if (!isMobileSearchActive) {
+      setIsMobileMenuOpen(false);
+      setIsProfileDropdownOpen(false);
+    }
     if (isMobileSearchActive) {
       setSearchQuery("");
     }
@@ -122,6 +132,8 @@ const Navbar = () => {
   // Profile Dropdown Toggle
   const toggleProfileDropdown = () => {
     setIsProfileDropdownOpen((prev) => !prev);
+    // Ensure desktop search is not active if profile dropdown is toggled
+    setIsSearchActive(false);
   };
 
   // Handle Logout
@@ -155,12 +167,15 @@ const Navbar = () => {
   // Close handlers for clicking outside dropdowns/menus
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Close profile dropdown if clicked outside and not mobile menu is open
       if (
         profileDropdownRef.current &&
-        !profileDropdownRef.current.contains(event.target)
+        !profileDropdownRef.current.contains(event.target) &&
+        !isMobileMenuOpen
       ) {
         setIsProfileDropdownOpen(false);
       }
+      // Close mobile menu if clicked outside
       if (
         isMobileMenuOpen &&
         mobileMenuRef.current &&
@@ -174,7 +189,7 @@ const Navbar = () => {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isMobileMenuOpen]);
+  }, [isMobileMenuOpen, isProfileDropdownOpen]);
 
   // Handle Escape Key
   useEffect(() => {
@@ -196,18 +211,29 @@ const Navbar = () => {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isMobileMenuOpen, isProfileDropdownOpen, isSearchActive, isMobileSearchActive]);
 
+  useEffect(() => {
+    if (location.pathname.startsWith("/search")) {
+      setIsVisitedSearchResultPage(true);
+    } else {
+      setIsVisitedSearchResultPage(false);
+    }
+  }, [location.pathname, setIsVisitedSearchResultPage]);
+
+
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg shadow-lg border-b border-gray-200/50 dark:border-charcoal/50 transition-colors duration-300">
+    <nav className={`fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg transition-colors duration-300  ${isVisitedSearchResultPage ? 'hidden' : 'block'} `}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
         {/* Left Section - Logo */}
         <div className="flex items-center">
+          {/* Logo is always visible unless a search bar is active */}
           {!isSearchActive && !isMobileSearchActive && (
             <Link to="/" className="flex items-center space-x-2 group">
               <img src={logo} alt="Scholara Collective Logo" className="h-10 w-auto" />
             </Link>
           )}
-          
-          {/* Back Arrow for Search Mode */}
+
+          {/* Back Arrow for Search Mode (Desktop and Mobile) */}
           {(isSearchActive || isMobileSearchActive) && (
             <button
               onClick={isMobileSearchActive ? toggleMobileSearch : toggleSearch}
@@ -220,27 +246,28 @@ const Navbar = () => {
         </div>
 
         {/* Center Section - Navigation Links or Search Bar */}
-        <div className="flex-1 max-w-2xl mx-4">
-          {/* Desktop Search Bar */}
-          <div className="hidden lg:block">
+        <div className={`flex-1 max-w-2xl mx-4 `}>
+          {/* Desktop Search Bar or Navigation Links */}
+          <div className="hidden lg:block ">
             {isSearchActive ? (
-              <form onSubmit={handleSearchSubmit} className="w-full">
+              <form onSubmit={handleSearchSubmit} className="w-full ">
                 <div className="relative">
+                  {/* FIX: Use `w-full` for active state and `w-0` for inactive to enable transition */}
                   <input
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search resources..."
-                    className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
+                    className={`px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out ${isSearchActive ? 'w-full opacity-100' : 'w-0 opacity-0'}`}
                   />
-                  <Search 
-                    size={18} 
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400" 
+                  <Search
+                    size={18}
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
                   />
                   <button
                     type="submit"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200"
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full transition-colors duration-200"
                   >
                     <Search size={14} />
                   </button>
@@ -262,26 +289,27 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile Search Bar */}
+          {/* Mobile Search Bar (only visible on mobile when active) */}
           <div className="lg:hidden">
             {isMobileSearchActive && (
               <form onSubmit={handleSearchSubmit} className="w-full">
                 <div className="relative">
+                  {/* FIX: Use `w-full` for active state and `w-0` for inactive to enable transition */}
                   <input
                     ref={mobileSearchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search resources..."
-                    className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
+                    className={`px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out ${isMobileSearchActive ? 'w-full opacity-100' : 'w-0 opacity-0'}`}
                   />
-                  <Search 
-                    size={18} 
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400" 
+                  <Search
+                    size={18}
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
                   />
                   <button
                     type="submit"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200"
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full transition-colors duration-200"
                   >
                     <Search size={14} />
                   </button>
@@ -292,9 +320,9 @@ const Navbar = () => {
         </div>
 
         {/* Right Section - Search Icon, Auth/Profile, Mobile Menu Button */}
-        <div className="flex items-center space-x-4">
-          {/* Search Icon (Desktop) */}
-          {!isSearchActive && (
+        {(!isSearchActive && !isMobileSearchActive) && (
+          <div className="flex items-center space-x-4">
+            {/* Desktop Search Icon */}
             <button
               onClick={toggleSearch}
               className="hidden lg:block p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
@@ -302,111 +330,111 @@ const Navbar = () => {
             >
               <Search size={20} />
             </button>
-          )}
 
-          {/* User Profile / Auth Buttons (Desktop) */}
-          {!isSearchActive && isAuthenticated ? (
-            <div className="relative" ref={profileDropdownRef}>
-              <button
-                onClick={toggleProfileDropdown}
-                className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 group relative overflow-hidden hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95"
-                aria-label="Profile menu"
-              >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
-                  {user?.username?.charAt(0).toUpperCase() || "U"}
-                </div>
-                <span className="hidden md:block text-gray-700 dark:text-gray-200 font-medium text-sm">
-                  {user?.username || "User"}
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 ${
-                    isProfileDropdownOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-              {isProfileDropdownOpen && (
-                <div className={`absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none ${isMobileMenuOpen ? 'lg:block hidden' : ''}`}>
-                  {user && (
-                    <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {user.username || "User"}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">
-                        {user.roles || "Member"}
-                      </p>
+            {/* User Profile / Auth Buttons (Desktop) */}
+            <div className="hidden lg:flex items-center space-x-3">
+              {isAuthenticated ? (
+                <div className="relative" ref={profileDropdownRef}>
+                  <button
+                    onClick={toggleProfileDropdown}
+                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 group relative overflow-hidden hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95"
+                    aria-label="Profile menu"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
+                      {user?.username?.charAt(0).toUpperCase() || "U"}
+                    </div>
+                    <span className="hidden md:block text-gray-700 dark:text-gray-200 font-medium text-sm">
+                      {user?.username || "User"}
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 ${
+                        isProfileDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  {isProfileDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      {user && (
+                        <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            {user.username || "User"}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">
+                            {user.roles || "Member"}
+                          </p>
+                        </div>
+                      )}
+                      <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                        <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
+                        <span className="font-medium">{user?.scholaraCoins || 0} Coins</span>
+                      </div>
+                      <Link
+                        to="/referral"
+                        onClick={handleNavLinkClick}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <FontAwesomeIcon
+                          icon={faUserFriends}
+                          className="mr-3 text-amber-500 dark:text-amber-400"
+                          size="sm"
+                        />
+                        Referrals
+                      </Link>
+                      {isAdmin && (
+                        <Link
+                          to="/admin"
+                          onClick={handleNavLinkClick}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                        >
+                          <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
+                        </Link>
+                      )}
+                      <Link
+                        to="/profile"
+                        onClick={handleNavLinkClick}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <User size={16} className="mr-3" /> Profile
+                      </Link>
+                      <Link
+                        to="/settings"
+                        onClick={handleNavLinkClick}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <Settings size={16} className="mr-3" /> Settings
+                      </Link>
+                      <div className="border-t border-gray-100 dark:border-charcoal my-1"></div>
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <LogOut size={16} className="mr-3" /> Logout
+                      </button>
                     </div>
                   )}
-                  <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                    <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
-                    <span className="font-medium">{user?.scholaraCoins || 0} Coins</span>
-                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-3">
                   <Link
-                    to="/referral"
-                    onClick={handleNavLinkClick}
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                    to="/login"
+                    className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200"
                   >
-                    <FontAwesomeIcon 
-                      icon={faUserFriends} 
-                      className="mr-3 text-amber-500 dark:text-amber-400" 
-                      size="sm" 
-                    />
-                    Referrals
-                  </Link>
-                  {isAdmin && (
-                    <Link
-                      to="/admin"
-                      onClick={handleNavLinkClick}
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                    >
-                      <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
-                    </Link>
-                  )}
-                  <Link
-                    to="/profile"
-                    onClick={handleNavLinkClick}
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                  >
-                    <User size={16} className="mr-3" /> Profile
+                    Log In
                   </Link>
                   <Link
-                    to="/settings"
-                    onClick={handleNavLinkClick}
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                    to="/register"
+                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95"
                   >
-                    <Settings size={16} className="mr-3" /> Settings
+                    Sign Up
                   </Link>
-                  <div className="border-t border-gray-100 dark:border-charcoal my-1"></div>
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                  >
-                    <LogOut size={16} className="mr-3" /> Logout
-                  </button>
                 </div>
               )}
             </div>
-          ) : !isSearchActive && !isAuthenticated ? (
-            <div className="hidden lg:flex items-center space-x-3">
-              <Link
-                to="/login"
-                className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200"
-              >
-                Log In
-              </Link>
-              <Link
-                to="/register"
-                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95"
-              >
-                Sign Up
-              </Link>
-            </div>
-          ) : null}
 
-          {/* Mobile Controls */}
-          <div className="lg:hidden flex items-center space-x-2">
-            {/* Mobile Search Button */}
-            {!isMobileSearchActive && (
+            {/* Mobile Controls (always visible on mobile, hidden on desktop) */}
+            <div className="lg:hidden flex items-center space-x-2">
+              {/* Mobile Search Button */}
               <button
                 onClick={toggleMobileSearch}
                 className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
@@ -414,10 +442,97 @@ const Navbar = () => {
               >
                 <Search size={20} />
               </button>
-            )}
 
-            {/* Mobile Menu Button (Hamburger) */}
-            {!isMobileSearchActive && (
+              {/* FIX: Add the mobile profile dropdown here so it's not hidden */}
+              {isAuthenticated ? (
+                <div className="relative" ref={profileDropdownRef}>
+                  <button
+                    onClick={toggleProfileDropdown}
+                    className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 dark:bg-charcoal hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 transform active:scale-95"
+                    aria-label="Profile menu"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
+                      {user?.username?.charAt(0).toUpperCase() || "U"}
+                    </div>
+                  </button>
+                  {isProfileDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      {user && (
+                        <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            {user.username || "User"}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">
+                            {user.roles || "Member"}
+                          </p>
+                        </div>
+                      )}
+                      <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                        <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
+                        <span className="font-medium">{user?.scholaraCoins || 0} Coins</span>
+                      </div>
+                      <Link
+                        to="/referral"
+                        onClick={handleNavLinkClick}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <FontAwesomeIcon
+                          icon={faUserFriends}
+                          className="mr-3 text-amber-500 dark:text-amber-400"
+                          size="sm"
+                        />
+                        Referrals
+                      </Link>
+                      {isAdmin && (
+                        <Link
+                          to="/admin"
+                          onClick={handleNavLinkClick}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                        >
+                          <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
+                        </Link>
+                      )}
+                      <Link
+                        to="/profile"
+                        onClick={handleNavLinkClick}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <User size={16} className="mr-3" /> Profile
+                      </Link>
+                      <Link
+                        to="/settings"
+                        onClick={handleNavLinkClick}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <Settings size={16} className="mr-3" /> Settings
+                      </Link>
+                      <div className="border-t border-gray-100 dark:border-charcoal my-1"></div>
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <LogOut size={16} className="mr-3" /> Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <Link
+                    to="/login"
+                    className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              )}
+              {/* Mobile Menu Button (Hamburger) */}
               <button
                 onClick={toggleMobileMenu}
                 className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
@@ -429,9 +544,9 @@ const Navbar = () => {
                   <Menu className="w-6 h-6" />
                 )}
               </button>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Mobile Side Navigation - Backdrop & Menu Container */}
@@ -517,7 +632,7 @@ const Navbar = () => {
                 </nav>
               </div>
 
-              {/* Fixed Auth Section at Bottom */}
+              {/* Fixed Auth Section at Bottom (Mobile) */}
               <div className="p-4 border-t border-gray-200 dark:border-charcoal bg-gray-50/80 dark:bg-onyx backdrop-blur-sm">
                 {isAuthenticated ? (
                   <div className="space-y-3">
