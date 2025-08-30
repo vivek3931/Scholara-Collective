@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, NavLink  } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   Menu,
   X,
@@ -57,6 +57,7 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
 
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const profileDropdownRef = useRef(null);
   const mobileMenuRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -167,11 +168,10 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
   // Close handlers for clicking outside dropdowns/menus
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Close profile dropdown if clicked outside and not mobile menu is open
+      // Close profile dropdown if clicked outside
       if (
         profileDropdownRef.current &&
-        !profileDropdownRef.current.contains(event.target) &&
-        !isMobileMenuOpen
+        !profileDropdownRef.current.contains(event.target)
       ) {
         setIsProfileDropdownOpen(false);
       }
@@ -219,17 +219,15 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
     }
   }, [location.pathname, setIsVisitedSearchResultPage]);
 
-
-
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg transition-colors duration-300  ${isVisitedSearchResultPage ? 'hidden' : 'block'} `}>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
+    <nav className={`fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg transition-colors duration-300 ${isVisitedSearchResultPage ? 'hidden' : 'block'}`}>
+      <div className="container mx-auto px-2 sm:px-4 lg:px-8 h-18 flex items-center justify-between min-w-0">
         {/* Left Section - Logo */}
-        <div className="flex items-center">
+        <div className="flex items-center flex-shrink-0 min-w-0">
           {/* Logo is always visible unless a search bar is active */}
           {!isSearchActive && !isMobileSearchActive && (
-            <Link to="/" className="flex items-center space-x-2 group">
-              <img src={logo} alt="Scholara Collective Logo" className="h-10 w-auto" />
+            <Link to="/" className="flex items-center space-x-2 group flex-shrink-0">
+              <img src={logo} alt="Scholara Collective Logo" className="h-10 w-auto flex-shrink-0 max-w-[120px] sm:max-w-[200px]" />
             </Link>
           )}
 
@@ -237,7 +235,7 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
           {(isSearchActive || isMobileSearchActive) && (
             <button
               onClick={isMobileSearchActive ? toggleMobileSearch : toggleSearch}
-              className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+              className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0"
               aria-label="Close search"
             >
               <ArrowLeft size={24} />
@@ -246,20 +244,19 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
         </div>
 
         {/* Center Section - Navigation Links or Search Bar */}
-        <div className={`flex-1 max-w-2xl mx-4 `}>
+        <div className="flex-1 max-w-2xl mx-4">
           {/* Desktop Search Bar or Navigation Links */}
-          <div className="hidden lg:block ">
+          <div className="hidden lg:block">
             {isSearchActive ? (
-              <form onSubmit={handleSearchSubmit} className="w-full ">
+              <form onSubmit={handleSearchSubmit} className="w-full">
                 <div className="relative">
-                  {/* FIX: Use `w-full` for active state and `w-0` for inactive to enable transition */}
                   <input
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search resources..."
-                    className={`px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out ${isSearchActive ? 'w-full opacity-100' : 'w-0 opacity-0'}`}
+                    className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out"
                   />
                   <Search
                     size={18}
@@ -294,14 +291,13 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
             {isMobileSearchActive && (
               <form onSubmit={handleSearchSubmit} className="w-full">
                 <div className="relative">
-                  {/* FIX: Use `w-full` for active state and `w-0` for inactive to enable transition */}
                   <input
                     ref={mobileSearchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search resources..."
-                    className={`px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out ${isMobileSearchActive ? 'w-full opacity-100' : 'w-0 opacity-0'}`}
+                    className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out"
                   />
                   <Search
                     size={18}
@@ -321,7 +317,7 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
 
         {/* Right Section - Search Icon, Auth/Profile, Mobile Menu Button */}
         {(!isSearchActive && !isMobileSearchActive) && (
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0 min-w-0">
             {/* Desktop Search Icon */}
             <button
               onClick={toggleSearch}
@@ -337,24 +333,24 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                 <div className="relative" ref={profileDropdownRef}>
                   <button
                     onClick={toggleProfileDropdown}
-                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 group relative overflow-hidden hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95"
+                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 group relative overflow-hidden hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 z-10"
                     aria-label="Profile menu"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
                       {user?.username?.charAt(0).toUpperCase() || "U"}
                     </div>
-                    <span className="hidden md:block text-gray-700 dark:text-gray-200 font-medium text-sm">
+                    <span className="hidden xl:block text-gray-700 dark:text-gray-200 font-medium text-sm whitespace-nowrap">
                       {user?.username || "User"}
                     </span>
                     <ChevronDown
                       size={16}
-                      className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 ${
+                      className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 flex-shrink-0 ${
                         isProfileDropdownOpen ? "rotate-180" : ""
                       }`}
                     />
                   </button>
                   {isProfileDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                       {user && (
                         <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
                           <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -415,16 +411,16 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 xl:space-x-3">
                   <Link
                     to="/login"
-                    className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200"
+                    className="px-3 xl:px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
                   >
                     Log In
                   </Link>
                   <Link
                     to="/register"
-                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95"
+                    className="px-3 xl:px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
                   >
                     Sign Up
                   </Link>
@@ -432,23 +428,23 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
               )}
             </div>
 
-            {/* Mobile Controls (always visible on mobile, hidden on desktop) */}
-            <div className="lg:hidden flex items-center space-x-2">
+            {/* Mobile Controls */}
+            <div className="lg:hidden flex items-center">
               {/* Mobile Search Button */}
               <button
                 onClick={toggleMobileSearch}
-                className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0"
                 aria-label="Search"
               >
                 <Search size={20} />
               </button>
 
-              {/* FIX: Add the mobile profile dropdown here so it's not hidden */}
+              {/* Mobile Profile Button (only if authenticated) */}
               {isAuthenticated ? (
-                <div className="relative" ref={profileDropdownRef}>
+                <div className="relative ml-2" ref={profileDropdownRef}>
                   <button
                     onClick={toggleProfileDropdown}
-                    className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 dark:bg-charcoal hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 transform active:scale-95"
+                    className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 dark:bg-charcoal hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 transform active:scale-95 flex-shrink-0"
                     aria-label="Profile menu"
                   >
                     <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
@@ -456,7 +452,7 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                     </div>
                   </button>
                   {isProfileDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                       {user && (
                         <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
                           <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -511,31 +507,34 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                         onClick={handleLogout}
                         className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
-                        <LogOut size={16} className="mr-3" /> Logout
+                        <LogOut size={16} />
+                        Logout
                       </button>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center space-x-3">
+                /* Mobile Auth Buttons (only if not authenticated) */
+                <div className="flex items-center flex-1 justify-end ml-2 mr-2 space-x-1">
                   <Link
                     to="/login"
-                    className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200"
+                    className="flex-1 text-center px-2 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
                   >
                     Log In
                   </Link>
                   <Link
                     to="/register"
-                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95"
+                    className="flex-1 text-center px-2 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
                   >
                     Sign Up
                   </Link>
                 </div>
               )}
+
               {/* Mobile Menu Button (Hamburger) */}
               <button
                 onClick={toggleMobileMenu}
-                className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
+                className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95 flex-shrink-0"
                 aria-label="Toggle mobile menu"
               >
                 {isMobileMenuOpen ? (
@@ -571,7 +570,7 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-charcoal bg-gray-50/80 dark:bg-onyx backdrop-blur-sm">
               <div className="flex items-center gap-2">
-                <img src={logo} alt="Scholara Collective Logo" className="h-8 w-auto" />
+                <img src={logo} alt="Scholara Collective Logo" className="h-8 w-auto flex-shrink-0" />
               </div>
               <button
                 onClick={toggleMobileMenu}
@@ -637,7 +636,7 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                 {isAuthenticated ? (
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 p-3 bg-white/90 dark:bg-onyx/80 backdrop-blur-sm rounded-lg shadow-sm">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold flex-shrink-0">
                         {user?.username?.charAt(0).toUpperCase() || "U"}
                       </div>
                       <div className="flex-1 min-w-0">
