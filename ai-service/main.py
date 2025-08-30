@@ -35,7 +35,9 @@ chat_model = ChatGroq(
 
 # Load embeddings
 try:
-    embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-large-en-v1.5")
+    # embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-large-en-v1.5")
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
     print("✅ Embeddings model loaded successfully.")
 except Exception as e:
     print(f"❌ Error loading embeddings model: {e}")
