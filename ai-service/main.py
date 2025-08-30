@@ -14,9 +14,7 @@ from create import process_document_and_add_to_db, get_chroma_db
 
 # LangChain imports
 from langchain_core.prompts import PromptTemplate
-# from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain_huggingface import HuggingFaceEmbeddings
-
 from langchain_community.vectorstores import Chroma
 
 # Load env vars
@@ -35,8 +33,8 @@ chat_model = ChatGroq(
 
 # Load embeddings
 try:
-    # embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-large-en-v1.5")
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    # embeddings = HuggingFaceBgeEmbeddings(model_name="BAAI/bge-large-en-v1.5")
+    embeddings = HuggingFaceEmbeddings(model_name="hf-internal-testing/tiny-random-bert")
 
     print("✅ Embeddings model loaded successfully.")
 except Exception as e:
