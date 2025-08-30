@@ -5,15 +5,24 @@ import { useAuth } from '../../context/AuthContext/AuthContext.jsx';
 import { useModal } from '../../context/ModalContext/ModalContext.jsx';
 import { LogIn } from 'lucide-react';
 import { Helmet } from 'react-helmet-async'; // Import Helmet
+import { useEffect } from 'react';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoggingIn, setIsLoggingIn] = useState(false);
+    const { isAuthenticated } = useAuth();
 
+    
     const navigate = useNavigate();
     const { login } = useAuth();
     const { showModal, hideModal } = useModal();
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/');
+        }
+    }, [isAuthenticated, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

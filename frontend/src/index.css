@@ -255,6 +255,8 @@ body.dark ::-webkit-scrollbar-track {
   }
 }
 
+
+
 .modal-backdrop {
   z-index: 9999 !important;
 }

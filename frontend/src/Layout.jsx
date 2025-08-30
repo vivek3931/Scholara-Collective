@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback , useMemo} from "react";
 import Navbar from './components/Navbar/Navbar';
 import Footer from './components/Footer/Footer';
 import { Outlet } from "react-router-dom";
@@ -21,6 +21,7 @@ const Layout = () => {
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { showModal } = useModal();
   const { user, isAuthenticated, isInitialized: isAuthInitialized } = useAuth();
+  const [isVisitedSearchResultPage, setIsVisitedSearchResultPage] = useState(false);
 
   // --- Data Fetching for Layout (Navbar, Footer, Global Theme) ---
 
@@ -97,6 +98,8 @@ const Layout = () => {
     });
   }, []);
 
+  
+
   // Use Route Cache hook for navigation data
   const {
     data: navigationData,
@@ -146,6 +149,8 @@ const Layout = () => {
     });
   }, [clearAppConfigCache, showModal]);
 
+   
+
   // Global loader for the entire layout if critical data is still loading
   const showLayoutLoader = isAppConfigLoading || isNavigationLoading || !isAuthInitialized;
   if (showLayoutLoader) {
@@ -170,12 +175,12 @@ const Layout = () => {
         isUserSessionLoading={!isAuthInitialized}
         onRefreshApp={refreshAppData}
         onClearCache={clearAppCache}
+        isVisitedSearchResultPage={isVisitedSearchResultPage} 
+        setIsVisitedSearchResultPage={setIsVisitedSearchResultPage}
       />
-      <main className="flex-grow pt-[72px] ">
-        {/* Outlet renders the currently matched nested route component (e.g., App.jsx, LoginPage, etc.) */}
+      <main className={`flex-grow ${isVisitedSearchResultPage ? 'pt-[10px]' : 'pt-[72px]' } transition-all duration-300`}>
         <Outlet />
       </main>
-      {/* Footer component, receiving appConfig from Layout's state */}
       <Footer appConfig={effectiveAppConfig} />
 
       {isAppConfigStale && (

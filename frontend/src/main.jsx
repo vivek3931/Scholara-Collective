@@ -22,7 +22,7 @@ import CustomWarningModal from "./components/CustomWarningModal/CustomWarningMod
 import ChatbotToggle from "./components/ChatbotToggle/ChatbotToggle.jsx";
 import Loader from "./components/Loader/Loader.jsx";
 import Contact from "./components/Contact/Contact.jsx";
-// import ChatBot from "./components/Chatbot/Chatbot.jsx";
+import ChatBot from "./components/Chatbot/Chatbot.jsx";
 import MobileFrame from "./components/ScholaraFeatures/IphonePreview.jsx";
 import SearchResults from "./components/SearchResult/SearchResult.jsx";
 import Layout from "./Layout"; // Correctly import your custom Layout component
@@ -160,7 +160,7 @@ const router = createBrowserRouter(
           </Suspense>
         }
       />
-      {/* <Route path="/chatbot" element={<ChatBot />} /> */}
+      <Route path="/chatbot" element={<ChatBot />} />
 
       <Route
         path="/resources/:resourceId"
