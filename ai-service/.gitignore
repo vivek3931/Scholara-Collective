@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Virtual Environment
+venv/
+
+# Local Databases & Cache
+chroma_db/
+pdf_cache/
+temp_pdfs/
+
+# Env files
+.env
+
+# Local test scripts (not needed on Railway)
+global_service.py
