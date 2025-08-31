@@ -3,14 +3,142 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Enhanced viewport meta tag to prevent address bar expansion -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" />
+    <!-- Prevent iOS from changing phone numbers to links -->
+    <meta name="format-detection" content="telephone=no" />
+    <!-- Prevent automatic zoom on form inputs -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Scholara Collective</title>
   </head>
   <body>
     <div id="root"></div>
+    
+    <!-- Enhanced JavaScript for viewport stability -->
+    <script>
+      // Enhanced viewport height fix that integrates with your Layout component
+      function setViewportHeight() {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', vh + 'px');
+        
+        // Update main element height if it exists (works with your Layout component)
+        const mainElement = document.querySelector('main');
+        if (mainElement) {
+          mainElement.style.minHeight = `${window.innerHeight}px`;
+        }
+        
+        // Update root element for consistency
+        const rootElement = document.getElementById('root');
+        if (rootElement) {
+          rootElement.style.height = `${window.innerHeight}px`;
+        }
+      }
+
+      // Initialize on DOM content loaded
+      document.addEventListener('DOMContentLoaded', setViewportHeight);
+      
+      // Initialize viewport height immediately
+      setViewportHeight();
+
+      // Enhanced event listeners for better mobile support
+      window.addEventListener('resize', () => {
+        setTimeout(setViewportHeight, 50);
+      });
+      
+      window.addEventListener('orientationchange', () => {
+        setTimeout(setViewportHeight, 150); // Longer delay for orientation
+      });
+      
+      // Visual viewport API support for modern browsers
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', setViewportHeight);
+      }
+
+      // Enhanced touch handling to prevent address bar expansion
+      let isScrolling = false;
+      let startY = 0;
+      let startX = 0;
+      let preventPullToRefresh = false;
+
+      document.addEventListener('touchstart', function(e) {
+        startY = e.touches[0].clientY;
+        startX = e.touches[0].clientX;
+        isScrolling = false;
+        
+        // Check if at top of page
+        const rootElement = document.getElementById('root');
+        const scrollTop = rootElement ? rootElement.scrollTop : 0;
+        preventPullToRefresh = scrollTop === 0;
+      }, { passive: true });
+
+      document.addEventListener('touchmove', function(e) {
+        if (isScrolling) return;
+        
+        const currentY = e.touches[0].clientY;
+        const currentX = e.touches[0].clientX;
+        const diffY = Math.abs(currentY - startY);
+        const diffX = Math.abs(currentX - startX);
+        
+        // Determine if this is a vertical scroll
+        if (diffY > diffX && diffY > 10) {
+          isScrolling = true;
+          
+          // Prevent pull-to-refresh at top of page
+          if (preventPullToRefresh && currentY > startY) {
+            e.preventDefault();
+            return false;
+          }
+        }
+      }, { passive: false });
+
+      document.addEventListener('touchend', function() {
+        isScrolling = false;
+        preventPullToRefresh = false;
+      }, { passive: true });
+      
+      // iOS Safari specific fixes
+      document.addEventListener('gesturestart', function(e) {
+        e.preventDefault();
+      }, { passive: false });
+      
+      // Prevent double-tap zoom
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function(e) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+          e.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, { passive: false });
+      
+      // Prevent context menu on long press
+      document.addEventListener('contextmenu', function(e) {
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+        }
+      }, { passive: false });
+      
+      // Additional fix for viewport changes
+      if (screen && screen.orientation) {
+        screen.orientation.addEventListener('change', () => {
+          setTimeout(setViewportHeight, 200);
+        });
+      }
+      
+      // Fix for when keyboard appears/disappears on mobile
+      window.addEventListener('focusin', () => {
+        setTimeout(setViewportHeight, 300);
+      });
+      
+      window.addEventListener('focusout', () => {
+        setTimeout(setViewportHeight, 300);
+      });
+    </script>
+    
     <script type="module" src="/src/main.jsx"></script>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9967784681788612"
-     crossorigin="anonymous"></script>
+         crossorigin="anonymous"></script>
   </body>
 </html>
-  
