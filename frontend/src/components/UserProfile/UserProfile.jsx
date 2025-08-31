@@ -12,13 +12,16 @@ import {
   faArrowLeft,
   faUpload,
   faBookmark,
-} from "@fortawesome/free-solid-svg-icons"; // Added faUpload, faBookmark
+} from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "../../context/AuthContext/AuthContext.jsx";
-import SavedResources from "../SavedResources/SavedResources.jsx"; // Import the SavedResources component
+import SavedResources from "../SavedResources/SavedResources.jsx";
 import UniversalResourceCard from "../UniversalResourceCard/UniversalResourceCard.jsx";
 import { useNavigate } from "react-router-dom";
+import { useModal } from "../../context/ModalContext/ModalContext.jsx";
 
-const Profile = ({ showModal }) => {
+// Option 1: Use the modal context instead of props
+const Profile = () => {
+  const { showModal } = useModal(); // Get showModal from context
   const {
     user,
     token,
@@ -27,12 +30,15 @@ const Profile = ({ showModal }) => {
     error: authError,
     clearError,
   } = useAuth();
+
+  // ... rest of your component code remains the same
+
   const [resources, setResources] = useState([]);
   const [loadingResources, setLoadingResources] = useState(true);
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ username: "", bio: "" });
-  const [activeTab, setActiveTab] = useState("uploads"); // State for active tab: 'uploads' or 'saved'
+  const [activeTab, setActiveTab] = useState("uploads");
   const navigate = useNavigate();
 
   console.log("User in Profile:", user);
@@ -69,12 +75,10 @@ const Profile = ({ showModal }) => {
     };
 
     if (user && activeTab === "uploads") {
-      // Fetch only if user exists and 'uploads' tab is active
       setFormData({ username: user.username || "", bio: user.bio || "" });
       fetchUploadedResources();
     }
-    // No explicit fetch for 'saved' here, as SavedResources component will handle its own fetching
-  }, [user, token, activeTab]); // Added activeTab to dependencies
+  }, [user, token, activeTab]);
 
   const handleEditToggle = () => {
     setIsEditing(!isEditing);
@@ -86,7 +90,6 @@ const Profile = ({ showModal }) => {
   };
 
   const handleResourceDeleted = async (resourceId) => {
-    // Remove from resources state
     setResources((prev) =>
       prev.filter((resource) => resource._id !== resourceId)
     );
@@ -120,7 +123,6 @@ const Profile = ({ showModal }) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const updatedData = await response.json();
-      // Update AuthContext user state to ensure consistency across the app
       setUser((prev) => ({ ...prev, ...formData }));
       clearError();
       setIsEditing(false);
@@ -307,7 +309,7 @@ const Profile = ({ showModal }) => {
                         </div>
                         <button
                           onClick={handleSave}
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                          className="w-full bg-gradient-to-r from-amber-600 to-amber-400 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                         >
                           <FontAwesomeIcon icon={faSave} />
                           Save Changes
@@ -450,7 +452,9 @@ const Profile = ({ showModal }) => {
                     </>
                   )}
 
-                  
+                  {activeTab === "saved" && (
+                    <SavedResources />
+                  )}
                 </div>
               </div>
             </div>
