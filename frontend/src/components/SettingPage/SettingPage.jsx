@@ -21,7 +21,7 @@ import axios from "axios";
 import { useModal } from "../../context/ModalContext/ModalContext.jsx";
 
 const Settings = () => {
-  const { user, setUser } = useAuth();
+  const { user, setUser, token } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const navigate = useNavigate();
 
@@ -48,9 +48,9 @@ const Settings = () => {
   useEffect(() => {
     if (user) {
       setFormData({
-        username: user.username,
-        email: user.email,
-        notifications: user.notifications,
+        username: user.username || "",
+        email: user.email || "",
+        notifications: user.notifications !== undefined ? user.notifications : true,
       });
     }
   }, [user]);
@@ -85,8 +85,10 @@ const Settings = () => {
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
     try {
+      console.log('Updating profile with data:', formData);
+      
       const response = await axios.patch(
-        "/api/auth/users/profile",
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/users/profile`, // Fixed endpoint
         {
           username: formData.username,
           email: formData.email,
@@ -94,23 +96,32 @@ const Settings = () => {
         },
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${token}`, // Use token from useAuth
           },
         }
       );
-      setUser(response.data.user);
-      // Use showModal from context
+      
+      console.log('Profile update response:', response.data);
+      
+      if (response.data.user) {
+        setUser(response.data.user); // Update user in context
+      }
+      
       showModal({
         type: "success",
         title: "Profile Updated",
         message: "Your profile information has been successfully updated.",
       });
     } catch (err) {
+      console.error('Profile update error:', err);
       const errorMessage =
         err.response?.data?.message ||
         "Failed to update profile. Please try again.";
-      // Use showModal from context
-      showModal({ type: "error", title: "Update Failed", message: errorMessage });
+      showModal({ 
+        type: "error", 
+        title: "Update Failed", 
+        message: errorMessage 
+      });
     }
   };
 
@@ -118,7 +129,6 @@ const Settings = () => {
     e.preventDefault();
 
     if (passwordData.newPassword !== passwordData.confirmNewPassword) {
-      // Use showModal from context
       showModal({
         type: "error",
         title: "Password Mismatch",
@@ -127,37 +137,57 @@ const Settings = () => {
       return;
     }
 
+    if (passwordData.newPassword.length < 6) {
+      showModal({
+        type: "error",
+        title: "Password Too Short",
+        message: "New password must be at least 6 characters long.",
+      });
+      return;
+    }
+
     try {
-      await axios.post(
-        "/api/auth/change-password",
+      console.log('Changing password...');
+      
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/users/me/password`, // Fixed endpoint
         {
           currentPassword: passwordData.currentPassword,
           newPassword: passwordData.newPassword,
         },
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${token}`, // Use token from useAuth
           },
         }
       );
-      // Use showModal from context
+      
+      console.log('Password change response:', response.data);
+      
       showModal({
         type: "success",
         title: "Password Changed",
         message: "Your password has been successfully updated.",
       });
+      
+      // Clear password form
       setPasswordData({
         currentPassword: "",
         newPassword: "",
         confirmNewPassword: "",
       });
       setShowPasswords({ current: false, new: false, confirm: false });
+      
     } catch (err) {
+      console.error('Password change error:', err);
       const errorMessage =
         err.response?.data?.message ||
         "Failed to change password. Please check your current password.";
-      // Use showModal from context
-      showModal({ type: "error", title: "Change Failed", message: errorMessage });
+      showModal({ 
+        type: "error", 
+        title: "Change Failed", 
+        message: errorMessage 
+      });
     }
   };
 
@@ -171,6 +201,13 @@ const Settings = () => {
         <div className="max-w-4xl mx-auto animate-fade-in">
           {/* Page Header */}
           <div className="mb-8">
+            <button
+              onClick={handleGoBack}
+              className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mb-4 transition-colors"
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Back
+            </button>
             <h1 className="text-4xl font-poppins font-bold text-gray-900 dark:text-white mb-2">
               Settings
             </h1>
@@ -245,7 +282,6 @@ const Settings = () => {
                     Account Information
                   </h2>
                 </div>
-                {/* Old error/success messages are removed */}
                 <form onSubmit={handleProfileSubmit} className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
@@ -306,7 +342,6 @@ const Settings = () => {
                     Security
                   </h2>
                 </div>
-                {/* Old password error/success messages are removed */}
                 <form onSubmit={handlePasswordSubmit} className="space-y-6">
                   <div>
                     <label
@@ -324,6 +359,7 @@ const Settings = () => {
                         onChange={handlePasswordChange}
                         className="block w-full px-4 py-3 pr-12 border border-gray-300 dark:border-charcoal rounded-xl bg-white/95 dark:bg-onyx/95 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 hover:shadow-glow-sm"
                         placeholder="Enter current password"
+                        required
                       />
 
                       <button
@@ -359,6 +395,8 @@ const Settings = () => {
                           onChange={handlePasswordChange}
                           className="block w-full px-4 py-3 pr-12 border border-gray-300 dark:border-charcoal rounded-xl bg-white/95 dark:bg-onyx/95 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 hover:shadow-glow-sm"
                           placeholder="Enter new password"
+                          minLength="6"
+                          required
                         />
                         <button
                           type="button"
@@ -391,6 +429,8 @@ const Settings = () => {
                           onChange={handlePasswordChange}
                           className="block w-full px-4 py-3 pr-12 border border-gray-300 dark:border-charcoal rounded-xl bg-white/95 dark:bg-onyx/95 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 hover:shadow-glow-sm"
                           placeholder="Confirm new password"
+                          minLength="6"
+                          required
                         />
                         <button
                           type="button"
@@ -421,8 +461,6 @@ const Settings = () => {
           </div>
         </div>
       </main>
-      {/* Footer */}
-      
     </div>
   );
 };
