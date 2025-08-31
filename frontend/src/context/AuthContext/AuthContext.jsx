@@ -1,12 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import * as api from "../../api.js"; // Assuming this handles your API calls
+import * as api from "../../api.js";
 
-// Create the context
 const AuthContext = createContext(null);
 
-// Create the provider component
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUserState] = useState(null);
   const [token, setToken] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,13 +12,37 @@ export const AuthProvider = ({ children }) => {
 
   const clearError = () => setError(null);
 
+  // Enhanced setUser function that also updates localStorage
+  const setUser = (userData) => {
+    console.log('Setting user in AuthContext:', userData);
+    
+    if (typeof userData === 'function') {
+      // Handle functional updates
+      setUserState(prevUser => {
+        const newUser = userData(prevUser);
+        console.log('Functional update - new user:', newUser);
+        if (newUser) {
+          localStorage.setItem("user", JSON.stringify(newUser));
+        }
+        return newUser;
+      });
+    } else {
+      // Handle direct updates
+      console.log('Direct update - new user:', userData);
+      setUserState(userData);
+      if (userData) {
+        localStorage.setItem("user", JSON.stringify(userData));
+      }
+    }
+  };
+
   // Centralized function to clear authentication state and local storage
   const clearAuthAndStorage = () => {
-    setUser(null);
+    setUserState(null);
     setToken(null);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    clearError(); // Clear any existing errors
+    clearError();
   };
 
   useEffect(() => {
@@ -32,7 +54,7 @@ export const AuthProvider = ({ children }) => {
         if (storedToken && storedUser) {
           try {
             const parsedUser = JSON.parse(storedUser);
-            setUser(parsedUser);
+            setUserState(parsedUser); // Use setUserState directly here to avoid localStorage write
             setToken(storedToken);
 
             const isValid = await verifyTokenInBackground(storedToken);
@@ -40,8 +62,8 @@ export const AuthProvider = ({ children }) => {
               console.warn('Stored token was invalid during initialization, logging out.');
               clearAuthAndStorage();
             } else {
-              // Fetch fresh coin data after successful token verification
-              await fetchUserCoinsInternal(storedToken);
+              // Fetch fresh data but preserve profile info
+              await fetchUserDataInternal(storedToken);
             }
           } catch (e) {
             console.error("Failed to parse auth data from storage, clearing corrupted data:", e);
@@ -62,7 +84,6 @@ export const AuthProvider = ({ children }) => {
 
   // Set up periodic coin updates (every 5 minutes)
   useEffect(() => {
-    // Check authentication inline instead of using isAuthenticated variable
     if (!user || !token) return;
 
     const interval = setInterval(() => {
@@ -102,6 +123,45 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Fetch complete user data (renamed from fetchUserCoinsInternal for clarity)
+  const fetchUserDataInternal = async (authToken = token) => {
+    if (!authToken) {
+      console.warn("Cannot fetch user data: No token available.");
+      return null;
+    }
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/me`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const freshUserData = await response.json();
+        console.log("Fresh user data from server:", freshUserData);
+        
+        // Update user state with fresh data from server
+        setUserState(prevUser => {
+          const updatedUser = { ...prevUser, ...freshUserData };
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+          return updatedUser;
+        });
+        
+        return freshUserData;
+      } else {
+        console.error("Failed to fetch user data:", response.status);
+        if (response.status === 401 || response.status === 403) {
+          clearAuthAndStorage();
+        }
+        return null;
+      }
+    } catch (error) {
+      console.error("Network error fetching user data:", error);
+      return null;
+    }
+  };
+
   // Internal function that accepts token parameter (for initial load)
   const fetchUserCoinsInternal = async (authToken = token) => {
     if (!authToken) {
@@ -118,23 +178,22 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         const data = await response.json();
-        // Update the user object with fresh data
-        setUser(prevUser => ({
-          ...prevUser,
-          scholaraCoins: data.scholaraCoins
-        }));
-        
-        // Also update local storage to keep it in sync
-        const updatedUser = JSON.parse(localStorage.getItem("user") || '{}');
-        const newUserData = { ...updatedUser, scholaraCoins: data.scholaraCoins };
-        localStorage.setItem("user", JSON.stringify(newUserData));
+        // Only update coins, preserve other user data
+        setUserState(prevUser => {
+          const updatedUser = {
+            ...prevUser,
+            scholaraCoins: data.scholaraCoins
+          };
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+          return updatedUser;
+        });
         
         console.log("User coins updated:", data.scholaraCoins);
         return data.scholaraCoins;
       } else {
         console.error("Failed to fetch user coins:", response.status);
         if (response.status === 401 || response.status === 403) {
-          clearAuthAndStorage(); // Token expired, log out
+          clearAuthAndStorage();
         }
         return null;
       }
@@ -191,7 +250,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem("token", newToken);
         localStorage.setItem("user", JSON.stringify(newUser));
         setToken(newToken);
-        setUser(newUser);
+        setUserState(newUser);
         setAuthLoading(false);
         return { success: true, message: message };
       } else {
@@ -244,7 +303,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("token", newToken);
       localStorage.setItem("user", JSON.stringify(loggedInUser));
       setToken(newToken);
-      setUser(loggedInUser);
+      setUserState(loggedInUser);
       setAuthLoading(false);
       
       // Fetch fresh coin data after login
@@ -279,35 +338,31 @@ export const AuthProvider = ({ children }) => {
 
   // Function to update coins locally (useful when you know coins changed)
   const updateUserCoins = (newCoins) => {
-    setUser(prevUser => ({
-      ...prevUser,
-      scholaraCoins: newCoins
-    }));
-    
-    const currentUser = JSON.parse(localStorage.getItem("user") || '{}');
-    const updatedUser = { ...currentUser, scholaraCoins: newCoins };
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+    setUserState(prevUser => {
+      const updatedUser = {
+        ...prevUser,
+        scholaraCoins: newCoins
+      };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      return updatedUser;
+    });
   };
 
   // Function to add/subtract coins locally and optionally sync with server
   const adjustUserCoins = async (coinChange, syncWithServer = true) => {
     // Update locally first for immediate UI feedback
-    setUser(prevUser => ({
-      ...prevUser,
-      scholaraCoins: (prevUser.scholaraCoins || 0) + coinChange
-    }));
-    
-    // Update localStorage
-    const currentUser = JSON.parse(localStorage.getItem("user") || '{}');
-    const updatedUser = { 
-      ...currentUser, 
-      scholaraCoins: (currentUser.scholaraCoins || 0) + coinChange 
-    };
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+    setUserState(prevUser => {
+      const updatedUser = {
+        ...prevUser,
+        scholaraCoins: (prevUser.scholaraCoins || 0) + coinChange
+      };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      return updatedUser;
+    });
     
     // Optionally sync with server to get the actual value
     if (syncWithServer) {
-      setTimeout(() => fetchUserCoins(), 1000); // Fetch fresh data after 1 second
+      setTimeout(() => fetchUserCoins(), 1000);
     }
   };
 
@@ -315,7 +370,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
-    setUser,
+    setUser, // This now properly updates both state and localStorage
     token,
     isAuthenticated,
     authLoading,
