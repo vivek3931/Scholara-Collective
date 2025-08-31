@@ -71,6 +71,10 @@ html, body { /* Apply min-height and background-color here */
   will-change: background-color; /* Optimize rendering for background changes */
 }
 
+main{
+  min-height: calc(var(--vh, 1vh) * 100);
+}
+
 /* Ensure the dark class applies solid onyx background after initial load */
 html.dark, body.dark {
   background-color: rgb(28, 37, 38); /* Solid onyx fallback for dark mode */
@@ -185,40 +189,7 @@ body.dark ::-webkit-scrollbar-track {
 /* Add these classes to your existing CSS to fix iPhone preview positioning */
 
 /* Prevent layout shift from scrollbar on mobile screens */
-.iphone-preview-container {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  /* Compensate for potential scrollbar space */
-  padding-right: calc(100vw - 100%);
-  box-sizing: border-box;
-}
 
-/* Mobile-specific adjustments */
-@media (max-width: 1023px) {
-  .iphone-preview-container {
-    padding-right: 0;
-    padding-left: calc(100vw - 100%);
-  }
-  
-  /* Ensure the iPhone preview is perfectly centered */
-  .iphone-preview-wrapper {
-    transform: translateX(calc((100vw - 100%) / -2));
-  }
-}
-
-/* For very small screens */
-@media (max-width: 640px) {
-  .iphone-preview-container {
-    padding-left: 0;
-    transform: none;
-  }
-  
-  .iphone-preview-wrapper {
-    transform: none;
-    scale: 0.8; /* Slightly smaller on mobile */
-  }
-}
 
 /* Alternative: Force consistent scrollbar space */
 .scrollbar-gutter {
