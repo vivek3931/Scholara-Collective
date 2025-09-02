@@ -69,7 +69,7 @@ app.use('/api/users' , userRoutes);
 app.use('/api' , subjectRoutes);
 app.use('/api', searchRoutes);
 app.use('/api' , geminiRoutes);
-app.use('/api' , chatbotRoutes);
+app.use('/api/chatbot' , chatbotRoutes);
 
 
 
