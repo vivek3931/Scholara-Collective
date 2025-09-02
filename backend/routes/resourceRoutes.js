@@ -10,7 +10,9 @@ const User = require('../models/User');
 const axios = require('axios');
 const mongoose = require('mongoose');
 const pdf = require('pdf-parse'); // For PDF text extraction
-const Subject = require('../models/Subject')
+const Subject = require('../models/Subject');
+const { extractTextFromBuffer } = require('../utils/extractTextFromBuffer');
+const stream = require('stream');
 
 require('dotenv').config();
 
@@ -19,6 +21,7 @@ cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true,
     timeout: 60000
 });
 
@@ -45,36 +48,38 @@ const upload = multer({
 });
 
 // --- Helper Functions ---
-const getCloudinaryResourceType = (mimetype) => {
-    if (mimetype.startsWith('image/')) {
+function getCloudinaryResourceType(fileType) {
+    if (fileType === 'pdf') {
+        return 'image'; // Changed from 'raw' to 'auto'
+    }
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileType)) {
         return 'image';
     }
-    // Cloudinary treats PDFs for thumbnail generation via "page" parameter
-    // effectively like a video resource for extraction purposes, or 'auto'
-    // when using its transformation syntax. However, the initial upload
-    // of a PDF should still be 'raw' for content storage.
-    if (mimetype === 'application/pdf') {
-        return 'raw'; // Store PDF as raw initially
-    }
-    return 'raw'; // Default for other documents
-};
+    return 'raw';
+}
 
-const getFileExtensionFromMime = (mimeType) => {
-    switch (mimeType) {
-        case 'application/pdf': return '.pdf';
-        case 'image/jpeg': return '.jpg';
-        case 'image/png': return '.png';
-        case 'image/gif': return '.gif';
-        case 'image/svg+xml': return '.svg';
-        case 'application/msword': return '.doc';
-        case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': return '.docx';
-        case 'application/vnd.ms-excel': return '.xls';
-        case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': return '.xlsx';
-        case 'application/vnd.ms-powerpoint': return '.ppt';
-        case 'application/vnd.openxmlformats-officedocument.presentationml.presentation': return '.pptx';
-        default: return '';
-    }
-};
+function getFileExtensionFromMime(mimeType) {
+    const mimeToExtension = {
+        'application/pdf': 'pdf',
+        'application/msword': 'doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+        'application/vnd.ms-powerpoint': 'ppt',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+        'application/vnd.ms-excel': 'xls',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+        'text/plain': 'txt',
+        'text/csv': 'csv',
+        'image/jpeg': 'jpg',
+        'image/jpg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'image/svg+xml': 'svg'
+    };
+    
+    return mimeToExtension[mimeType] || 'unknown';
+}
+
 
 const getFileExtensionFromUrl = (url) => {
     if (!url) return '';
@@ -85,6 +90,8 @@ const getFileExtensionFromUrl = (url) => {
     }
     return '';
 };
+
+
 
 const uploadWithRetry = async (fileBuffer, options, retries = 3) => {
     for (let i = 0; i < retries; i++) {
@@ -128,9 +135,9 @@ router.get('/suggestions', async (req, res) => {
                 title: { $regex: search, $options: 'i' },
                 visibility: 'public'
             })
-            .select('_id title')
-            .limit(5 - textResults.length)
-            .lean();
+                .select('_id title')
+                .limit(5 - textResults.length)
+                .lean();
             const combined = [...textResults, ...regexResults]
                 .filter((v, i, a) => a.findIndex(t => t._id.toString() === v._id.toString()) === i)
                 .slice(0, 5);
@@ -139,7 +146,7 @@ router.get('/suggestions', async (req, res) => {
         res.json(textResults);
     } catch (err) {
         console.error('Suggestions route error:', err.message);
-        res.status(500).json({ 
+        res.status(500).json({
             msg: 'Failed to fetch suggestions',
             error: process.env.NODE_ENV === 'development' ? err.message : undefined
         });
@@ -161,12 +168,12 @@ router.get('/analytics/stats', async (req, res) => {
 });
 
 // GET /api/resources/trending (Specific)
-router.get('/trending', async (req, res) => { 
+router.get('/trending', async (req, res) => {
     try {
         const trendingResources = await Resource.find({ visibility: 'public' })
-            .sort({ averageRating: -1, downloads: -1, createdAt: -1 }) 
-            .limit(9) 
-            .populate('uploadedBy', 'username'); 
+            .sort({ averageRating: -1, downloads: -1, createdAt: -1 })
+            .limit(9)
+            .populate('uploadedBy', 'username');
 
         res.json(trendingResources);
     } catch (err) {
@@ -177,43 +184,63 @@ router.get('/trending', async (req, res) => {
 
 // GET thumbnail route (for existing resources)
 router.get('/:id/thumbnail', async (req, res) => {
-    console.log("hit thumbnail route ")
+    console.log("Hit thumbnail route for resource:", req.params.id);
+    
     try {
         const resource = await Resource.findById(req.params.id);
         if (!resource) {
             return res.status(404).json({ msg: 'Resource not found' });
         }
 
+        console.log("Resource found:", {
+            id: resource._id,
+            fileType: resource.fileType,
+            mimeType: resource.mimeType,
+            publicId: resource.cloudinaryPublicId,
+            thumbnailUrl: resource.thumbnailUrl
+        });
+
         let thumbnailUrl = null;
 
-        if (resource.fileType === 'pdf') {
-             // For PDFs, use Cloudinary's URL generation with resource_type: 'image' to get a thumbnail of the first page
+        // First try to use stored thumbnail URL
+        if (resource.thumbnailUrl) {
+            console.log("Using stored thumbnail URL:", resource.thumbnailUrl);
+            return res.redirect(resource.thumbnailUrl);
+        }
+
+        // Generate thumbnail URL based on file type
+        if (resource.mimeType && resource.mimeType.startsWith('application/pdf')) {
             thumbnailUrl = cloudinary.url(resource.cloudinaryPublicId, {
-                resource_type: 'image', // Treat the PDF public_id as an image source for transformation
+                resource_type: 'image',
                 format: 'jpg',
-                page: 1, // Get the first page
+                page: 1,
                 width: 300,
-                crop: "fit",
-                quality: 'auto',
-                fetch_format: 'auto'
+                height: 400,
+                crop: "fill",
+                quality: 'auto:good',
+                secure: true
             });
-        } else if (resource.fileType === 'image') {
-            // For images, generate a transformed URL
+        } else if (resource.mimeType && resource.mimeType.startsWith("image/")) {
             thumbnailUrl = cloudinary.url(resource.cloudinaryPublicId, {
                 resource_type: 'image',
                 width: 300,
-                crop: "fit",
-                quality: 'auto',
-                fetch_format: 'auto'
+                height: 400,
+                crop: "fill",
+                quality: 'auto:good',
+                fetch_format: 'auto',
+                secure: true
             });
         } else {
-            // For other document types, return a generic placeholder or null
-            return res.status(400).json({ msg: 'Thumbnail generation is not supported for this file type via this route.' });
+            return res.status(400).json({ msg: 'Thumbnail generation is not supported for this file type.' });
         }
-       
-        console.log("Generated thumbnail URL: ", thumbnailUrl);
+
+        console.log("Generated thumbnail URL:", thumbnailUrl);
 
         if (thumbnailUrl) {
+            // Optionally update the resource with the generated thumbnail URL for future use
+            resource.thumbnailUrl = thumbnailUrl;
+            await resource.save();
+            
             res.redirect(thumbnailUrl);
         } else {
             res.status(404).json({ msg: 'Thumbnail not available for this resource type.' });
@@ -228,7 +255,7 @@ router.get('/:id/thumbnail', async (req, res) => {
 });
 
 // GET /api/resources/community/feed (Specific, and protected)
-router.get('/community/feed', protect, async (req, res) => { 
+router.get('/community/feed', protect, async (req, res) => {
     try {
         const recentComments = await Resource.aggregate([
             { $unwind: '$comments' },
@@ -254,7 +281,7 @@ router.get('/community/feed', protect, async (req, res) => {
                     },
                     resource: {
                         _id: '$_id',
-                        title: '$title'
+                        title: '$_id'
                     },
                     createdAt: '$comments.createdAt'
                 }
@@ -264,7 +291,7 @@ router.get('/community/feed', protect, async (req, res) => {
         const recentRatings = await Resource.aggregate([
             { $unwind: '$ratings' },
             { $sort: { 'ratings.createdAt': -1 } },
-            { $limit: 10 }, 
+            { $limit: 10 },
             {
                 $lookup: {
                     from: 'users',
@@ -293,7 +320,7 @@ router.get('/community/feed', protect, async (req, res) => {
             }
         ]);
 
-        const allActivity = [...recentComments, ...recentRatings].sort((a, b) => 
+        const allActivity = [...recentComments, ...recentRatings].sort((a, b) =>
             new Date(b.createdAt) - new Date(a.createdAt)
         ).slice(0, 15);
 
@@ -355,7 +382,7 @@ router.get('/', async (req, res) => {
             .limit(parseInt(limit))
             .skip((page - 1) * parseInt(limit))
             .populate('uploadedBy', 'username')
-            .populate('comments.postedBy', 'username'); 
+            .populate('comments.postedBy', 'username');
 
         const total = await Resource.countDocuments(query);
 
@@ -395,13 +422,13 @@ router.get('/:id', async (req, res) => {
     try {
         const resource = await Resource.findById(req.params.id)
             .populate('uploadedBy', 'username')
-            .populate('comments.postedBy', 'username'); 
+            .populate('comments.postedBy', 'username');
 
         if (!resource) {
             return res.status(404).json({ msg: 'Resource not found' });
         }
-        
-        res.json({ resource, comments: resource.comments }); 
+
+        res.json({ resource, comments: resource.comments });
     } catch (err) {
         console.error('Get resource by ID route error:', err.message);
         if (err.kind === 'ObjectId') {
@@ -447,13 +474,13 @@ router.get('/:id/download', protect, async (req, res) => {
         const headResponse = await axios.head(fileUrl);
         const contentType = headResponse.headers['content-type'];
         const contentDisposition = `attachment; filename="${encodeURIComponent(resource.title)}${fileExtension}"`;
-        
+
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', contentDisposition);
-        
+
         const response = await axios.get(fileUrl, { responseType: 'stream' });
         response.data.pipe(res);
-        
+
         response.data.on('error', (err) => {
             console.error('Download stream error:', err);
             if (!res.headersSent) {
@@ -501,11 +528,11 @@ router.post('/:id/purchase', protect, async (req, res) => {
         user.purchasedResources.push(resource._id);
 
         await user.save();
-        
+
         // IMPORTANT: Return the updated user data including purchasedResources
-        res.json({ 
-            success: true, 
-            message: 'Purchase successful', 
+        res.json({
+            success: true,
+            message: 'Purchase successful',
             scholaraCoins: user.scholaraCoins,
             purchasedResources: user.purchasedResources, // Add this line
             user: {
@@ -565,6 +592,8 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
             return res.status(400).json({ msg: 'No file uploaded.' });
         }
 
+        console.log(`Processing file: ${req.file.originalname}, Size: ${req.file.size} bytes, Type: ${req.file.mimetype}`);
+
         // === File Hashing for duplicate detection ===
         const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
         const existingFileHashResource = await Resource.findOne({ fileHash });
@@ -574,23 +603,12 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
                 existingResourceId: existingFileHashResource._id
             });
         }
-
-        let textContent = '';
-        const isPdf = req.file.mimetype === 'application/pdf';
-
-        if (isPdf) {
-            try {
-                const data = await pdf(req.file.buffer);
-                textContent = data.text;
-            } catch (err) {
-                console.error("Error extracting text from PDF:", err);
-                return res.status(400).json({ msg: "Failed to process PDF content." });
-            }
-        }
-
+        
+        // === Extract Text and Hash ===
+        const textContent = await extractTextFromBuffer(req.file.buffer, req.file.mimetype);
         const textHash = crypto.createHash('sha256').update(textContent).digest('hex');
 
-        if (isPdf) {
+        if (textContent.length > 0) {
             const existingTextHashResource = await Resource.findOne({ textHash });
             if (existingTextHashResource) {
                 return res.status(409).json({
@@ -599,20 +617,20 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
                 });
             }
         }
-
-        const { title, subject, year, description, tags, institution, course } = req.body;
+        
+        const { title, description, tags, subject, year, type, source, institution, course } = req.body;
 
         // === Handle subject field (string/object) ===
         let subjectValue;
         if (typeof subject === 'string') {
             try {
                 const parsedSubject = JSON.parse(subject);
-                subjectValue = parsedSubject.label || parsedSubject.value;
+                subjectValue = parsedSubject.value || parsedSubject.label;
             } catch (e) {
                 subjectValue = subject;
             }
         } else if (typeof subject === 'object' && subject !== null) {
-            subjectValue = subject.label || subject.value;
+            subjectValue = subject.value || subject.label;
         } else {
             subjectValue = subject;
         }
@@ -636,6 +654,7 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
         const parsedYear = parseInt(year);
         const currentYear = new Date().getFullYear();
 
+        // === Validation ===
         if (!title || !finalSubjectName || !parsedYear || !institution || !course) {
             return res.status(400).json({ msg: 'Please enter all required fields (Title, Subject, Year, Institution, Course).' });
         }
@@ -649,62 +668,118 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
             return res.status(400).json({ msg: `Invalid year. Must be between 1900 and ${currentYear + 5}.` });
         }
 
-        // === Upload to Cloudinary ===
-        const resourceType = getCloudinaryResourceType(req.file.mimetype);
-        // Using 'fileType' to determine if it's an image or document for Cloudinary's initial upload
-        const cloudinaryUploadResourceType = req.file.mimetype.startsWith('image/') ? 'image' : 'raw';
+        // === Upload to Cloudinary - CRITICAL FIX ===
+        // For PDFs, we need to upload as 'auto' or 'image' to enable thumbnail generation
+        let cloudinaryUploadResourceType;
+        let uploadOptions;
+        
+        const cleanFileName = req.file.originalname
+            .replace(/\s+/g, '_')
+            .replace(/[^a-zA-Z0-9_.-]/g, '')
+            .substring(0, 100);
 
-        const fileExtension = getFileExtensionFromMime(req.file.mimetype) || getFileExtensionFromUrl(req.file.originalname);
-        const originalName = req.file.originalname.replace(/\s/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
+        if (req.file.mimetype === 'application/pdf') {
+            // CRITICAL: Upload PDF as 'auto' resource type to enable thumbnail generation
+            uploadOptions = {
+                folder: 'paperpal_resources',
+                resource_type: 'auto', // Changed from 'raw' to 'auto'
+                public_id: `${Date.now()}_${cleanFileName}`,
+                overwrite: false,
+                use_filename: false,
+                unique_filename: true,
+                format: 'pdf' // Explicitly set format for PDFs
+            };
+        } else if (req.file.mimetype.startsWith('image/')) {
+            uploadOptions = {
+                folder: 'paperpal_resources',
+                resource_type: 'image',
+                public_id: `${Date.now()}_${cleanFileName}`,
+                overwrite: false,
+                use_filename: false,
+                unique_filename: true
+            };
+        } else {
+            // Other document types
+            uploadOptions = {
+                folder: 'paperpal_resources',
+                resource_type: 'raw',
+                public_id: `${Date.now()}_${cleanFileName}`,
+                overwrite: false,
+                use_filename: false,
+                unique_filename: true
+            };
+        }
 
-        const uploadOptions = {
-            folder: 'paperpal_resources',
-            resource_type: cloudinaryUploadResourceType, // Use 'image' for images, 'raw' for documents
-            public_id: `paperpal_resources/${Date.now()}_${originalName}`,
-            overwrite: false,
-        };
-
+        console.log("Uploading to Cloudinary with options:", uploadOptions);
         const result = await uploadWithRetry(req.file.buffer, uploadOptions);
+        
         if (!result || !result.secure_url) {
             throw new Error('Cloudinary upload failed to return a URL.');
         }
 
-        // === Generate Thumbnail ===
-        let thumbnailUrl = null;
+        console.log("Cloudinary upload successful. Public ID:", result.public_id);
 
-        if (isPdf) {
+        // === Generate Thumbnail - FIXED APPROACH ===
+        let thumbnailUrl = null;
+        
+        if (req.file.mimetype === 'application/pdf') {
             try {
-                // For PDFs, generate a thumbnail using Cloudinary's URL transformation.
-                // We reference the uploaded 'raw' public_id but transform it as an 'image'.
+                // For PDFs uploaded with resource_type: 'auto', we can generate thumbnails
                 thumbnailUrl = cloudinary.url(result.public_id, {
-                    resource_type: 'image', // Treat the PDF public_id as an image source for transformation
+                    resource_type: 'image', // Use 'image' for transformations
                     format: 'jpg',
-                    page: 1, // Get the first page
+                    page: 1,
                     width: 300,
+                    height: 400,
                     crop: "fit",
                     quality: 'auto',
+                    secure: true,
                     fetch_format: 'auto'
                 });
+                
+                console.log("Generated PDF thumbnail URL:", thumbnailUrl);
+                
+                // Test if thumbnail generation works
+                try {
+                    const testResponse = await axios.head(thumbnailUrl, { timeout: 5000 });
+                    if (testResponse.status !== 200) {
+                        console.log("Thumbnail test failed, setting to null");
+                        thumbnailUrl = null;
+                    } else {
+                        console.log("PDF thumbnail verified successfully");
+                    }
+                } catch (testError) {
+                    console.log("PDF thumbnail verification failed:", testError.message);
+                    thumbnailUrl = null;
+                }
+                
             } catch (e) {
-                console.error("Cloudinary PDF thumbnail generation failed:", e);
-                // Optionally set a default thumbnail here if generation fails
+                console.error("PDF thumbnail generation failed:", e);
+                thumbnailUrl = null;
             }
         } else if (req.file.mimetype.startsWith("image/")) {
-            // For images, generate a thumbnail by transforming the uploaded image
-            thumbnailUrl = cloudinary.url(result.public_id, {
-                resource_type: 'image', // Already an image
-                width: 300,
-                crop: "fit",
-                quality: 'auto',
-                fetch_format: 'auto'
-            });
-        } else {
-            // For other document types (e.g., Word, Excel), you might have a generic placeholder
-            // For now, it remains null as there's no automatic thumbnail generation for them
-            thumbnailUrl = null; 
+            try {
+                thumbnailUrl = cloudinary.url(result.public_id, {
+                    resource_type: 'image',
+                    width: 300,
+                    height: 400,
+                    crop: "fit",
+                    quality: 'auto',
+                    fetch_format: 'auto',
+                    secure: true
+                });
+                console.log("Generated image thumbnail URL:", thumbnailUrl);
+            } catch (e) {
+                console.error("Image thumbnail generation failed:", e);
+                thumbnailUrl = null;
+            }
         }
 
-        // === Save Resource ===
+        // === Get proper file extension ===
+        const fileExtension = getFileExtensionFromMime(req.file.mimetype);
+        console.log("File extension determined:", fileExtension);
+
+        // === Save Resource to Database ===
         const newResource = new Resource({
             title,
             subject: finalSubjectName,
@@ -716,46 +791,148 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
             uploadedBy: req.user.id,
             cloudinaryUrl: result.secure_url,
             cloudinaryPublicId: result.public_id,
-            fileType: req.file.mimetype.split('/')[0] === 'image'
-                ? 'image'
-                : (fileExtension.substring(1) || 'document'),
+            fileType: fileExtension,
             visibility: 'public',
             fileHash,
-            textHash: isPdf ? textHash : undefined,
-            thumbnailUrl // Save the generated thumbnail URL
+            textHash,
+            thumbnailUrl,
+            originalFileName: req.file.originalname,
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype
         });
 
         const resource = await newResource.save();
+        console.log("Resource saved to database with ID:", resource._id);
 
-        // === Coin System ===
-        const user = await User.findById(req.user.id);
-        if (user) {
-            user.scholaraCoins += 80;
-            await user.save();
+        // === Trigger AI Processing Service (NON-BLOCKING) ===
+        console.log("Document uploaded to DB. Submitting job to AI service...");
+        axios.post('http://localhost:8000/process-document', {
+            title: resource.title,
+            text: textContent,
+            text_hash: resource.textHash
+        })
+        .then(() => {
+            console.log("AI processing request sent successfully.");
+        })
+        .catch(aiError => {
+            console.error('Failed to trigger AI processing service:', aiError.message);
+        });
+
+        // Return success response immediately
+        res.status(201).json({
+            ...resource.toObject(),
+            message: 'File uploaded successfully!'
+        });
+
+        // === Coin System & WebSocket Emitter ===
+        try {
+            const user = await User.findById(req.user.id);
+            if (user) {
+                user.scholaraCoins += 80;
+                await user.save();
+                console.log(`Added 80 coins to user ${user._id}`);
+            }
+
+            if (req.io) {
+                const stats = {
+                    resources: await Resource.countDocuments({ visibility: 'public' }),
+                    students: await User.countDocuments(),
+                    courses: (await Resource.distinct('course')).length,
+                    universities: (await Resource.distinct('institution')).length
+                };
+                req.io.emit('statsUpdated', stats);
+                console.log("Stats updated via WebSocket");
+            }
+        } catch (postProcessError) {
+            console.error('Post-process error (non-critical):', postProcessError);
         }
-
-        // === Emit updated stats ===
-        if (req.io) {
-            const stats = {
-                resources: await Resource.countDocuments({ visibility: 'public' }),
-                students: await User.countDocuments(),
-                courses: (await Resource.distinct('course')).length,
-                universities: (await Resource.distinct('institution')).length
-            };
-            req.io.emit('statsUpdated', stats);
-        }
-
-        res.status(201).json(resource);
 
     } catch (err) {
-        console.error('Upload route error:', err.message);
+        console.error('Upload route error:', err);
+        
+        // Specific error handling
         if (err.message === 'Invalid file type.') {
-            return res.status(400).json({ msg: 'Invalid file type.' });
+            return res.status(400).json({ msg: 'Invalid file type. Please upload a supported file format.' });
+        }
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ msg: 'File too large. Maximum size allowed is 10MB.' });
         }
         if (err instanceof mongoose.Error.ValidationError) {
-            return res.status(400).json({ msg: err.message });
+            return res.status(400).json({ msg: `Validation error: ${err.message}` });
         }
-        res.status(500).json({ msg: 'Server error during upload. ' + err.message });
+        if (err.message.includes('Cloudinary')) {
+            return res.status(500).json({ msg: 'File upload service error. Please try again.' });
+        }
+        
+        res.status(500).json({ 
+            msg: 'Server error during upload. Please try again.', 
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined 
+        });
+    }
+});
+
+// ALSO UPDATE THE THUMBNAIL ROUTE
+router.get('/:id/thumbnail', async (req, res) => {
+    console.log("Hit thumbnail route for resource:", req.params.id);
+    
+    try {
+        const resource = await Resource.findById(req.params.id);
+        if (!resource) {
+            return res.status(404).json({ msg: 'Resource not found' });
+        }
+
+        console.log("Resource found:", {
+            id: resource._id,
+            fileType: resource.fileType,
+            mimeType: resource.mimeType,
+            publicId: resource.cloudinaryPublicId,
+            storedThumbnailUrl: resource.thumbnailUrl
+        });
+
+        // For PDFs, generate thumbnail URL dynamically
+        if (resource.mimeType && resource.mimeType === 'application/pdf') {
+            try {
+                const thumbnailUrl = cloudinary.url(resource.cloudinaryPublicId, {
+                    resource_type: 'image',
+                    format: 'jpg',
+                    page: 1,
+                    width: 300,
+                    height: 400,
+                    crop: "fit",
+                    quality: 'auto',
+                    secure: true
+                });
+                
+                console.log("Generated PDF thumbnail URL:", thumbnailUrl);
+                return res.redirect(thumbnailUrl);
+                
+            } catch (error) {
+                console.error("Error generating PDF thumbnail:", error);
+                return res.status(404).json({ msg: 'Unable to generate PDF thumbnail' });
+            }
+        } else if (resource.mimeType && resource.mimeType.startsWith("image/")) {
+            const thumbnailUrl = cloudinary.url(resource.cloudinaryPublicId, {
+                resource_type: 'image',
+                width: 300,
+                height: 400,
+                crop: "fit",
+                quality: 'auto',
+                fetch_format: 'auto',
+                secure: true
+            });
+            
+            console.log("Generated image thumbnail URL:", thumbnailUrl);
+            return res.redirect(thumbnailUrl);
+        } else {
+            return res.status(400).json({ msg: 'Thumbnail generation is not supported for this file type.' });
+        }
+
+    } catch (err) {
+        console.error('Thumbnail route error:', err.message);
+        if (err.kind === 'ObjectId') {
+            return res.status(404).json({ msg: 'Resource not found' });
+        }
+        res.status(500).json({ msg: 'Server error fetching thumbnail.' });
     }
 });
 
@@ -775,132 +952,132 @@ router.get('/:id/comments', async (req, res) => {
 });
 // Get ratings for a resource
 router.get('/:id/ratings', async (req, res) => {
-  try {
-    const resourceId = req.params.id;
-    const userId = req.query.userId;
+    try {
+        const resourceId = req.params.id;
+        const userId = req.query.userId;
 
-    const resource = await Resource.findById(resourceId)
-      .select('ratings averageRating')
-      .populate('ratings.postedBy', 'username');
+        const resource = await Resource.findById(resourceId)
+            .select('ratings averageRating')
+            .populate('ratings.postedBy', 'username');
 
-    if (!resource) {
-      return res.status(404).json({
-        success: false,
-        message: 'Resource not found'
-      });
+        if (!resource) {
+            return res.status(404).json({
+                success: false,
+                message: 'Resource not found'
+            });
+        }
+
+        // Calculate average rating
+        const totalRatings = resource.ratings.length;
+        const sumRatings = resource.ratings.reduce((sum, rating) => sum + rating.value, 0);
+        const averageRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
+
+        // Find user's rating if userId provided
+        let userRating = 0;
+        if (userId) {
+            const userRatingObj = resource.ratings.find(
+                r => r.postedBy._id.toString() === userId.toString()
+            );
+            userRating = userRatingObj ? userRatingObj.value : 0;
+        }
+
+        const response = {
+            success: true,
+            userRating,
+            overallRating: parseFloat(averageRating.toFixed(1)),
+            ratingsCount: totalRatings,
+            ratings: resource.ratings.map(r => ({
+                value: r.value,
+                postedBy: {
+                    _id: r.postedBy._id,
+                    username: r.postedBy.username
+                },
+                createdAt: r.createdAt
+            }))
+        };
+
+        res.status(200).json(response);
+
+    } catch (err) {
+        console.error('Error getting ratings:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: err.message
+        });
     }
-
-    // Calculate average rating
-    const totalRatings = resource.ratings.length;
-    const sumRatings = resource.ratings.reduce((sum, rating) => sum + rating.value, 0);
-    const averageRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
-
-    // Find user's rating if userId provided
-    let userRating = 0;
-    if (userId) {
-      const userRatingObj = resource.ratings.find(
-        r => r.postedBy._id.toString() === userId.toString()
-      );
-      userRating = userRatingObj ? userRatingObj.value : 0;
-    }
-
-    const response = {
-      success: true,
-      userRating,
-      overallRating: parseFloat(averageRating.toFixed(1)),
-      ratingsCount: totalRatings,
-      ratings: resource.ratings.map(r => ({
-        value: r.value,
-        postedBy: {
-          _id: r.postedBy._id,
-          username: r.postedBy.username
-        },
-        createdAt: r.createdAt
-      }))
-    };
-
-    res.status(200).json(response);
-
-  } catch (err) {
-    console.error('Error getting ratings:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: err.message
-    });
-  }
 });
 router.post('/:id/rate', protect, async (req, res) => {
-  try {
-    const resourceId = req.params.id;
-    const { value } = req.body;
-    const userId = req.user._id;
+    try {
+        const resourceId = req.params.id;
+        const { value } = req.body;
+        const userId = req.user._id;
 
-    // Validation
-    if (!value || !Number.isInteger(value) || value < 1 || value > 5) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Rating must be an integer between 1 and 5'
-      });
+        // Validation
+        if (!value || !Number.isInteger(value) || value < 1 || value > 5) {
+            return res.status(400).json({
+                success: false,
+                message: 'Rating must be an integer between 1 and 5'
+            });
+        }
+
+        // Find the resource
+        let resource = await Resource.findById(resourceId);
+        if (!resource) {
+            return res.status(404).json({
+                success: false,
+                message: 'Resource not found'
+            });
+        }
+
+        // Check for existing rating by this user
+        const existingRatingIndex = resource.ratings.findIndex(
+            r => r.postedBy.toString() === userId.toString()
+        );
+
+        // Update or add rating
+        if (existingRatingIndex !== -1) {
+            resource.ratings[existingRatingIndex].value = value;
+        } else {
+            resource.ratings.push({
+                postedBy: userId,
+                value
+            });
+        }
+
+        // Calculate new average rating
+        const totalRatings = resource.ratings.length;
+        const sumRatings = resource.ratings.reduce((sum, rating) => sum + rating.value, 0);
+        const averageRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
+
+        // Save the resource
+        await resource.save();
+
+        // Prepare response
+        const response = {
+            success: true,
+            message: 'Rating saved successfully',
+            userRating: value,
+            overallRating: parseFloat(averageRating.toFixed(1)),
+            ratingsCount: totalRatings,
+            resource: {
+                _id: resource._id,
+                title: resource.title,
+                averageRating: parseFloat(averageRating.toFixed(1)),
+                ratingsCount: totalRatings
+            }
+        };
+
+        res.status(200).json(response);
+
+    } catch (err) {
+        console.error('Error rating resource:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: err.message
+        });
     }
-
-    // Find the resource
-    let resource = await Resource.findById(resourceId);
-    if (!resource) {
-      return res.status(404).json({
-        success: false,
-        message: 'Resource not found'
-      });
-    }
-
-    // Check for existing rating by this user
-    const existingRatingIndex = resource.ratings.findIndex(
-      r => r.postedBy.toString() === userId.toString()
-    );
-
-    // Update or add rating
-    if (existingRatingIndex !== -1) {
-      resource.ratings[existingRatingIndex].value = value;
-    } else {
-      resource.ratings.push({ 
-        postedBy: userId, 
-        value 
-      });
-    }
-
-    // Calculate new average rating
-    const totalRatings = resource.ratings.length;
-    const sumRatings = resource.ratings.reduce((sum, rating) => sum + rating.value, 0);
-    const averageRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
-
-    // Save the resource
-    await resource.save();
-
-    // Prepare response
-    const response = {
-      success: true,
-      message: 'Rating saved successfully',
-      userRating: value,
-      overallRating: parseFloat(averageRating.toFixed(1)),
-      ratingsCount: totalRatings,
-      resource: {
-        _id: resource._id,
-        title: resource.title,
-        averageRating: parseFloat(averageRating.toFixed(1)),
-        ratingsCount: totalRatings
-      }
-    };
-
-    res.status(200).json(response);
-
-  } catch (err) {
-    console.error('Error rating resource:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: err.message
-    });
-  }
 });
 
 router.post('/:id/comment', protect, async (req, res) => {
@@ -909,12 +1086,12 @@ router.post('/:id/comment', protect, async (req, res) => {
         if (!text) {
             return res.status(400).json({ msg: 'Comment text is required' });
         }
-        
+
         let resource = await Resource.findById(req.params.id);
         if (!resource) {
             return res.status(404).json({ msg: 'Resource not found' });
         }
-        
+
         // ** FIX: Filter out any invalid rating objects before saving **
         resource.ratings = resource.ratings.filter(rating => rating.value !== undefined && rating.value !== null);
 
@@ -922,10 +1099,10 @@ router.post('/:id/comment', protect, async (req, res) => {
             text,
             postedBy: req.user.id,
         };
-        
+
         resource.comments.unshift(newComment);
         await resource.save();
-        
+
         // After saving, find the resource again and populate the comments
         const updatedResource = await Resource.findById(req.params.id).populate({
             path: 'comments.postedBy',
@@ -934,7 +1111,7 @@ router.post('/:id/comment', protect, async (req, res) => {
 
         const populatedComment = updatedResource.comments[0];
 
-        res.json(populatedComment); 
+        res.json(populatedComment);
     } catch (err) {
         console.error('Comment route error:', err.message);
         res.status(500).json({ msg: 'Server error' });
@@ -1150,7 +1327,6 @@ router.put('/:id', protect, authorize('admin', 'superadmin'), async (req, res) =
         res.status(500).json({ msg: 'Server error during resource deletion.' });
     }
 });
-
 router.delete('/:id/delete-my-resource', protect, async (req, res) => {
     try {
         const resource = await Resource.findById(req.params.id);
@@ -1164,7 +1340,7 @@ router.delete('/:id/delete-my-resource', protect, async (req, res) => {
 
         console.log("Attempting to delete Cloudinary file:", {
             publicId: resource.cloudinaryPublicId,
-            resourceType: getCloudinaryResourceType(resource.fileType)
+            resourceType: getCloudinaryResourceType(resource.fileType) // Now correctly returns 'image' for PDFs
         });
 
         try {
