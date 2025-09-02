@@ -1,7 +1,7 @@
 import React, { StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import App from "./App.jsx"; // App is now your Home Page component
+import App from "./App.jsx";
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -9,12 +9,11 @@ import {
   RouterProvider,
 } from "react-router-dom";
 
-import { AnimatePresence, motion } from "framer-motion";
-
 // Context Providers
 import { AuthProvider } from "./context/AuthContext/AuthContext.jsx";
 import { ThemeProvider } from "./context/ThemeProvider/ThemeProvider.jsx";
 import { ModalProvider } from "./context/ModalContext/ModalContext.jsx";
+import { ResourceProvider } from "./context/ResourceContext/ResourceContext.jsx";
 import { HelmetProvider } from "react-helmet-async";
 
 // Component Imports
@@ -25,7 +24,8 @@ import Contact from "./components/Contact/Contact.jsx";
 import ChatBot from "./components/Chatbot/Chatbot.jsx";
 import MobileFrame from "./components/ScholaraFeatures/IphonePreview.jsx";
 import SearchResults from "./components/SearchResult/SearchResult.jsx";
-import Layout from "./Layout"; // Correctly import your custom Layout component
+import Layout from "./Layout/Layout.jsx";
+import AdminLayout from "./Layout/AdminLayout.jsx";
 
 // Use React.lazy() for all page components to enable code splitting
 const LoginPage = React.lazy(() => import("./pages/Login/LoginPage.jsx"));
@@ -53,7 +53,6 @@ const AdminResources = React.lazy(() =>
 const AdminSetup = React.lazy(() =>
   import("./components/AdminSetup/AdminSetup.jsx")
 );
-const AdminLayout = React.lazy(() => import("./AdminLayout.jsx"));
 const Profile = React.lazy(() =>
   import("./components/UserProfile/UserProfile.jsx")
 );
@@ -77,165 +76,151 @@ const ReferralPage = React.lazy(() =>
   import("./components/ReferralPage/ReferralPage.jsx")
 );
 
-// The main router with Suspense wrappers
 const router = createBrowserRouter(
   createRoutesFromElements(
-    // The Layout component now wraps all routes that need the consistent Navbar and Footer.
-    // It is rendered as the element for the root path.
-    // All other routes are nested inside it.
-    <Route path="/" element={<Layout />}>
-      {/* App.jsx is now the index route, meaning it's the component rendered at "/" */}
-      <Route
-        index
-        element={
-          <Suspense fallback={<Loader message="Loading Home Page..." />}>
-            <App /> {/* App.jsx component renders as the Home Page */}
-          </Suspense>
-        }
-      />
-
-      {/* Public routes wrapped in Suspense */}
-      <Route
-        path="/login"
-        element={
-          <Suspense fallback={<Loader message="Loading Login..." />}>
-            <LoginPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/register"
-        element={
-          <Suspense fallback={<Loader message="Loading Register..." />}>
-            <RegisterPage />
-          </Suspense>
-        }
-      />
-
-      <Route
-        path="/contributors"
-        element={
-          <Suspense fallback={<Loader message="Loading Contributors..." />}>
-            <ContributorsPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/about"
-        element={
-          <Suspense fallback={<Loader message="Loading About..." />}>
-            <AboutPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/contact"
-        element={
-          <Suspense fallback={<Loader message="Loading Contact..." />}>
-            <Contact />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/referral"
-        element={
-          <Suspense fallback={<Loader message="Loading Referral..." />}>
-            <ReferralPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <Suspense fallback={<Loader message="Loading Settings..." />}>
-            <Settings />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/mobile"
-        element={
-          <Suspense fallback={<Loader message="Loading Mobile Frame..." />}>
-            <MobileFrame />
-          </Suspense>
-        }
-      />
-      <Route path="/chatbot" element={<ChatBot />} />
-
-      <Route
-        path="/resources/:resourceId"
-        element={
-          <Suspense fallback={<Loader message="Loading Resource Details..." />}>
-            <ResourceDetailPage />
-          </Suspense>
-        }
-      />
-
-      <Route
-        path="/setup/admin"
-        element={
-          <Suspense fallback={<Loader message="Loading Admin Setup..." />}>
-            <AdminSetup />
-          </Suspense>
-        }
-      />
-
-      {/* Protected routes wrapped in ProtectedRoute */}
-      <Route element={<ProtectedRoute />}>
+    <>
+      
+      <Route path="/" element={<Layout />}>
         <Route
-          path="/resources"
+          index
           element={
-            <Suspense fallback={<Loader message="Loading Resources..." />}>
-              <FullPageResources isFullPage={true} showSearchControls={true} />
+            <Suspense fallback={<Loader message="Loading Home Page..." />}>
+              <App />
             </Suspense>
           }
         />
         <Route
-          path="/upload"
+          path="/login"
           element={
-            <Suspense fallback={<Loader message="Loading Upload..." />}>
-              <UploadPage />
+            <Suspense fallback={<Loader message="Loading Login..." />}>
+              <LoginPage />
             </Suspense>
           }
         />
         <Route
-          path="/profile"
+          path="/register"
           element={
-            <Suspense fallback={<Loader message="Loading Profile..." />}>
-              <Profile />
+            <Suspense fallback={<Loader message="Loading Register..." />}>
+              <RegisterPage />
             </Suspense>
           }
         />
         <Route
-          path="/search"
+          path="/contributors"
           element={
-            <Suspense fallback={<Loader message="Loading Search Results..." />}>
-              <SearchResults />
+            <Suspense fallback={<Loader message="Loading Contributors..." />}>
+              <ContributorsPage />
             </Suspense>
           }
         />
         <Route
-          path="/saved"
+          path="/about"
           element={
-            <Suspense
-              fallback={<Loader message="Loading Saved Resources..." />}
-            >
-              <SavedResourcesPage />
+            <Suspense fallback={<Loader message="Loading About..." />}>
+              <AboutPage />
             </Suspense>
           }
         />
+        <Route
+          path="/contact"
+          element={
+            <Suspense fallback={<Loader message="Loading Contact..." />}>
+              <Contact />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/referral"
+          element={
+            <Suspense fallback={<Loader message="Loading Referral..." />}>
+              <ReferralPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <Suspense fallback={<Loader message="Loading Settings..." />}>
+              <Settings />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/mobile"
+          element={
+            <Suspense fallback={<Loader message="Loading Mobile Frame..." />}>
+              <MobileFrame />
+            </Suspense>
+          }
+        />
+        <Route path="/chatbot" element={<ChatBot />} />
+        <Route
+          path="/resources/:resourceId"
+          element={
+            <Suspense fallback={<Loader message="Loading Resource Details..." />}>
+              <ResourceDetailPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/setup/admin"
+          element={
+            <Suspense fallback={<Loader message="Loading Admin Setup..." />}>
+              <AdminSetup />
+            </Suspense>
+          }
+        />
+
+        {/* Protected user routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route
+            path="/resources"
+            element={
+              <Suspense fallback={<Loader message="Loading Resources..." />}>
+                <FullPageResources isFullPage={true} showSearchControls={true} />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/upload"
+            element={
+              <Suspense fallback={<Loader message="Loading Upload..." />}>
+                <UploadPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <Suspense fallback={<Loader message="Loading Profile..." />}>
+                <Profile />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <Suspense fallback={<Loader message="Loading Search Results..." />}>
+                <SearchResults />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/saved"
+            element={
+              <Suspense fallback={<Loader message="Loading Saved Resources..." />}>
+                <SavedResourcesPage />
+              </Suspense>
+            }
+          />
+        </Route>
       </Route>
 
-      {/* Admin protected routes wrapped in ProtectedRoute */}
+      {/* This is a separate, top-level route tree for the admin section.
+        It is not nested within the main `Layout` route.
+      */}
       <Route element={<ProtectedRoute requiredRole="admin" />}>
-        <Route
-          path="/admin"
-          element={
-            <Suspense fallback={<Loader message="Loading Admin Panel..." />}>
-              <AdminLayout />
-            </Suspense>
-          }
-        >
+        <Route path="/admin" element={<AdminLayout />}>
           <Route
             index
             element={
@@ -255,8 +240,7 @@ const router = createBrowserRouter(
           <Route
             path="resources"
             element={
-              <Suspense
-                fallback={<Loader message="Loading Admin Resources..." />}
+              <Suspense fallback={<Loader message="Loading Admin Resources..." />}
               >
                 <AdminResources />
               </Suspense>
@@ -265,8 +249,7 @@ const router = createBrowserRouter(
           <Route
             path="settings"
             element={
-              <Suspense
-                fallback={<Loader message="Loading Admin Settings..." />}
+              <Suspense fallback={<Loader message="Loading Admin Settings..." />}
               >
                 <AdminSettings />
               </Suspense>
@@ -275,7 +258,7 @@ const router = createBrowserRouter(
         </Route>
       </Route>
 
-      {/* 404 route */}
+      {/* 404 route - placed outside the Layout to give a full-page error */}
       <Route
         path="*"
         element={
@@ -300,7 +283,7 @@ const router = createBrowserRouter(
           </div>
         }
       />
-    </Route> // Closing tag for the main Layout route
+    </>
   )
 );
 
@@ -308,11 +291,13 @@ const router = createBrowserRouter(
 const AppWithProviders = () => (
   <StrictMode>
     <AuthProvider>
-      <ThemeProvider>
-        <ModalProvider>
-          <RouterProvider router={router} />
-          <CustomWarningModal />
-          <ChatbotToggle />
+        <ThemeProvider>
+          <ModalProvider>
+      <ResourceProvider>
+            <RouterProvider router={router} />
+            <CustomWarningModal />
+            <ChatbotToggle />
+      </ResourceProvider>
         </ModalProvider>
       </ThemeProvider>
     </AuthProvider>
