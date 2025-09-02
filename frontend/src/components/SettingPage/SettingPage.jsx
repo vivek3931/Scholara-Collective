@@ -201,13 +201,7 @@ const Settings = () => {
         <div className="max-w-4xl mx-auto animate-fade-in">
           {/* Page Header */}
           <div className="mb-8">
-            <button
-              onClick={handleGoBack}
-              className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mb-4 transition-colors"
-            >
-              <FontAwesomeIcon icon={faArrowLeft} />
-              Back
-            </button>
+            
             <h1 className="text-4xl font-poppins font-bold text-gray-900 dark:text-white mb-2">
               Settings
             </h1>
