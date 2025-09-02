@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Menu,
   X,
@@ -18,11 +18,10 @@ import {
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserFriends } from "@fortawesome/free-solid-svg-icons";
-// Restored original imports from your project structure
 import { useAuth } from "../../context/AuthContext/AuthContext";
-import { useNavigate } from "react-router-dom";
-import logo from '../../assets/logo.svg'
-import coin from '../../assets/coin.svg'
+import { useResource } from "../../context/ResourceContext/ResourceContext";
+import logo from '../../assets/logo.svg';
+import coin from '../../assets/coin.svg';
 
 // Desktop NavLink component
 const DesktopNavLink = ({ to, text }) => (
@@ -47,15 +46,16 @@ const MobileNavLink = ({ to, icon, text, onClick }) => (
   </Link>
 );
 
-const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
+const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
-
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1); // Track selected suggestion
   const { isAuthenticated, user, logout } = useAuth();
+  const { performSearch, fetchSuggestions, suggestions, clearSearchResults } = useResource();
   const navigate = useNavigate();
   const location = useLocation();
   const profileDropdownRef = useRef(null);
@@ -63,7 +63,6 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
   const searchInputRef = useRef(null);
   const mobileSearchInputRef = useRef(null);
 
-  // Check if the user is an admin or superadmin
   const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
 
   // Body Scroll Lock Logic
@@ -89,6 +88,35 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
     }
   }, [isSearchActive, isMobileSearchActive]);
 
+  // Fetch suggestions when search query changes
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      fetchSuggestions(searchQuery);
+      setSelectedSuggestionIndex(-1); // Reset selection when query changes
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery, fetchSuggestions]);
+
+  // Handle keyboard navigation for suggestions
+  const handleKeyDown = (e, isMobile = false) => {
+    if (suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedSuggestionIndex((prev) =>
+        prev < suggestions.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedSuggestionIndex((prev) => (prev > -1 ? prev - 1 : -1));
+    } else if (e.key === "Enter" && selectedSuggestionIndex >= 0) {
+      e.preventDefault();
+      const suggestion = suggestions[selectedSuggestionIndex];
+      handleSuggestionClick(suggestion);
+    }
+  };
+
   // Mobile Menu Toggle with Animation Control
   const toggleMobileMenu = () => {
     if (isMobileMenuOpen) {
@@ -98,7 +126,6 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
       }, 300);
     } else {
       setIsMobileMenuOpen(true);
-      // Ensure profile dropdown is closed when opening mobile menu
       setIsProfileDropdownOpen(false);
       setTimeout(() => {
         setIsAnimating(true);
@@ -109,31 +136,32 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
   // Search Toggle Functions
   const toggleSearch = () => {
     setIsSearchActive(!isSearchActive);
-    // Ensure the profile dropdown is closed when desktop search is activated
     if (!isSearchActive) {
       setIsProfileDropdownOpen(false);
     }
     if (isSearchActive) {
       setSearchQuery("");
+      setSelectedSuggestionIndex(-1);
+      clearSearchResults();
     }
   };
 
   const toggleMobileSearch = () => {
     setIsMobileSearchActive(!isMobileSearchActive);
-    // Ensure the mobile menu and dropdown are closed
     if (!isMobileSearchActive) {
       setIsMobileMenuOpen(false);
       setIsProfileDropdownOpen(false);
     }
     if (isMobileSearchActive) {
       setSearchQuery("");
+      setSelectedSuggestionIndex(-1);
+      clearSearchResults();
     }
   };
 
   // Profile Dropdown Toggle
   const toggleProfileDropdown = () => {
     setIsProfileDropdownOpen((prev) => !prev);
-    // Ensure desktop search is not active if profile dropdown is toggled
     setIsSearchActive(false);
   };
 
@@ -145,37 +173,50 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
     if (isMobileMenuOpen) toggleMobileMenu();
   };
 
-  // Handle NavLink click (closes mobile menu and dropdown)
+  // Handle NavLink click (closes mobile menu only)
   const handleNavLinkClick = () => {
     if (isMobileMenuOpen) {
       toggleMobileMenu();
     }
-    setIsProfileDropdownOpen(false);
   };
 
   // Handle Search Submit
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      // Navigate to search results page
+      const filters = {
+        subject: "",
+        year: "",
+        tags: "",
+        sort: "newest",
+      };
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      performSearch(searchQuery.trim(), filters, 1);
       setIsSearchActive(false);
       setIsMobileSearchActive(false);
       setSearchQuery("");
+      setSelectedSuggestionIndex(-1);
     }
+  };
+
+  // Handle Suggestion Click
+  const handleSuggestionClick = (suggestion) => {
+    setSearchQuery(suggestion.title);
+    setIsSearchActive(false);
+    setIsMobileSearchActive(false);
+    setSelectedSuggestionIndex(-1);
+    navigate(`/resources/${suggestion._id}`);
   };
 
   // Close handlers for clicking outside dropdowns/menus
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Close profile dropdown if clicked outside
       if (
         profileDropdownRef.current &&
         !profileDropdownRef.current.contains(event.target)
       ) {
         setIsProfileDropdownOpen(false);
       }
-      // Close mobile menu if clicked outside
       if (
         isMobileMenuOpen &&
         mobileMenuRef.current &&
@@ -200,38 +241,31 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
         if (isSearchActive) {
           setIsSearchActive(false);
           setSearchQuery("");
+          setSelectedSuggestionIndex(-1);
+          clearSearchResults();
         }
         if (isMobileSearchActive) {
           setIsMobileSearchActive(false);
           setSearchQuery("");
+          setSelectedSuggestionIndex(-1);
+          clearSearchResults();
         }
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isMobileMenuOpen, isProfileDropdownOpen, isSearchActive, isMobileSearchActive]);
-
-  useEffect(() => {
-    if (location.pathname.startsWith("/search")) {
-      setIsVisitedSearchResultPage(true);
-    } else {
-      setIsVisitedSearchResultPage(false);
-    }
-  }, [location.pathname, setIsVisitedSearchResultPage]);
+  }, [isMobileMenuOpen, isProfileDropdownOpen, isSearchActive, isMobileSearchActive, clearSearchResults]);
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg transition-colors duration-300 ${isVisitedSearchResultPage ? 'hidden' : 'block'}`}>
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg transition-colors duration-300">
       <div className="container mx-auto px-2 sm:px-4 lg:px-8 h-18 flex items-center justify-between min-w-0">
         {/* Left Section - Logo */}
         <div className="flex items-center flex-shrink-0 min-w-0">
-          {/* Logo is always visible unless a search bar is active */}
           {!isSearchActive && !isMobileSearchActive && (
             <Link to="/" className="flex items-center space-x-2 group flex-shrink-0">
               <img src={logo} alt="Scholara Collective Logo" className="h-10 w-auto flex-shrink-0 max-w-[120px] sm:max-w-[200px]" />
             </Link>
           )}
-
-          {/* Back Arrow for Search Mode (Desktop and Mobile) */}
           {(isSearchActive || isMobileSearchActive) && (
             <button
               onClick={isMobileSearchActive ? toggleMobileSearch : toggleSearch}
@@ -242,10 +276,8 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
             </button>
           )}
         </div>
-
         {/* Center Section - Navigation Links or Search Bar */}
         <div className="flex-1 max-w-2xl mx-4">
-          {/* Desktop Search Bar or Navigation Links */}
           <div className="hidden lg:block">
             {isSearchActive ? (
               <form onSubmit={handleSearchSubmit} className="w-full">
@@ -255,6 +287,7 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e)}
                     placeholder="Search resources..."
                     className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out"
                   />
@@ -268,6 +301,27 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                   >
                     <Search size={14} />
                   </button>
+                  {/* Suggestions Dropdown */}
+                  {suggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-charcoal rounded-xl shadow-xl border border-gray-200 dark:border-charcoal z-50 max-h-60 overflow-y-auto">
+                      {suggestions.map((suggestion, index) => (
+                        <button
+                          key={suggestion._id || index}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className={`w-full px-4 py-3 text-left transition-colors duration-200 flex items-center gap-3 border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${
+                            index === selectedSuggestionIndex
+                              ? "bg-gray-50 dark:bg-gray-700"
+                              : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                          }`}
+                        >
+                          <Search className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {suggestion.title}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </form>
             ) : (
@@ -285,8 +339,6 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
               </div>
             )}
           </div>
-
-          {/* Mobile Search Bar (only visible on mobile when active) */}
           <div className="lg:hidden">
             {isMobileSearchActive && (
               <form onSubmit={handleSearchSubmit} className="w-full">
@@ -296,6 +348,7 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, true)}
                     placeholder="Search resources..."
                     className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out"
                   />
@@ -309,16 +362,34 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                   >
                     <Search size={14} />
                   </button>
+                  {/* Suggestions Dropdown */}
+                  {suggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-charcoal rounded-xl shadow-xl border border-gray-200 dark:border-charcoal z-50 max-h-60 overflow-y-auto">
+                      {suggestions.map((suggestion, index) => (
+                        <button
+                          key={suggestion._id || index}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className={`w-full px-4 py-3 text-left transition-colors duration-200 flex items-center gap-3 border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${
+                            index === selectedSuggestionIndex
+                              ? "bg-gray-50 dark:bg-gray-700"
+                              : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                          }`}
+                        >
+                          <Search className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {suggestion.title}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </form>
             )}
           </div>
         </div>
-
-        {/* Right Section - Search Icon, Auth/Profile, Mobile Menu Button */}
         {(!isSearchActive && !isMobileSearchActive) && (
           <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0 min-w-0">
-            {/* Desktop Search Icon */}
             <button
               onClick={toggleSearch}
               className="hidden lg:block p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
@@ -326,8 +397,6 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
             >
               <Search size={20} />
             </button>
-
-            {/* User Profile / Auth Buttons (Desktop) */}
             <div className="hidden lg:flex items-center space-x-3">
               {isAuthenticated ? (
                 <div className="relative" ref={profileDropdownRef}>
@@ -367,7 +436,6 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                       </div>
                       <Link
                         to="/referral"
-                        onClick={handleNavLinkClick}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
                         <FontAwesomeIcon
@@ -380,7 +448,6 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                       {isAdmin && (
                         <Link
                           to="/admin"
-                          onClick={handleNavLinkClick}
                           className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                         >
                           <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
@@ -388,14 +455,12 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                       )}
                       <Link
                         to="/profile"
-                        onClick={handleNavLinkClick}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
                         <User size={16} className="mr-3" /> Profile
                       </Link>
                       <Link
                         to="/settings"
-                        onClick={handleNavLinkClick}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
                         <Settings size={16} className="mr-3" /> Settings
@@ -427,10 +492,7 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                 </div>
               )}
             </div>
-
-            {/* Mobile Controls */}
             <div className="lg:hidden flex items-center">
-              {/* Mobile Search Button */}
               <button
                 onClick={toggleMobileSearch}
                 className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0"
@@ -438,8 +500,6 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
               >
                 <Search size={20} />
               </button>
-
-              {/* Mobile Profile Button (only if authenticated) */}
               {isAuthenticated ? (
                 <div className="relative ml-2" ref={profileDropdownRef}>
                   <button
@@ -514,24 +574,23 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                   )}
                 </div>
               ) : (
-                /* Mobile Auth Buttons (only if not authenticated) */
                 <div className="flex items-center flex-1 justify-end ml-2 mr-2 space-x-1">
                   <Link
                     to="/login"
                     className="flex-1 text-center px-2 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
+                    onClick={handleNavLinkClick}
                   >
                     Log In
                   </Link>
                   <Link
                     to="/register"
                     className="flex-1 text-center px-2 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
+                    onClick={handleNavLinkClick}
                   >
                     Sign Up
                   </Link>
                 </div>
               )}
-
-              {/* Mobile Menu Button (Hamburger) */}
               <button
                 onClick={toggleMobileMenu}
                 className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95 flex-shrink-0"
@@ -547,11 +606,8 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
           </div>
         )}
       </div>
-
-      {/* Mobile Side Navigation - Backdrop & Menu Container */}
       {isMobileMenuOpen && (
         <>
-          {/* Backdrop - Fixed positioning to cover entire viewport */}
           <div
             className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-md transition-opacity duration-300 ${
               isAnimating ? "opacity-100" : "opacity-0"
@@ -559,16 +615,13 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
             style={{ minHeight: "100vh", width: "100vw" }}
             onClick={toggleMobileMenu}
           />
-
-          {/* Mobile Menu - Fixed positioning with transform */}
           <div
             ref={mobileMenuRef}
-            className={`fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] bg-white/95 dark:bg-onyx/95 backdrop-blur-lg shadow-2xl transition-transform duration-300 ease-in-out ${
+            className={`fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] bg-white/95 dark:bg-onyx/95 shadow-2xl transition-transform duration-300 ease-in-out ${
               isAnimating ? "translate-x-0" : "translate-x-full"
             }`}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-charcoal bg-gray-50/80 dark:bg-onyx backdrop-blur-sm">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-charcoal bg-gray-50/80 dark:bg-onyx">
               <div className="flex items-center gap-2">
                 <img src={logo} alt="Scholara Collective Logo" className="h-8 w-auto flex-shrink-0" />
               </div>
@@ -580,10 +633,7 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                 <X size={20} className="text-gray-700 dark:text-gray-200" />
               </button>
             </div>
-
-            {/* Navigation Content */}
             <div className="flex flex-col h-[calc(100dvh-64px)]">
-              {/* Navigation Links */}
               <div className="flex-1 p-4 space-y-1 overflow-y-auto bg-white/90 dark:bg-onyx backdrop-blur-sm">
                 <nav className="space-y-1">
                   <MobileNavLink
@@ -630,8 +680,6 @@ const Navbar = ({isVisitedSearchResultPage , setIsVisitedSearchResultPage}) => {
                   />
                 </nav>
               </div>
-
-              {/* Fixed Auth Section at Bottom (Mobile) */}
               <div className="p-4 border-t border-gray-200 dark:border-charcoal bg-gray-50/80 dark:bg-onyx backdrop-blur-sm">
                 {isAuthenticated ? (
                   <div className="space-y-3">

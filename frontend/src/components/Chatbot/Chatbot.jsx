@@ -16,9 +16,9 @@ import {
 } from "lucide-react";
 import { debounce } from "lodash"; // Ensure lodash is installed: npm install lodash
 import { useAuth } from "../../context/AuthContext/AuthContext";
-import logo from '../../assets/logo.svg'
+import logo from "../../assets/logo.svg";
 
-const ChatBot = ({isDragging}) => {
+const ChatBot = ({ isDragging }) => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +33,7 @@ const ChatBot = ({isDragging}) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
-  const [textareaHeight, setTextareaHeight] = useState(56);
+  const [textareaHeight, setTextareaHeight] = useState(32);
   const typingTimeoutRef = useRef(null);
   const { user } = useAuth();
 
@@ -46,18 +46,14 @@ const ChatBot = ({isDragging}) => {
   };
 
   // Auto-resize textarea
-  const adjustTextareaHeight = () => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = 'auto';
-      const newHeight = Math.min(Math.max(textarea.scrollHeight, 56), 120);
-      textarea.style.height = `${newHeight}px`;
-      setTextareaHeight(newHeight);
-    }
-  };
-
   useEffect(() => {
-    adjustTextareaHeight();
+    if (textareaRef.current) {
+      const ta = textareaRef.current;
+      ta.style.height = "auto"; // Reset height
+      const newHeight = ta.scrollHeight;
+      setTextareaHeight(newHeight);
+      ta.style.height = `${newHeight}px`; // Set height directly
+    }
   }, [inputMessage]);
 
   const handleScroll = debounce(() => {
@@ -108,14 +104,14 @@ const ChatBot = ({isDragging}) => {
       setCopiedMessageId(messageId);
       setTimeout(() => setCopiedMessageId(null), 2000);
     } catch (err) {
-      console.error('Failed to copy text: ', err);
+      console.error("Failed to copy text: ", err);
     }
   };
 
   // Delete chat function
   const deleteChat = (chatId, e) => {
     e.stopPropagation();
-    setChatHistory(prev => prev.filter(chat => chat.id !== chatId));
+    setChatHistory((prev) => prev.filter((chat) => chat.id !== chatId));
     if (currentChatId === chatId) {
       createNewChat();
     }
@@ -409,10 +405,22 @@ const ChatBot = ({isDragging}) => {
     if (!text) return text;
 
     return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate dark:text-pearl font-semibold">$1</strong>')
-      .replace(/__(.*?)__/g, '<strong class="text-slate dark:text-pearl font-semibold">$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em class="text-steel dark:text-ash italic">$1</em>')
-      .replace(/_(.*?)_/g, '<em class="text-steel dark:text-ash italic">$1</em>')
+      .replace(
+        /\*\*(.*?)\*\*/g,
+        '<strong class="text-slate dark:text-pearl font-semibold">$1</strong>'
+      )
+      .replace(
+        /__(.*?)__/g,
+        '<strong class="text-slate dark:text-pearl font-semibold">$1</strong>'
+      )
+      .replace(
+        /\*(.*?)\*/g,
+        '<em class="text-steel dark:text-ash italic">$1</em>'
+      )
+      .replace(
+        /_(.*?)_/g,
+        '<em class="text-steel dark:text-ash italic">$1</em>'
+      )
       .replace(
         /`([^`]+)`/g,
         '<code class="bg-gradient-to-r from-slate-100 to-gray-100 dark:from-slate-800 dark:to-gray-800 px-2 py-1 rounded-md text-sm font-mono text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-700 shadow-sm">$1</code>'
@@ -428,108 +436,108 @@ const ChatBot = ({isDragging}) => {
     const elements = formatBotMessage(displayText);
 
     const getLanguageColor = (lang) => {
-      const language = (lang || '').toLowerCase();
+      const language = (lang || "").toLowerCase();
       const colorMap = {
-        javascript: 'text-yellow-400',
-        js: 'text-yellow-400',
-        typescript: 'text-blue-400',
-        ts: 'text-blue-400',
-        python: 'text-green-400',
-        py: 'text-green-400',
-        java: 'text-orange-400',
-        cpp: 'text-purple-400',
-        'c++': 'text-purple-400',
-        c: 'text-purple-400',
-        html: 'text-orange-300',
-        css: 'text-blue-300',
-        scss: 'text-pink-400',
-        sass: 'text-pink-400',
-        sql: 'text-cyan-400',
-        bash: 'text-gray-300',
-        shell: 'text-gray-300',
-        json: 'text-yellow-300',
-        xml: 'text-red-300',
-        php: 'text-indigo-400',
-        ruby: 'text-red-400',
-        go: 'text-cyan-300',
-        rust: 'text-orange-500',
-        swift: 'text-orange-300',
-        kotlin: 'text-purple-300',
-        dart: 'text-blue-300',
-        react: 'text-cyan-400',
-        vue: 'text-green-300',
-        angular: 'text-red-400',
-        markdown: 'text-slate-300',
-        md: 'text-slate-300',
-        yaml: 'text-purple-300',
-        yml: 'text-purple-300',
-        dockerfile: 'text-blue-400',
-        default: 'text-gray-300'
+        javascript: "text-yellow-400",
+        js: "text-yellow-400",
+        typescript: "text-blue-400",
+        ts: "text-blue-400",
+        python: "text-green-400",
+        py: "text-green-400",
+        java: "text-orange-400",
+        cpp: "text-purple-400",
+        "c++": "text-purple-400",
+        c: "text-purple-400",
+        html: "text-orange-300",
+        css: "text-blue-300",
+        scss: "text-pink-400",
+        sass: "text-pink-400",
+        sql: "text-cyan-400",
+        bash: "text-gray-300",
+        shell: "text-gray-300",
+        json: "text-yellow-300",
+        xml: "text-red-300",
+        php: "text-indigo-400",
+        ruby: "text-red-400",
+        go: "text-cyan-300",
+        rust: "text-orange-500",
+        swift: "text-orange-300",
+        kotlin: "text-purple-300",
+        dart: "text-blue-300",
+        react: "text-cyan-400",
+        vue: "text-green-300",
+        angular: "text-red-400",
+        markdown: "text-slate-300",
+        md: "text-slate-300",
+        yaml: "text-purple-300",
+        yml: "text-purple-300",
+        dockerfile: "text-blue-400",
+        default: "text-gray-300",
       };
       return colorMap[language] || colorMap.default;
     };
 
     const getLanguageIcon = (lang) => {
-      const language = (lang || '').toLowerCase();
+      const language = (lang || "").toLowerCase();
       const iconMap = {
-        javascript: '🟨',
-        js: '🟨',
-        typescript: '🔷',
-        ts: '🔷',
-        python: '🐍',
-        py: '🐍',
-        java: '☕',
-        cpp: '⚙️',
-        'c++': '⚙️',
-        c: '⚙️',
-        html: '🌐',
-        css: '🎨',
-        scss: '💅',
-        sass: '💅',
-        sql: '🗃️',
-        bash: '💻',
-        shell: '💻',
-        json: '📄',
-        xml: '📋',
-        php: '🐘',
-        ruby: '💎',
-        go: '🔷',
-        rust: '🦀',
-        swift: '🍎',
-        kotlin: '🎯',
-        dart: '🎯',
-        react: '⚛️',
-        vue: '💚',
-        angular: '🅰️',
-        markdown: '📝',
-        md: '📝',
-        yaml: '📋',
-        yml: '📋',
-        dockerfile: '🐳',
-        default: '📝'
+        javascript: "🟨",
+        js: "🟨",
+        typescript: "🔷",
+        ts: "🔷",
+        python: "🐍",
+        py: "🐍",
+        java: "☕",
+        cpp: "⚙️",
+        "c++": "⚙️",
+        c: "⚙️",
+        html: "🌐",
+        css: "🎨",
+        scss: "💅",
+        sass: "💅",
+        sql: "🗃️",
+        bash: "💻",
+        shell: "💻",
+        json: "📄",
+        xml: "📋",
+        php: "🐘",
+        ruby: "💎",
+        go: "🔷",
+        rust: "🦀",
+        swift: "🍎",
+        kotlin: "🎯",
+        dart: "🎯",
+        react: "⚛️",
+        vue: "💚",
+        angular: "🅰️",
+        markdown: "📝",
+        md: "📝",
+        yaml: "📋",
+        yml: "📋",
+        dockerfile: "🐳",
+        default: "📝",
       };
       return iconMap[language] || iconMap.default;
     };
 
     const getLanguageGradient = (lang) => {
-      const language = (lang || '').toLowerCase();
+      const language = (lang || "").toLowerCase();
       const gradientMap = {
-        javascript: 'from-yellow-900 via-yellow-800 to-amber-800',
-        js: 'from-yellow-900 via-yellow-800 to-amber-800',
-        typescript: 'from-blue-900 via-blue-800 to-indigo-800',
-        ts: 'from-blue-900 via-blue-800 to-indigo-800',
-        python: 'from-green-900 via-green-800 to-emerald-800',
-        py: 'from-green-900 via-green-800 to-emerald-800',
-        java: 'from-orange-900 via-orange-800 to-red-800',
-        cpp: 'from-purple-900 via-purple-800 to-indigo-800',
-        'c++': 'from-purple-900 via-purple-800 to-indigo-800',
-        c: 'from-purple-900 via-purple-800 to-indigo-800',
-        html: 'from-orange-900 via-red-800 to-pink-800',
-        css: 'from-blue-900 via-cyan-800 to-teal-800',
-        sql: 'from-cyan-900 via-cyan-800 to-blue-800',
-        react: 'from-cyan-900 via-blue-800 to-indigo-800',
-        vue: 'from-green-900 via-teal-800 to-cyan-800',
-        default: 'from-slate-900 via-gray-800 to-slate-800'
+        javascript: "from-yellow-900 via-yellow-800 to-amber-800",
+        js: "from-yellow-900 via-yellow-800 to-amber-800",
+        typescript: "from-blue-900 via-blue-800 to-indigo-800",
+        ts: "from-blue-900 via-blue-800 to-indigo-800",
+        python: "from-green-900 via-green-800 to-emerald-800",
+        py: "from-green-900 via-green-800 to-emerald-800",
+        java: "from-orange-900 via-orange-800 to-red-800",
+        cpp: "from-purple-900 via-purple-800 to-indigo-800",
+        "c++": "from-purple-900 via-purple-800 to-indigo-800",
+        c: "from-purple-900 via-purple-800 to-indigo-800",
+        html: "from-orange-900 via-red-800 to-pink-800",
+        css: "from-blue-900 via-cyan-800 to-teal-800",
+        sql: "from-cyan-900 via-cyan-800 to-blue-800",
+        react: "from-cyan-900 via-blue-800 to-indigo-800",
+        vue: "from-green-900 via-teal-800 to-cyan-800",
+        default: "from-slate-900 via-gray-800 to-slate-800",
       };
       return gradientMap[language] || gradientMap.default;
     };
@@ -541,20 +549,28 @@ const ChatBot = ({isDragging}) => {
             case "code":
               return (
                 <div key={index} className="my-4">
-                  <div className={`bg-gradient-to-br ${getLanguageGradient(element.language)} dark:from-black dark:via-gray-900 dark:to-black rounded-xl overflow-hidden shadow-glow-sm  border border-slate-600 dark:border-gray-700`}>
+                  <div
+                    className={`bg-gradient-to-br ${getLanguageGradient(
+                      element.language
+                    )} dark:from-black dark:via-gray-900 dark:to-black rounded-xl overflow-hidden shadow-glow-sm  border border-slate-600 dark:border-gray-700`}
+                  >
                     <div className="bg-gradient-to-r from-slate-800/80 to-gray-800/80 dark:from-gray-900/90 dark:to-black/90 px-4 py-3 flex items-center justify-between border-b border-slate-600/50 dark:border-gray-700/50 backdrop-blur-sm">
                       <div className="flex items-center space-x-3">
-                        <span className="text-lg">{getLanguageIcon(element.language)}</span>
+                        <span className="text-lg">
+                          {getLanguageIcon(element.language)}
+                        </span>
                         <span className="text-xs text-slate-200 dark:text-gray-300 font-mono font-semibold uppercase tracking-wider">
-                          {element.language || 'code'}
+                          {element.language || "code"}
                         </span>
                         <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
                         <span className="text-xs text-slate-400 dark:text-gray-500">
-                          {element.content.split('\n').length} lines
+                          {element.content.split("\n").length} lines
                         </span>
                       </div>
                       <button
-                        onClick={() => copyMessage(element.content, `code-${index}`)}
+                        onClick={() =>
+                          copyMessage(element.content, `code-${index}`)
+                        }
                         className="flex items-center space-x-2 px-3 py-1.5 text-slate-300 hover:text-white hover:bg-slate-700/50 dark:hover:bg-gray-800/50 rounded-lg transition-all duration-200 text-xs font-medium backdrop-blur-sm"
                         title="Copy code"
                       >
@@ -573,7 +589,11 @@ const ChatBot = ({isDragging}) => {
                     </div>
                     <div className="p-5 bg-gradient-to-br from-slate-900/50 to-gray-900/50 dark:from-black/50 dark:to-gray-900/50 backdrop-blur-sm">
                       <pre className="overflow-x-auto">
-                        <code className={`font-mono text-sm leading-relaxed whitespace-pre-wrap ${getLanguageColor(element.language)} filter brightness-110`}>
+                        <code
+                          className={`font-mono text-sm leading-relaxed whitespace-pre-wrap ${getLanguageColor(
+                            element.language
+                          )} filter brightness-110`}
+                        >
                           {element.content}
                         </code>
                       </pre>
@@ -628,7 +648,9 @@ const ChatBot = ({isDragging}) => {
                   return (
                     <h2
                       key={`${index}-${pIndex}`}
-                      className="text-lg font-semibold mb-3 text-slate dark:text-pearl border-l-4 border-orange-400 pl-3"
+                      className="text-lg font-semibold mb-3 text-slate dark:text-pearl border-l-4
+
+ border-orange-400 pl-3"
                     >
                       {trimmedParagraph.substring(3)}
                     </h2>
@@ -708,7 +730,7 @@ const ChatBot = ({isDragging}) => {
               <div className="whitespace-pre-wrap">{message.text}</div>
             )}
           </div>
-          
+
           {/* Copy button for completed messages */}
           {!message.isTyping && !isCurrentlyTyping && (
             <button
@@ -736,10 +758,14 @@ const ChatBot = ({isDragging}) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div>
-                <img src={logo} alt="Scholara Ai" className="lg:w-[70%] h-auto w-[calc(100%-6rem)]" />
+                <img
+                  src={logo}
+                  alt="Scholara Ai"
+                  className="lg:w-[70%] h-auto w-[calc(100%-6rem)]"
+                />
               </div>
             </div>
-            
+
             {/* Header Controls */}
             <div className="flex items-center space-x-3">
               <div className="hidden lg:flex items-center space-x-2 px-3 py-2 bg-white/50 dark:bg-onyx/50 backdrop-blur-sm rounded-lg border border-silver/30 dark:border-ash/20">
@@ -748,7 +774,7 @@ const ChatBot = ({isDragging}) => {
                   AI Assistant Ready
                 </span>
               </div>
-              
+
               <button
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                 className="lg:hidden p-3 rounded-xl bg-white/50 dark:bg-onyx/50 backdrop-blur-sm border border-silver/30 dark:border-ash/20 text-slate dark:text-pearl hover:bg-white/70 dark:hover:bg-onyx/70 transition-all"
@@ -841,7 +867,7 @@ const ChatBot = ({isDragging}) => {
                       </span>
                     </p>
                   </div>
-                  
+
                   {/* Delete button */}
                   <button
                     onClick={(e) => deleteChat(chat.id, e)}
@@ -852,7 +878,7 @@ const ChatBot = ({isDragging}) => {
                   </button>
                 </div>
               ))}
-              
+
               {chatHistory.length === 0 && (
                 <div className="text-center py-8 text-steel dark:text-ash">
                   <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -876,7 +902,7 @@ const ChatBot = ({isDragging}) => {
               {messages.map((message, index) => renderMessage(message, index))}
               <div ref={messagesEndRef} className="h-4"></div>
             </div>
-            
+
             {/* Scroll to bottom button */}
             {showScrollButton && (
               <button
@@ -894,7 +920,7 @@ const ChatBot = ({isDragging}) => {
             <div className="flex items-end space-x-3 max-w-4xl mx-auto">
               {/* Input Container */}
               <div className="flex-1 bg-white dark:bg-onyx border border-silver/50 dark:border-ash/30 rounded-2xl shadow-glow-sm focus-within:shadow-glow-sm transition-all duration-300 focus-within:border-orange-400 dark:focus-within:border-orange-500">
-                <div className="flex items-end p-2">
+                <div className="flex lg:items-end lg:p-2 p-1 items-center justify-center">
                   <textarea
                     ref={textareaRef}
                     value={inputMessage}
@@ -905,12 +931,10 @@ const ChatBot = ({isDragging}) => {
                         handleSendMessage();
                       }
                     }}
-                    className="flex-1 px-4 py-3 bg-transparent text-slate dark:text-pearl placeholder-steel dark:placeholder-ash focus:outline-none resize-none min-h-[56px] max-h-[120px]"
+                    className="flex-1 flex justify-center px-4 bg-transparent text-slate dark:text-pearl placeholder-steel dark:placeholder-ash focus:outline-none resize-none overflow-y-hidden"
                     placeholder="Type your message here..."
-                    disabled={isLoading || isTypingResponse}
                     style={{ height: `${textareaHeight}px` }}
                   />
-                  
                   {/* Input Actions */}
                   <div className="flex items-center space-x-2 pl-2">
                     {/* Character count */}
@@ -919,17 +943,21 @@ const ChatBot = ({isDragging}) => {
                         {inputMessage.length}
                       </span>
                     )}
-                    
+
                     {/* Send Button */}
                     <button
                       onClick={handleSendMessage}
-                      disabled={isLoading || !inputMessage.trim() || isTypingResponse}
+                      disabled={
+                        isLoading || !inputMessage.trim() || isTypingResponse
+                      }
                       className="lg:p-3 px-1 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white lg:rounded-xl rounded-r-xl font-semibold transition-all duration-300 shadow-glow-sm hover:shadow-orange-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transform hover:scale-105 disabled:hover:scale-100 min-w-[40px] lg:min-w-[60px] justify-center"
                     >
                       {isLoading || isTypingResponse ? (
                         <div className="flex items-center space-x-2">
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span className="hidden sm:block text-sm">Sending...</span>
+                          <span className="hidden sm:block text-sm">
+                            Sending...
+                          </span>
                         </div>
                       ) : (
                         <div className="flex items-center space-x-2">
@@ -942,7 +970,7 @@ const ChatBot = ({isDragging}) => {
                 </div>
               </div>
             </div>
-            
+
             {/* Input Footer */}
             <div className="items-center lg:flex hidden justify-between mt-3 text-xs text-steel dark:text-ash max-w-4xl mx-auto px-1">
               <div className="flex items-center space-x-4">
@@ -954,71 +982,21 @@ const ChatBot = ({isDragging}) => {
                   </div>
                 )}
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 {messages.length > 1 && (
-                  <span>{messages.filter(m => m.sender === 'user').length} messages</span>
+                  <span>
+                    {messages.filter((m) => m.sender === "user").length}{" "}
+                    messages
+                  </span>
                 )}
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Enhanced Custom Styles */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-        
-        .scrollbar-thin::-webkit-scrollbar {
-          width: 6px;
-        }
-        
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-          background-color: rgba(251, 146, 60, 0.5);
-          border-radius: 9999px;
-        }
-        
-        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-          background-color: rgba(251, 146, 60, 0.8);
-        }
-        
-        /* Enhanced focus states */
-        .focus-within\\:shadow-glow-md:focus-within {
-           box-shadow: 0 0 0 1px rgba(251, 146, 60, 0.3), 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Smooth transitions for mobile */
-        @media (max-width: 1023px) {
-          .transform {
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          }
-        }
-        
-        /* Code syntax highlighting enhancement */
-        .bg-clip-text {
-          -webkit-background-clip: text;
-          background-clip: text;
-        }
-      `}</style>
     </div>
-  );
-};
-
+  )
+}
 export default ChatBot;
+     

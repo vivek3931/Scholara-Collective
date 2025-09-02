@@ -1,96 +1,42 @@
-import React, { useState, useEffect } from "react";
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext/AuthContext";
+import { useResource } from "../../context/ResourceContext/ResourceContext";
 import {
-  Search,
-  Filter,
-  SortAsc,
-  SortDesc,
   BookOpen,
   User,
   Calendar,
-  Tag,
-  Download,
-  Star,
-  Eye,
-  ArrowLeft,
-  Loader2,
   FileText,
   Image,
   FileSpreadsheet,
   Presentation,
   AlertCircle,
+  Loader2,
+  Filter,
+  Search,
 } from "lucide-react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
-import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const SearchResults = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const {
+    performSearch,
+    searchResults,
+    searchLoading,
+    searchError,
+    totalResults,
+    totalPages,
+    currentPage,
+  } = useResource();
 
-  // State management
-  const [resources, setResources] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [suggestions, setSuggestions] = useState([]);
-  const [showFilters, setShowFilters] = useState(false);
-  const [totalResults, setTotalResults] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [visiblePages, setVisiblePages] = useState(new Set([1]));
-  const [numPages, setNumPages] = useState(0);
-  const [previewDataUrl, setPreviewDataUrl] = useState(null);
-  console.log(resources )
-
-  console.log(resources[0]?.thumbnailUrl)
-
-  // Filter and search state
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+  // Filter state
   const [filters, setFilters] = useState({
     subject: searchParams.get("subject") || "",
     year: searchParams.get("year") || "",
     tags: searchParams.get("tags") || "",
     sort: searchParams.get("sort") || "newest",
   });
-
-  useEffect(() => {
-    if (!previewDataUrl || !numPages || numPages <= 1) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const newVisiblePages = new Set(visiblePages);
-        let shouldUpdate = false;
-
-        entries.forEach(entry => {
-          const pageNumber = parseInt(entry.target.getAttribute('data-page-number'), 10);
-
-          if (entry.isIntersecting) {
-            if (!newVisiblePages.has(pageNumber)) {
-              newVisiblePages.add(pageNumber);
-              shouldUpdate = true;
-            }
-          }
-        });
-
-        if (shouldUpdate) {
-          setVisiblePages(newVisiblePages);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    // Observe all page elements
-    const pageElements = document.querySelectorAll('[data-page-number]');
-    pageElements.forEach(el => observer.observe(el));
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [previewDataUrl, numPages, visiblePages]);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Get file type icon and color
   const getFileTypeIcon = (fileType) => {
@@ -136,159 +82,55 @@ const SearchResults = () => {
     }
   };
 
-  // Fetch search results
-  const fetchSearchResults = async (query, currentFilters, page = 1) => {
-    if (!query.trim()) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams({
-        search: query,
-        page: page.toString(),
-        limit: "10",
-      });
-
-      // Add filters to params
-      Object.entries(currentFilters).forEach(([key, value]) => {
-        if (value && key !== "sort") {
-          params.append(key, value);
-        }
-      });
-
-      if (currentFilters.sort && currentFilters.sort !== "newest") {
-        params.append("sort", currentFilters.sort);
-      }
-
-      const response = await axios.get(`${API_URL}/resources?${params}`);
-      const data = response.data;
-
-      setResources(data.resources || []);
-      setTotalResults(data.total || 0);
-      setTotalPages(data.totalPages || 1);
-      setCurrentPage(data.currentPage || 1);
-    } catch (err) {
-      console.error("Search error:", err);
-      setError("Failed to fetch search results. Please try again.");
-      setResources([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch search suggestions
-  const fetchSuggestions = async (query) => {
-    if (!query.trim() || query.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-
-    try {
-      const response = await axios.get(
-        `${API_URL}/resources/suggestions?search=${encodeURIComponent(query)}`
-      );
-      setSuggestions(response.data || []);
-    } catch (err) {
-      console.error("Suggestions error:", err);
-      setSuggestions([]);
-    }
-  };
-
-  // Handle search submission
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-
-    // Update URL params
-    const newParams = new URLSearchParams();
-    newParams.set("q", searchQuery);
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) {
-        newParams.set(key, value);
-      }
-    });
-
-    setSearchParams(newParams);
-    fetchSearchResults(searchQuery, filters, 1);
-  };
-
   // Handle filter changes
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
 
     // Update URL
-    const newParams = new URLSearchParams();
-    newParams.set("q", searchQuery);
-    Object.entries(newFilters).forEach(([filterKey, filterValue]) => {
-      if (filterValue) {
-        newParams.set(filterKey, filterValue);
-      }
-    });
+    const newParams = new URLSearchParams(searchParams);
+    if (value) {
+      newParams.set(key, value);
+    } else {
+      newParams.delete(key);
+    }
 
     setSearchParams(newParams);
-    fetchSearchResults(searchQuery, newFilters, 1);
+    performSearch(searchParams.get("q") || "", newFilters, 1);
   };
 
   // Handle pagination
   const handlePageChange = (page) => {
-    setCurrentPage(page);
-    fetchSearchResults(searchQuery, filters, page);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("page", page.toString());
+    setSearchParams(newParams);
+    performSearch(searchParams.get("q") || "", filters, page);
     window.scrollTo(0, 0);
   };
 
-  // Handle suggestion click
-  const handleSuggestionClick = (suggestion) => {
-    setSearchQuery(suggestion.title);
-    setSuggestions([]);
-    navigate(`/resources/${suggestion._id}`);
-  };
-
-  // Initial search on component mount
+  // Initial search on component mount and when searchParams change
   useEffect(() => {
-    const query = searchParams.get("q");
+    const query = searchParams.get("q") || "";
+    const page = parseInt(searchParams.get("page")) || 1;
+    const initialFilters = {
+      subject: searchParams.get("subject") || "",
+      year: searchParams.get("year") || "",
+      tags: searchParams.get("tags") || "",
+      sort: searchParams.get("sort") || "newest",
+    };
+    setFilters(initialFilters);
     if (query) {
-      setSearchQuery(query);
-      const initialFilters = {
-        subject: searchParams.get("subject") || "",
-        year: searchParams.get("year") || "",
-        tags: searchParams.get("tags") || "",
-        sort: searchParams.get("sort") || "newest",
-      };
-      setFilters(initialFilters);
-      fetchSearchResults(query, initialFilters, 1);
-    } else {
-      setLoading(false);
+      performSearch(query, initialFilters, page);
     }
-  }, []);
-
-  // Fetch suggestions on search query change
-  useEffect(() => {
-    const debounceTimer = setTimeout(() => {
-      if (searchQuery !== searchParams.get("q")) {
-        fetchSuggestions(searchQuery);
-      }
-    }, 300);
-
-    return () => clearTimeout(debounceTimer);
-  }, [searchQuery]);
-
-  const handleBackClick = () => {
-    navigate(-1);
-  };
+  }, [searchParams, performSearch]);
 
   return (
     <div className="min-h-screen flex flex-col">
-
       {/* Animated background */}
       <div className="fixed inset-0 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200 dark:from-onyx dark:via-charcoal dark:to-onyx"></div>
 
       {/* Main Content */}
       <main className="relative z-10 container mx-auto px-4 pt-16 lg:px-8 py-8 flex-1">
-        <button onClick={handleBackClick}  className="mb-4 fixed top-4 left-4 bg-white dark:bg-charcoal dark:hover:bg-onyx shadow-glow-sm duration-200 rounded-md hover:scale-105 px-4 py-2 z-20 flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100">
-          <FontAwesomeIcon icon={faArrowLeft} /> Back
-      </button>
         <div className="max-w-7xl mx-auto">
           {/* Search Header */}
           <div className="mb-8 animate-fade-in">
@@ -296,55 +138,16 @@ const SearchResults = () => {
               Search Results
             </h1>
 
-            {/* Search Form */}
-            <div className="relative mb-6">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSearchSubmit(e)}
-                  placeholder="Search for resources..."
-                  className="w-full px-6 py-4 pl-12 pr-16 text-lg bg-white/95 dark:bg-charcoal/95 backdrop-blur-lg border border-gray-300 dark:border-charcoal rounded-2xl dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 shadow-glow-sm"
-                />
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <button
-                  onClick={handleSearchSubmit}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-400 text-white rounded-xl hover:scale-105 transition-all duration-200 shadow-glow-sm"
-                >
-                  Search
-                </button>
-              </div>
-
-              {/* Search Suggestions */}
-              {suggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-charcoal rounded-xl shadow-xl border border-gray-200 dark:border-charcoal z-50 max-h-60 overflow-y-auto">
-                  {suggestions.map((suggestion, index) => (
-                    <button
-                      key={suggestion._id || index}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 flex items-center gap-3 border-b border-gray-100 dark:border-gray-600 last:border-b-0"
-                    >
-                      <Search className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {suggestion.title}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* Results Info and Filters */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="text-gray-600 dark:text-gray-400">
-                {!loading && (
+                {!searchLoading && (
                   <span>
                     {totalResults > 0
                       ? `Found ${totalResults} result${
                           totalResults === 1 ? "" : "s"
-                        } for "${searchParams.get("q")}"`
-                      : `No results found for "${searchParams.get("q")}"`}
+                        } for "${searchParams.get("q") || ""}"`
+                      : `No results found for "${searchParams.get("q") || ""}"`}
                   </span>
                 )}
               </div>
@@ -385,7 +188,7 @@ const SearchResults = () => {
                         handleFilterChange("subject", e.target.value)
                       }
                       placeholder="Filter by subject"
-                      className="w-full px-3 py-2 bg-white dark:bg-onyx border border-gray-300 dark:border-charcoal rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all duration-200 "
+                      className="w-full px-3 py-2 bg-white dark:bg-onyx border border-gray-300 dark:border-charcoal rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all duration-200"
                     />
                   </div>
                   <div>
@@ -413,7 +216,7 @@ const SearchResults = () => {
                         handleFilterChange("tags", e.target.value)
                       }
                       placeholder="Filter by tags (comma-separated)"
-                      className="w-full px-3 py-2 bg-white dark:bg-onyx border border-gray-300 dark:border-charcoal rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all duration-200 "
+                      className="w-full px-3 py-2 bg-white dark:bg-onyx border border-gray-300 dark:border-charcoal rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all duration-200"
                     />
                   </div>
                 </div>
@@ -422,7 +225,7 @@ const SearchResults = () => {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {searchLoading && (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
               <span className="ml-3 text-gray-600 dark:text-gray-400">
@@ -432,16 +235,22 @@ const SearchResults = () => {
           )}
 
           {/* Error State */}
-          {error && (
+          {searchError && (
             <div className="text-center py-12">
               <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                 Search Failed
               </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                {searchError}
+              </p>
               <button
                 onClick={() =>
-                  fetchSearchResults(searchQuery, filters, currentPage)
+                  performSearch(
+                    searchParams.get("q") || "",
+                    filters,
+                    currentPage
+                  )
                 }
                 className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-400 text-white rounded-xl hover:scale-105 transition-all duration-200 shadow-glow-sm"
               >
@@ -451,22 +260,25 @@ const SearchResults = () => {
           )}
 
           {/* No Results */}
-          {!loading && !error && resources.length === 0 && searchQuery && (
-            <div className="text-center py-12">
-              <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                No resources found
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Try a different search query or adjust your filters.
-              </p>
-            </div>
-          )}
+          {!searchLoading &&
+            !searchError &&
+            searchResults.length === 0 &&
+            searchParams.get("q") && (
+              <div className="text-center py-12">
+                <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  No resources found
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Try a different search query using the search bar above.
+                </p>
+              </div>
+            )}
 
           {/* Search Results List */}
-          {!loading && !error && resources.length > 0 && (
+          {!searchLoading && !searchError && searchResults.length > 0 && (
             <div className="flex flex-col gap-4 animate-fade-in-up">
-              {resources.map((resource) => (
+              {searchResults.map((resource) => (
                 <Link
                   to={`/resources/${resource._id}`}
                   key={resource._id}
@@ -474,13 +286,17 @@ const SearchResults = () => {
                 >
                   {/* Thumbnail/Icon */}
                   <div
-                    className={`relative flex-shrink-0 flex items-center justify-center w-24 sm:w-32 lg:min-h-full h-auto  ${getFileTypeBackground(
+                    className={`relative flex-shrink-0 flex items-center justify-center w-24 sm:w-32 lg:min-h-full h-auto ${getFileTypeBackground(
                       resource.fileType
                     )}`}
                   >
                     {resource.fileType === "pdf" ? (
                       <img
-                        src={resource.thumbnailUrl}
+                        src={resource.thumbnailUrl || "https://res.cloudinary.com/dr9zse9a6/image/upload/v1756788547/scholara_note_qzpglu.svg"}
+                        onError={(e)=>{
+                          e.target.onerror = null;
+                           e.target.src = "https://res.cloudinary.com/dr9zse9a6/image/upload/v1756788547/scholara_note_qzpglu.svg"
+                        }}
                         alt={`Thumbnail for ${resource.title}`}
                         className="w-full h-full object-contain"
                       />
@@ -559,8 +375,6 @@ const SearchResults = () => {
           )}
         </div>
       </main>
-
-      
     </div>
   );
 };

@@ -181,7 +181,7 @@ growth >= 0
  </div>
  Admin Dashboard
 </h1>
-<p className="lg:text-lg text-xs text-gray-600 dark:text-platinum font-poppins">Welcome back! Here's what's happening with PaperPal.</p>
+<p className="lg:text-lg text-xs text-gray-600 dark:text-platinum font-poppins">Welcome back! Here's what's happening with Scholara.</p>
   </div>
   <div className="flex items-center space-x-4 mt-4 lg:mt-0">
 <select

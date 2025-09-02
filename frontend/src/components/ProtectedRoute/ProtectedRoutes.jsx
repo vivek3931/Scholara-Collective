@@ -2,6 +2,7 @@
 import React from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext/AuthContext.jsx';
+import Loader from '../Loader/Loader.jsx';
 
 // This component now accepts a 'requiredRole' prop to check for specific user roles.
 const ProtectedRoute = ({ requiredRole }) => {
@@ -10,10 +11,7 @@ const ProtectedRoute = ({ requiredRole }) => {
   if (authLoading) {
     // Optionally render a loading spinner or message while authentication status is being determined
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-64px)] bg-gray-50 dark:bg-onyx-900 text-gray-700 dark:text-gray-200">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
-        <span className="ml-4">Checking Authentication...</span>
-      </div>
+      <Loader message="Checking Authentication..." />
     );
   }
 

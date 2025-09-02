@@ -201,7 +201,6 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
   const scrollContainerRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [isScrolling, setIsScrolling] = useState(false);
 
   // Debounce scroll updates to prevent excessive re-renders
   const updateScrollButtons = useCallback(() => {
@@ -209,10 +208,10 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
       const newCanScrollLeft = scrollLeft > 0;
       const newCanScrollRight = scrollLeft < scrollWidth - clientWidth - 1;
-      
+
       // Only update state if values actually changed
-      setCanScrollLeft(prev => prev !== newCanScrollLeft ? newCanScrollLeft : prev);
-      setCanScrollRight(prev => prev !== newCanScrollRight ? newCanScrollRight : prev);
+      setCanScrollLeft((prev) => (prev !== newCanScrollLeft ? newCanScrollLeft : prev));
+      setCanScrollRight((prev) => (prev !== newCanScrollRight ? newCanScrollRight : prev));
     }
   }, []);
 
@@ -221,73 +220,64 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
     let timeoutId;
     return () => {
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(updateScrollButtons, 10);
+      timeoutId = setTimeout(updateScrollButtons, 50);
     };
   }, [updateScrollButtons]);
-
-  // Handle scroll start and end for performance
-  const handleScrollStart = useCallback(() => {
-    setIsScrolling(true);
-  }, []);
-
-  const handleScrollEnd = useCallback(() => {
-    setIsScrolling(false);
-  }, []);
 
   useEffect(() => {
     updateScrollButtons();
     const container = scrollContainerRef.current;
     if (container) {
       container.addEventListener('scroll', debouncedUpdateScrollButtons, { passive: true });
-      container.addEventListener('scrollstart', handleScrollStart, { passive: true });
-      container.addEventListener('scrollend', handleScrollEnd, { passive: true });
       window.addEventListener('resize', debouncedUpdateScrollButtons, { passive: true });
       return () => {
         container.removeEventListener('scroll', debouncedUpdateScrollButtons);
-        container.removeEventListener('scrollstart', handleScrollStart);
-        container.removeEventListener('scrollend', handleScrollEnd);
         window.removeEventListener('resize', debouncedUpdateScrollButtons);
       };
     }
-  }, [debouncedUpdateScrollButtons, handleScrollStart, handleScrollEnd, resources.length]);
+  }, [debouncedUpdateScrollButtons, resources.length]);
 
   const scroll = useCallback((direction) => {
     if (scrollContainerRef.current) {
-      const scrollAmount = 380 + 24; // Updated card width (380px) + gap (24px)
+      const scrollAmount = 220 + 24; // Card width (220px) + gap (24px)
       const currentScroll = scrollContainerRef.current.scrollLeft;
-      const targetScroll = direction === 'left' 
-        ? Math.max(0, currentScroll - scrollAmount)
-        : currentScroll + scrollAmount;
-      
+      const targetScroll =
+        direction === 'left'
+          ? Math.max(0, currentScroll - scrollAmount)
+          : currentScroll + scrollAmount;
+
       scrollContainerRef.current.scrollTo({
         left: targetScroll,
-        behavior: 'smooth'
+        behavior: 'smooth',
       });
+      // Trigger immediate scroll button update after programmatic scroll
+      setTimeout(updateScrollButtons, 100);
     }
-  }, []);
+  }, [updateScrollButtons]);
 
-  // Memoize the resource cards with increased width (380px = 350px + 30px)
-  const resourceCards = useMemo(() => 
-    resources.map((resource, index) => (
-      <motion.div
-        key={resource._id}
-        initial={{ opacity: 0, x: 50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: index * 0.05 }}
-        className="flex-shrink-0"
-        style={{ width: '350px' }} // Updated width to 380px (350px + 30px)
-      >
-        <div 
-          className="h-full"
-          style={{ 
-            minHeight: '280px',
-            maxHeight: '400px'
-          }}
+  // Memoize the resource cards
+  const resourceCards = useMemo(
+    () =>
+      resources.map((resource, index) => (
+        <motion.div
+          key={resource._id}
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: index * 0.05 }}
+          className="flex-shrink-0"
+          style={{ width: '220px' }}
         >
-          <MemoizedResourceCard resource={resource} />
-        </div>
-      </motion.div>
-    )), 
+          <div
+            className="h-full"
+            style={{
+              minHeight: '280px',
+              maxHeight: '550px',
+            }}
+          >
+            <MemoizedResourceCard resource={resource} />
+          </div>
+        </motion.div>
+      )),
     [resources]
   );
 
@@ -296,7 +286,7 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="mb-12"
+      className="mb-12 relative"
     >
       {/* Section Header */}
       <div className="flex items-center justify-between mb-6">
@@ -310,50 +300,10 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
             <Icon className="text-white" size={24} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-              {title}
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              {resources.length} resources available
-            </p>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{title}</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300">{resources.length} resources available</p>
           </div>
         </motion.div>
-
-        {/* Beautiful Navigation Buttons with better functionality */}
-        {!isLoading && resources.length > 0 && (
-          <div className="flex gap-3">
-            <motion.button
-              whileHover={{ scale: canScrollLeft ? 1.05 : 1 }}
-              whileTap={{ scale: canScrollLeft ? 0.9 : 1 }}
-              onClick={() => scroll('left')}
-              disabled={!canScrollLeft}
-              className={`group relative p-3 rounded-xl transition-all duration-200 ${
-                canScrollLeft
-                  ? 'bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white shadow-lg hover:shadow-xl hover:from-orange-500 hover:via-amber-600 hover:to-yellow-600'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-              }`}
-            >
-              <ChevronLeft size={20} className="relative z-10" />
-              
-              
-            </motion.button>
-            
-            <motion.button
-              whileHover={{ scale: canScrollRight ? 1.05 : 1 }}
-              whileTap={{ scale: canScrollRight ? 0.9 : 1 }}
-              onClick={() => scroll('right')}
-              disabled={!canScrollRight}
-              className={`group relative p-3 rounded-xl transition-all duration-200 ${
-                canScrollRight
-                  ? 'bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white shadow-lg hover:shadow-xl hover:from-orange-500 hover:via-amber-600 hover:to-yellow-600'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-              }`}
-            >
-              <ChevronRight size={20} className="relative z-10" />
-              
-            </motion.button>
-          </div>
-        )}
       </div>
 
       {/* Loading State */}
@@ -373,24 +323,78 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
         </div>
       )}
 
-      {/* Resources Swiper */}
+      {/* Resources Swiper with realistic shadow effects and extreme buttons */}
       {!isLoading && resources.length > 0 && (
         <div className="relative">
+          {/* Left shadow effect */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: canScrollLeft ? 1 : 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute left-0 top-0 bottom-0 w-16 pointer-events-none z-10"
+            style={{
+              boxShadow: canScrollLeft
+                ? 'inset 16px 0 16px -8px rgba(0, 0, 0, 0.15), inset 8px 0 8px -4px rgba(0, 0, 0, 0.1)'
+                : 'none',
+            }}
+          />
+
+          {/* Right shadow effect */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: canScrollRight ? 1 : 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute right-0 top-0 bottom-0 w-16 pointer-events-none z-10"
+            style={{
+              boxShadow: canScrollRight
+                ? 'inset -16px 0 16px -8px rgba(0, 0, 0, 0.15), inset -8px 0 8px -4px rgba(0, 0, 0, 0.1)'
+                : 'none',
+            }}
+          />
+
+          {/* Left navigation button - more extreme left */}
+          {canScrollLeft && (
+            <div className="absolute left-[-1rem] top-1/2 transform -translate-y-1/2 z-20">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => scroll('left')}
+                className="p-3 rounded-xl bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white shadow-md hover:shadow-lg hover:from-orange-500 hover:via-amber-600 hover:to-yellow-600 transition-all duration-200"
+              >
+                <ChevronLeft size={20} />
+              </motion.button>
+            </div>
+          )}
+
+          {/* Right navigation button - more extreme right */}
+          {canScrollRight && (
+            <div className="absolute right-[-1rem] top-1/2 transform -translate-y-1/2 z-20">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => scroll('right')}
+                className="p-3 rounded-xl bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white shadow-md hover:shadow-lg hover:from-orange-500 hover:via-amber-600 hover:to-yellow-600 transition-all duration-200"
+              >
+                <ChevronRight size={20} />
+              </motion.button>
+            </div>
+          )}
+
           <div
             ref={scrollContainerRef}
             className="flex gap-6 overflow-x-auto scrollbar-hide pb-4"
-            style={{ 
-              scrollbarWidth: 'none', 
+            style={{
+              scrollbarWidth: 'none',
               msOverflowStyle: 'none',
-              WebkitOverflowScrolling: 'touch', // Smooth scrolling on mobile
-              minHeight: '300px', // Consistent container height
-              alignItems: 'stretch' // Ensure all cards stretch to same height
+              WebkitOverflowScrolling: 'touch',
+              minHeight: '300px',
+              alignItems: 'stretch',
             }}
           >
             {resourceCards}
           </div>
-          
-          {/* Add some CSS to hide scrollbars completely */}
+
+          {/* Add CSS to hide scrollbars */}
           <style jsx>{`
             div::-webkit-scrollbar {
               display: none;
@@ -482,6 +486,7 @@ const CategoryButton = React.memo(({
 CategoryButton.displayName = 'CategoryButton';
 
 // Full Page Categories Modal Component
+// Full Page Categories Modal Component - Enhanced Compact Version
 const CategoriesModal = React.memo(({ 
   isOpen, 
   onClose, 
@@ -528,10 +533,10 @@ const CategoriesModal = React.memo(({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
         onClick={onClose}
       >
-        {/* Modal Content */}
+        {/* Modal Content - Compact Size */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -544,25 +549,25 @@ const CategoriesModal = React.memo(({
             stiffness: 400
           }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute inset-4 md:inset-8 bg-white dark:bg-onyx rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+          className="relative w-full max-w-4xl max-h-[85vh] bg-white dark:bg-onyx rounded-2xl shadow-2xl overflow-hidden flex flex-col"
         >
-          {/* Modal Header */}
-          <div className="flex items-center justify-between p-6 md:p-8 border-b border-gray-200 dark:border-charcoal bg-gradient-to-r from-amber-50 via-orange-50 to-red-50 dark:from-amber-950/10 dark:via-orange-950/10 dark:to-red-950/10">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 rounded-2xl shadow-lg">
-                <Grid3X3 className="text-white" size={28} />
+          {/* Modal Header - Compact */}
+          <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 dark:border-charcoal bg-gradient-to-r from-amber-50 via-orange-50 to-red-50 dark:from-amber-950/10 dark:via-orange-950/10 dark:to-red-950/10">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 rounded-xl shadow-lg">
+                <Grid3X3 className="text-white" size={20} />
               </div>
               <div>
-                <h2 className="lg:text-3xl text-xl font-bold bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 bg-clip-text text-transparent">
+                <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 bg-clip-text text-transparent">
                   All Categories
                 </h2>
-                <p className="text-gray-600 text-xs lg:text-sm dark:text-gray-300 mt-1">
-                  Choose from {filteredCategories.length} available categories
+                <p className="text-gray-600 text-xs md:text-sm dark:text-gray-300">
+                  {filteredCategories.length} categories available
                 </p>
               </div>
             </div>
             
-            {/* Minimize Button */}
+            {/* Close Button */}
             <motion.button
               whileHover={{ 
                 scale: 1.1,
@@ -570,43 +575,94 @@ const CategoriesModal = React.memo(({
               }}
               whileTap={{ scale: 0.9 }}
               onClick={onClose}
-              className="group relative overflow-hidden p-3 bg-gray-100 dark:bg-charcoal hover:bg-red-500 dark:hover:bg-red-500 rounded-xl transition-all duration-200"
+              className="group relative overflow-hidden p-2 bg-gray-100 dark:bg-charcoal hover:bg-red-500 dark:hover:bg-red-500 rounded-lg transition-all duration-200"
             >
-              <X size={24} className="text-gray-600 dark:text-gray-400 group-hover:text-white transition-colors relative z-10" />
+              <X size={20} className="text-gray-600 dark:text-gray-400 group-hover:text-white transition-colors relative z-10" />
               
               {/* Hover effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-red-400 to-red-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
             </motion.button>
           </div>
 
-          {/* Search Bar */}
-          <div className="p-6 md:p-8 border-b border-gray-200 dark:border-charcoal">
-            <div className="relative max-w-md">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          {/* Search Bar - Compact */}
+          <div className="p-4 md:p-6 border-b border-gray-200 dark:border-charcoal">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
                 placeholder="Search categories..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-charcoal border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-gray-800 dark:text-gray-200"
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-charcoal border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-gray-800 dark:text-gray-200 text-sm"
               />
             </div>
           </div>
 
-          {/* Categories Grid - Scrollable */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-2">
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-              {filteredCategories.map((category, index) => (
-                <CategoryButton
-                  key={category.id}
-                  category={category}
-                  index={index}
-                  selectedCategory={selectedCategory}
-                  subjectsByCategory={subjectsByCategory}
-                  onCategorySelect={handleCategorySelect}
-                  size="large"
-                />
-              ))}
+          {/* Categories Grid - Scrollable with Perfect Fit */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+              {filteredCategories.map((category, index) => {
+                const isSelected = selectedCategory?.id === category.id;
+                
+                return (
+                  <motion.button
+                    key={category.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: index * 0.02 }}
+                    whileHover={{ 
+                      scale: 1.05,
+                      transition: { duration: 0.1 }
+                    }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleCategorySelect(category)}
+                    className={`group relative transition-all duration-200 overflow-hidden p-3 md:p-4 rounded-xl ${
+                      isSelected
+                        ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 text-white shadow-lg shadow-amber-500/30'
+                        : 'bg-white dark:bg-onyx/95 border border-gray-200 dark:border-amber-500 hover:border-transparent hover:shadow-lg hover:shadow-gray-300/50 dark:hover:shadow-gray-900/50'
+                    }`}
+                  >
+                    {/* Background Gradient Overlay for hover */}
+                    {!isSelected && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 dark:from-amber-950/20 dark:via-orange-950/20 dark:to-red-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    )}
+                    
+                    {/* Shine effect on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
+                    
+                    {/* Category Name */}
+                    <h3 className={`font-semibold text-xs md:text-sm mb-1 transition-all duration-300 relative z-10 text-center ${
+                      isSelected
+                        ? 'text-white drop-shadow-sm'
+                        : 'text-gray-800 dark:text-gray-200 group-hover:text-amber-600 dark:group-hover:text-amber-400'
+                    }`}>
+                      {category.name}
+                    </h3>
+                    
+                    {/* Subject Count */}
+                    {subjectsByCategory[category.name] && (
+                      <p className={`transition-all duration-300 relative z-10 text-xs text-center ${
+                        isSelected
+                          ? 'text-white/90'
+                          : 'text-gray-500 dark:text-gray-400 group-hover:text-amber-500 dark:group-hover:text-amber-300'
+                      }`}>
+                        {subjectsByCategory[category.name].length} subjects
+                      </p>
+                    )}
+                    
+                    {/* Selection indicator */}
+                    {isSelected && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute top-1 right-1 w-4 h-4 bg-white/30 rounded-full flex items-center justify-center"
+                      >
+                        <Star size={10} className="text-white fill-white" />
+                      </motion.div>
+                    )}
+                  </motion.button>
+                );
+              })}
             </div>
             
             {/* No Results Message */}
@@ -614,25 +670,25 @@ const CategoriesModal = React.memo(({
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-center py-12"
+                className="text-center py-8"
               >
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                  <Search className="text-gray-400 dark:text-gray-500" size={24} />
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                  <Search className="text-gray-400 dark:text-gray-500" size={20} />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-1">
                   No categories found
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
                   Try searching with different keywords
                 </p>
               </motion.div>
             )}
           </div>
 
-          {/* Modal Footer */}
-          <div className="p-6 md:p-8 border-t border-gray-200 dark:border-charcoal bg-gray-50 dark:bg-charcoal/50">
+          {/* Modal Footer - Compact */}
+          <div className="p-4 md:p-6 border-t border-gray-200 dark:border-charcoal bg-gray-50 dark:bg-charcoal/50">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
                 {filteredCategories.length} of {categories.length} categories shown
               </p>
               
@@ -640,7 +696,7 @@ const CategoriesModal = React.memo(({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={onClose}
-                className="px-6 py-2 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white font-medium rounded-xl hover:shadow-lg transition-all duration-200"
+                className="px-4 md:px-6 py-2 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white font-medium rounded-lg hover:shadow-lg transition-all duration-200 text-sm"
               >
                 Done
               </motion.button>
