@@ -22,7 +22,7 @@ load_dotenv()
 
 # Flask setup
 app = Flask(__name__)
-CORS(app, origins=["https://scholara-collective.vercel.app", "http://localhost:5173"])
+CORS(app, origins=["https://scholara-collective.onrender.com", "http://localhost:5173"])
 
 # ✅ Use LangChain's Groq wrapper directly
 chat_model = ChatGroq(
