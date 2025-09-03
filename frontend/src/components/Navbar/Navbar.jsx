@@ -200,13 +200,28 @@ const Navbar = () => {
   };
 
   // Handle Suggestion Click
-  const handleSuggestionClick = (suggestion) => {
-    setSearchQuery(suggestion.title);
-    setIsSearchActive(false);
-    setIsMobileSearchActive(false);
-    setSelectedSuggestionIndex(-1);
-    navigate(`/resources/${suggestion._id}`);
+ const handleSuggestionClick = (suggestion) => {
+  const searchTerm = suggestion.title;
+  const filters = {
+    subject: "",
+    year: "",
+    tags: "",
+    sort: "newest",
   };
+  
+  setSearchQuery(searchTerm);
+  setIsSearchActive(false);
+  setIsMobileSearchActive(false);
+  setSelectedSuggestionIndex(-1);
+  
+  // Navigate to search results page
+  navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
+  // Perform the search
+  performSearch(searchTerm, filters, 1);
+  
+  // Clear the search query after navigation (optional)
+  setTimeout(() => setSearchQuery(""), 100);
+};
 
   // Close handlers for clicking outside dropdowns/menus
   useEffect(() => {
