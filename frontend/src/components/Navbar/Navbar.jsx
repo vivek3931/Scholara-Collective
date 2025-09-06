@@ -434,7 +434,7 @@ const Navbar = () => {
                     />
                   </button>
                   {isProfileDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50" onClickCapture={(e) => e.stopPropagation()}>
                       {user && (
                         <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
                           <p className="text-sm font-medium text-gray-900 dark:text-white truncate">

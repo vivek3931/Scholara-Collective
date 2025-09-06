@@ -178,8 +178,8 @@ const MemoizedResourceCard = React.memo(({ resource }) => (
     <div 
       className="h-full w-full"
       style={{
-        minHeight: '280px',
-        maxHeight: '400px',
+        minHeight: '300px',
+        maxHeight: '450px',
         width: '100%',
         display: 'flex',
         flexDirection: 'column'
@@ -239,7 +239,7 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
 
   const scroll = useCallback((direction) => {
     if (scrollContainerRef.current) {
-      const scrollAmount = 220 + 24; // Card width (220px) + gap (24px)
+      const scrollAmount = 280 + 24; // Adjusted card width (280px) + gap (24px)
       const currentScroll = scrollContainerRef.current.scrollLeft;
       const targetScroll =
         direction === 'left'
@@ -264,13 +264,13 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: index * 0.05 }}
-          className="flex-shrink-0"
-          style={{ width: '220px' }}
+          className="flex-shrink-0 snap-start"
+          style={{ width: '280px' }}
         >
           <div
             className="h-full"
             style={{
-              minHeight: '280px',
+              minHeight: '300px',
               maxHeight: '550px',
             }}
           >
@@ -382,12 +382,12 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
 
           <div
             ref={scrollContainerRef}
-            className="flex gap-6 overflow-x-auto scrollbar-hide pb-4"
+            className="flex gap-6 overflow-x-auto scrollbar-hide pb-4 scroll-snap-type-x proximity"
             style={{
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
-              minHeight: '300px',
+              minHeight: '320px',
               alignItems: 'stretch',
             }}
           >
@@ -448,10 +448,10 @@ const CategoryButton = React.memo(({
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" />
       
       {/* Category Name */}
-      <h3 className={`font-semibold text-sm  mb-2 transition-all duration-300 relative z-10 
+      <h3 className={`font-semibold text-sm mb-2 transition-all duration-300 relative z-10 ${
         isSelected
           ? 'text-white drop-shadow-sm'
-          : 'text-gray-800 dark:text-gray-200   group-hover:text-amber-600 dark:group-hover:text-amber-400'
+          : 'text-gray-800 dark:text-gray-200 group-hover:text-amber-600 dark:group-hover:text-amber-400'
       }`}>
         {category.name}
       </h3>
@@ -485,7 +485,6 @@ const CategoryButton = React.memo(({
 
 CategoryButton.displayName = 'CategoryButton';
 
-// Full Page Categories Modal Component
 // Full Page Categories Modal Component - Enhanced Compact Version
 const CategoriesModal = React.memo(({ 
   isOpen, 
@@ -985,6 +984,24 @@ const EnhancedResourcesSection = React.memo(({
               </p>
             </motion.div>
 
+            {/* Trending Resources */}
+            <ResourceSwiper
+              resources={state.trendingResources}
+              title="Trending Resources"
+              icon={TrendingUp}
+              isLoading={state.loadingTrending}
+              emptyMessage="No trending resources at the moment"
+            />
+
+            {/* Recently Added Resources */}
+            <ResourceSwiper
+              resources={state.recentResources}
+              title="Recently Added"
+              icon={Sparkles}
+              isLoading={state.loadingRecent}
+              emptyMessage="No recent resources found"
+            />
+
             {/* Categories Grid */}
             <CategoriesGrid
               categories={categories}
@@ -1003,24 +1020,6 @@ const EnhancedResourcesSection = React.memo(({
                 emptyMessage={`No resources found in ${state.selectedCategory.name}`}
               />
             )}
-
-            {/* Trending Resources */}
-            <ResourceSwiper
-              resources={state.trendingResources}
-              title="Trending Resources"
-              icon={TrendingUp}
-              isLoading={state.loadingTrending}
-              emptyMessage="No trending resources at the moment"
-            />
-
-            {/* Recently Added Resources */}
-            <ResourceSwiper
-              resources={state.recentResources}
-              title="Recently Added"
-              icon={Sparkles}
-              isLoading={state.loadingRecent}
-              emptyMessage="No recent resources found"
-            />
 
             {/* Beautiful Browse All Resources Button */}
           {!isFullPage && (

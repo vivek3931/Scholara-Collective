@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquareText, X, Menu } from "lucide-react";
 import ChatBot from "../Chatbot/Chatbot";
 
@@ -6,11 +7,9 @@ const ChatbotToggle = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isOnRightSide, setIsOnRightSide] = useState(false);
-
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef({ x: 10, y: window.innerHeight / 2 });
   const buttonRef = useRef(null);
-
   const holdTimer = useRef(null);
 
   useEffect(() => {
@@ -20,7 +19,7 @@ const ChatbotToggle = ({ user }) => {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const toggleChatbot = () => setIsOpen(!isOpen);
+  const toggleChatbot = () => setIsOpen((prev) => !prev);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -39,18 +38,18 @@ const ChatbotToggle = ({ user }) => {
     return () => document.body.classList.remove("body-no-scroll");
   }, [isOpen]);
 
-  // --- Smooth render loop ---
+  // --- Smooth render loop for dragging ---
   useEffect(() => {
     let frame;
     const animate = () => {
-      if (buttonRef.current) {
+      if (buttonRef.current && dragging) {
         buttonRef.current.style.transform = `translate(${dragRef.current.x}px, ${dragRef.current.y}px)`;
       }
       frame = requestAnimationFrame(animate);
     };
-    animate();
+    if (dragging) animate();
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [dragging]);
 
   // --- Drag Handlers ---
   const handleTouchStart = (e) => {
@@ -77,105 +76,119 @@ const ChatbotToggle = ({ user }) => {
 
   const handleTouchEnd = () => {
     clearTimeout(holdTimer.current);
-
     setDragging(false);
 
     const buttonWidth = buttonRef.current ? buttonRef.current.offsetWidth : 36;
     const screenWidth = window.innerWidth;
 
-    let targetX;
-
     const isNowOnRightSide = dragRef.current.x > screenWidth / 2;
     setIsOnRightSide(isNowOnRightSide);
 
-    if (isNowOnRightSide) {
-      targetX = screenWidth - buttonWidth;
-    } else {
-      targetX = 0;
-    }
+    const targetX = isNowOnRightSide ? screenWidth - buttonWidth : 0;
 
-    let start = dragRef.current.x;
-    let end = targetX;
-    let startTime = null;
-
-    const duration = 300;
-
-    const animateSnap = (timestamp) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      const ease = 0.25 * Math.pow(progress - 1, 3) + 1;
-      dragRef.current.x = start + (end - start) * ease;
-
-      if (progress < 1) {
-        requestAnimationFrame(animateSnap);
-      } else {
-        dragRef.current.x = end;
-        if (navigator.vibrate) navigator.vibrate(20);
+    // Animate snapping with spring
+    const animateSnap = () => {
+      dragRef.current.x = targetX;
+      if (buttonRef.current) {
+        buttonRef.current.style.transition = "transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)";
+        buttonRef.current.style.transform = `translate(${targetX}px, ${dragRef.current.y}px)`;
       }
+      if (navigator.vibrate) navigator.vibrate(20);
     };
 
     requestAnimationFrame(animateSnap);
   };
 
+  // Animation variants for the chatbot container
+  const containerVariants = {
+    closed: {
+      clipPath: "circle(1.5rem at calc(100% - 3rem) calc(100% - 3rem))",
+      transition: {
+        type: "spring",
+        stiffness: 300,
+        damping: 30,
+        mass: 1,
+      },
+    },
+    open: {
+      clipPath: "circle(150% at calc(100% - 3rem) calc(100% - 3rem))",
+      transition: {
+        type: "spring",
+        stiffness: 300,
+        damping: 30,
+        mass: 1,
+      },
+    },
+  };
+
+  // Animation variants for the FAB button
+  const fabVariants = {
+    closed: { scale: 1, rotate: 0 },
+    open: { scale: 1.1, rotate: 90 },
+  };
+
   return (
     <>
       {/* Backdrop */}
-      <div
-        className={`fixed inset-0 z-40 transition-opacity duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        } ${
-          isMobile
-            ? "bg-black/70 backdrop-blur-sm"
-            : "bg-onyx/80 backdrop-blur-[1px]"
-        }`}
-        style={{ willChange: "opacity", display: isOpen ? "block" : "none" }}
-        onClick={toggleChatbot}
-      />
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className={`fixed inset-0 z-40 ${
+              isMobile ? "bg-black/70 backdrop-blur-sm" : "bg-onyx/80 backdrop-blur-[1px]"
+            }`}
+            onClick={toggleChatbot}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Chatbot container */}
-      <div
+      <motion.div
+        variants={containerVariants}
+        initial="closed"
+        animate={isOpen ? "open" : "closed"}
         className={`z-50 fixed inset-0 w-full h-full overflow-hidden flex flex-col
           bg-gradient-to-br from-pearl via-ivory to-cream dark:from-onyx dark:via-charcoal dark:to-midnight
-          transition-[clip-path] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]
-          ${isOpen ? "pointer-events-auto" : "pointer-events-none"}`}
-        style={{
-          clipPath: isOpen
-            ? "circle(150% at calc(100% - 3rem) calc(100% - 3rem))"
-            : "circle(1.5rem at calc(100% - 3rem) calc(100% - 3rem))",
-          willChange: "clip-path",
-          display: "block",
-        }}
+          pointer-events-auto`}
       >
         <ChatBot user={user} />
-      </div>
+      </motion.div>
 
       {/* FAB button */}
-      <button
+      <motion.button
+        variants={fabVariants}
+        initial="closed"
+        animate={isOpen ? "open" : "closed"}
+        transition={{ type: "spring", stiffness: 400, damping: 20 }}
         onClick={toggleChatbot}
         className={`fixed bottom-6 right-6 z-[9999]
           bg-gradient-to-br from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600
-          text-white rounded-full shadow-lg transition-all duration-300 ease-out
-          transform hover:scale-105 active:scale-95 flex items-center justify-center
+          text-white rounded-full shadow-lg flex items-center justify-center
           focus:outline-none focus:ring-4 focus:ring-amber-400/30
           ${isMobile && isOpen ? "hidden" : "p-4 opacity-100"}`}
         aria-label={isOpen ? "Close chatbot" : "Open chatbot"}
       >
-        {isOpen ? (
-          <X className="w-5 h-5 md:w-6 md:h-6" />
-        ) : (
-          <>
-            <MessageSquareText className="w-5 h-5 md:w-6 md:h-6" />
-            <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300/80 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-400"></span>
-            </span>
-          </>
-        )}
-      </button>
+        <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.3 }}>
+          {isOpen ? (
+            <X className="w-5 h-5 md:w-6 md:h-6" />
+          ) : (
+            <>
+              <MessageSquareText className="w-5 h-5 md:w-6 md:h-6" />
+              <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300/80 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-400"></span>
+              </span>
+            </>
+          )}
+        </motion.div>
+      </motion.button>
 
       {/* Floating Swipe Button (draggable & snapping) */}
       {isMobile && isOpen && (
-        <button
+        <motion.button
           ref={buttonRef}
           onClick={toggleChatbot}
           onTouchStart={handleTouchStart}
@@ -188,16 +201,20 @@ const ChatbotToggle = ({ user }) => {
             ${isOnRightSide ? "rounded-l-md" : "rounded-r-md"}`}
           style={{
             transform: `translate(${dragRef.current.x}px, ${dragRef.current.y}px)`,
-            transition: dragging ? "none" : "transform 0.3s ease-out",
+            transition: dragging ? "none" : "transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)",
           }}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
           aria-label="Close chatbot"
         >
-          <Menu
-            className={`w-5 h-5 transition-transform duration-300 ease-out ${
-              isOnRightSide ? "rotate-180" : "rotate-0"
-            }`}
-          />
-        </button>
+          <motion.div
+            animate={{ rotate: isOnRightSide ? 180 : 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Menu className="w-5 h-5" />
+          </motion.div>
+        </motion.button>
       )}
     </>
   );
