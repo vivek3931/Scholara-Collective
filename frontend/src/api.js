@@ -147,9 +147,10 @@ export const getResources = async (searchQuery = '', subjectFilter = 'all', stat
 };
 
 export const toggleResourceVisibility = async (resourceId) => {
-  const response = await api.patch(`/admin/resources/${resourceId}/toggle-visibility`);
+  const response = await api.put(`/admin/resources/${resourceId}/toggle-visibility`); // Changed from patch to put
   return response.data;
 };
+
 
 export const deleteResource = async (resourceId) => {
   const response = await api.delete(`/admin/resources/${resourceId}`);
@@ -157,8 +158,7 @@ export const deleteResource = async (resourceId) => {
 };
 
 export const resolveFlags = async (resourceId, actionType) => { // actionType can be 'approve' or 'remove'
-  const response = await api.patch(`/admin/resources/${resourceId}/resolve-flags`, { action: actionType });
+  const response = await api.put(`/admin/resources/${resourceId}/resolve-flags`, { action: actionType }); // Changed from patch to put
   return response.data;
 };
-
 export default api;
