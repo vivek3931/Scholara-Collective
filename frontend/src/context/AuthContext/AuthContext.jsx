@@ -17,7 +17,6 @@ export const AuthProvider = ({ children }) => {
     console.log('Setting user in AuthContext:', userData);
     
     if (typeof userData === 'function') {
-      // Handle functional updates
       setUserState(prevUser => {
         const newUser = userData(prevUser);
         console.log('Functional update - new user:', newUser);
@@ -27,7 +26,6 @@ export const AuthProvider = ({ children }) => {
         return newUser;
       });
     } else {
-      // Handle direct updates
       console.log('Direct update - new user:', userData);
       setUserState(userData);
       if (userData) {
@@ -54,7 +52,7 @@ export const AuthProvider = ({ children }) => {
         if (storedToken && storedUser) {
           try {
             const parsedUser = JSON.parse(storedUser);
-            setUserState(parsedUser); // Use setUserState directly here to avoid localStorage write
+            setUserState(parsedUser);
             setToken(storedToken);
 
             const isValid = await verifyTokenInBackground(storedToken);
@@ -62,7 +60,6 @@ export const AuthProvider = ({ children }) => {
               console.warn('Stored token was invalid during initialization, logging out.');
               clearAuthAndStorage();
             } else {
-              // Fetch fresh data but preserve profile info
               await fetchUserDataInternal(storedToken);
             }
           } catch (e) {
@@ -82,31 +79,23 @@ export const AuthProvider = ({ children }) => {
     loadAuthData();
   }, []);
 
-  // Set up periodic coin updates (every 5 minutes)
   useEffect(() => {
     if (!user || !token) return;
 
     const interval = setInterval(() => {
       fetchUserCoins();
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [user, token]);
 
   const verifyTokenInBackground = async (tokenToVerify) => {
-    if (!tokenToVerify) {
-      return false;
-    }
-
+    if (!tokenToVerify) return false;
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/verify-token`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenToVerify}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${tokenToVerify}`, 'Content-Type': 'application/json' },
       });
-
       if (response.ok) {
         console.log('Token successfully verified.');
         return true;
@@ -123,37 +112,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Fetch complete user data (renamed from fetchUserCoinsInternal for clarity)
   const fetchUserDataInternal = async (authToken = token) => {
     if (!authToken) {
       console.warn("Cannot fetch user data: No token available.");
       return null;
     }
-    
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/users/me`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-        },
+        headers: { 'Authorization': `Bearer ${authToken}` },
       });
-
       if (response.ok) {
         const freshUserData = await response.json();
-        console.log("Fresh user data from server:", freshUserData);
-        
-        // Update user state with fresh data from server
         setUserState(prevUser => {
           const updatedUser = { ...prevUser, ...freshUserData };
           localStorage.setItem("user", JSON.stringify(updatedUser));
           return updatedUser;
         });
-        
         return freshUserData;
       } else {
         console.error("Failed to fetch user data:", response.status);
-        if (response.status === 401 || response.status === 403) {
-          clearAuthAndStorage();
-        }
+        if (response.status === 401 || response.status === 403) clearAuthAndStorage();
         return null;
       }
     } catch (error) {
@@ -162,39 +140,27 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Internal function that accepts token parameter (for initial load)
   const fetchUserCoinsInternal = async (authToken = token) => {
     if (!authToken) {
       console.warn("Cannot fetch user coins: No token available.");
       return null;
     }
-    
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/users/me`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-        },
+        headers: { 'Authorization': `Bearer ${authToken}` },
       });
-
       if (response.ok) {
         const data = await response.json();
-        // Only update coins, preserve other user data
         setUserState(prevUser => {
-          const updatedUser = {
-            ...prevUser,
-            scholaraCoins: data.scholaraCoins
-          };
+          const updatedUser = { ...prevUser, scholaraCoins: data.scholaraCoins };
           localStorage.setItem("user", JSON.stringify(updatedUser));
           return updatedUser;
         });
-        
         console.log("User coins updated:", data.scholaraCoins);
         return data.scholaraCoins;
       } else {
         console.error("Failed to fetch user coins:", response.status);
-        if (response.status === 401 || response.status === 403) {
-          clearAuthAndStorage();
-        }
+        if (response.status === 401 || response.status === 403) clearAuthAndStorage();
         return null;
       }
     } catch (error) {
@@ -203,19 +169,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // --- Core Authentication Methods ---
-
   const register = async (credentials) => {
     clearError();
     setAuthLoading(true);
     try {
-      const response = await api.register(credentials);
+      const response = await api.register(credentials); // Sends username, email, password
       setAuthLoading(false);
+      // OTP is sent by register endpoint, no need to call sendRegistrationOtp immediately
       return { success: true, data: response };
     } catch (err) {
       setAuthLoading(false);
-      const errorMessage =
-        err.response?.data?.message || "Registration failed. Please try again.";
+      const errorMessage = err.response?.data?.message || "Registration failed. Please try again.";
       setError(errorMessage);
       console.error("Registration failed:", errorMessage);
       return { success: false, error: errorMessage };
@@ -226,13 +190,12 @@ export const AuthProvider = ({ children }) => {
     clearError();
     setAuthLoading(true);
     try {
-      const result = await api.sendRegistrationOtp({ email });
+      const result = await api.sendRegistrationOtp({ email }); // For resending OTP
       setAuthLoading(false);
       return { success: true, data: result };
     } catch (err) {
       setAuthLoading(false);
-      const errorMessage =
-        err.response?.data?.message || "Failed to send OTP. Please try again.";
+      const errorMessage = err.response?.data?.message || "Failed to send OTP. Please try again.";
       setError(errorMessage);
       console.error("Send OTP failed:", errorMessage);
       return { success: false, error: errorMessage };
@@ -271,8 +234,6 @@ export const AuthProvider = ({ children }) => {
 
       if (err.response) {
         console.error("Error response from server:", err.response.data);
-        console.error("Error status:", err.response.status);
-
         if (err.response.status === 409) {
           errorMessage = err.response.data.message || "Email already verified. Please login instead.";
           shouldRedirect = true;
@@ -299,22 +260,16 @@ export const AuthProvider = ({ children }) => {
     setAuthLoading(true);
     try {
       const { token: newToken, user: loggedInUser } = await api.login(credentials);
-
       localStorage.setItem("token", newToken);
       localStorage.setItem("user", JSON.stringify(loggedInUser));
       setToken(newToken);
       setUserState(loggedInUser);
       setAuthLoading(false);
-      
-      // Fetch fresh coin data after login
       await fetchUserCoinsInternal(newToken);
-      
       return loggedInUser;
     } catch (err) {
       setAuthLoading(false);
-      const errorMessage =
-        err.response?.data?.message ||
-        "Login failed. Please check your credentials.";
+      const errorMessage = err.response?.data?.message || "Login failed. Please check your credentials.";
       setError(errorMessage);
       console.error("Login failed:", errorMessage);
       throw err;
@@ -331,46 +286,29 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Public function to fetch user coins (can be called manually)
-  const fetchUserCoins = async () => {
-    return await fetchUserCoinsInternal();
-  };
-
-  // Function to update coins locally (useful when you know coins changed)
+  const fetchUserCoins = async () => await fetchUserCoinsInternal();
   const updateUserCoins = (newCoins) => {
     setUserState(prevUser => {
-      const updatedUser = {
-        ...prevUser,
-        scholaraCoins: newCoins
-      };
+      const updatedUser = { ...prevUser, scholaraCoins: newCoins };
       localStorage.setItem("user", JSON.stringify(updatedUser));
       return updatedUser;
     });
   };
 
-  // Function to add/subtract coins locally and optionally sync with server
   const adjustUserCoins = async (coinChange, syncWithServer = true) => {
-    // Update locally first for immediate UI feedback
     setUserState(prevUser => {
-      const updatedUser = {
-        ...prevUser,
-        scholaraCoins: (prevUser.scholaraCoins || 0) + coinChange
-      };
+      const updatedUser = { ...prevUser, scholaraCoins: (prevUser.scholaraCoins || 0) + coinChange };
       localStorage.setItem("user", JSON.stringify(updatedUser));
       return updatedUser;
     });
-    
-    // Optionally sync with server to get the actual value
-    if (syncWithServer) {
-      setTimeout(() => fetchUserCoins(), 1000);
-    }
+    if (syncWithServer) setTimeout(() => fetchUserCoins(), 1000);
   };
 
   const isAuthenticated = !!user && !!token;
 
   const value = {
     user,
-    setUser, // This now properly updates both state and localStorage
+    setUser,
     token,
     isAuthenticated,
     authLoading,
@@ -392,8 +330,6 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (context === undefined) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
