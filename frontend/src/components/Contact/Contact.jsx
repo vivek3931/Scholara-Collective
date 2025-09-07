@@ -40,11 +40,6 @@ const Contact = () => {
   // State for showing submission success or failure messages
   const [submitSuccess, setSubmitSuccess] = useState(null); // null, true, or false
 
-  // Callback to handle going back in browser history
-  const handleGoBack = useCallback(() => {
-    window.history.back();
-  }, []);
-
   // Handler for form input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -78,15 +73,7 @@ const Contact = () => {
   return (
     <div className="min-h-screen bg-gray-50 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx text-gray-900 dark:text-white transition-colors duration-300 font-inter">
 
-      {/* Fixed Back Button */}
-      {/* This button allows users to navigate back to the previous page */}
-      <button
-        onClick={handleGoBack}
-        className="fixed top-4 left-4 z-50 inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-onyx shadow-lg hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-midnight hover:scale-105 transition-all duration-200 rounded-md border border-gray-200 dark:border-charcoal"
-      >
-        <FontAwesomeIcon icon={faArrowLeft} className="text-sm"/>
-        <span>Back</span>
-      </button>
+      
 
       {/* Header Section */}
       {/* This section contains the main title and a brief description of the page */}

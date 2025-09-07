@@ -78,9 +78,6 @@ const Settings = () => {
     }));
   };
 
-  const handleGoBack = () => {
-    navigate(-1);
-  };
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
@@ -195,7 +192,7 @@ const Settings = () => {
     <div className="min-h-screen flex flex-col">
       
       {/* Animated background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200 dark:from-onyx dark:via-charcoal dark:to-onyx"></div>
+      {/* <div className="fixed inset-0 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200 dark:from-onyx dark:via-charcoal dark:to-onyx"></div> */}
       {/* Main Content */}
       <main className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
         <div className="max-w-4xl mx-auto animate-fade-in">
