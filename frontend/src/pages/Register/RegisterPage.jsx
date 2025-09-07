@@ -1,10 +1,10 @@
 // src/pages/Register/RegisterPage.jsx
-import React, { useState, useEffect , useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext/AuthContext';
 import { useModal } from '../../context/ModalContext/ModalContext.jsx';
 import { UserPlus, Mail, CheckCircle } from 'lucide-react';
-import { Helmet } from 'react-helmet-async'; // Import Helmet for SEO
+import { Helmet } from 'react-helmet-async';
 
 const RegisterPage = () => {
     const [username, setUsername] = useState('');
@@ -19,18 +19,19 @@ const RegisterPage = () => {
 
     const navigate = useNavigate();
     const {
+        register,
         sendRegistrationOtp,
         verifyRegistrationOtp,
         authLoading,
         clearError,
-        isAuthenticated
+        isAuthenticated,
     } = useAuth();
     const { showModal, hideModal } = useModal();
 
     // Redirect if already authenticated
     useEffect(() => {
         if (isAuthenticated) {
-            navigate('/'); // Redirect to home or dashboard if already logged in
+            navigate('/');
         }
     }, [isAuthenticated, navigate]);
 
@@ -45,7 +46,7 @@ const RegisterPage = () => {
         if (isOtpSent && otpTimer > 0) {
             timer = setInterval(() => setOtpTimer((prev) => prev - 1), 1000);
         } else if (otpTimer === 0 && isOtpSent) {
-            setIsOtpSent(false); // Reset to initial form when timer expires
+            setIsOtpSent(false);
             showModal({
                 type: 'info',
                 title: 'OTP Expired',
@@ -93,9 +94,9 @@ const RegisterPage = () => {
             return false;
         }
         return true;
-    }, [password, confirmPassword, username.length, showModal, hideModal]); // Added dependencies
+    }, [password, confirmPassword, username.length, showModal, hideModal]);
 
-    const handleSendOtp = async (e) => {
+    const handleRegisterAndSendOtp = async (e) => {
         e.preventDefault();
         clearError();
 
@@ -103,7 +104,7 @@ const RegisterPage = () => {
 
         setIsSendingOtp(true);
         try {
-            const result = await sendRegistrationOtp({ email });
+            const result = await register({ username, email, password });
             if (result && result.success) {
                 setIsOtpSent(true);
                 setOtpTimer(600); // Reset timer to 10 minutes
@@ -117,8 +118,8 @@ const RegisterPage = () => {
             } else {
                 showModal({
                     type: 'error',
-                    title: 'Failed to Send OTP',
-                    message: result.message || 'An unexpected error occurred while sending OTP. Please try again.',
+                    title: 'Failed to Register',
+                    message: result.message || 'An unexpected error occurred during registration. Please try again.',
                     confirmText: 'OK',
                     onConfirm: hideModal,
                 });
@@ -126,8 +127,46 @@ const RegisterPage = () => {
         } catch (err) {
             showModal({
                 type: 'error',
-                title: 'Error Sending OTP',
-                message: err.response?.data?.message || 'Network error or unable to send OTP. Please try again.',
+                title: 'Error Registering',
+                message: err.response?.data?.message || 'Network error or unable to register. Please try again.',
+                confirmText: 'OK',
+                onConfirm: hideModal,
+            });
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+
+    const handleResendOtp = async (e) => {
+        e.preventDefault();
+        clearError();
+
+        setIsSendingOtp(true);
+        try {
+            const result = await sendRegistrationOtp({ email });
+            if (result && result.success) {
+                setOtpTimer(600); // Reset timer to 10 minutes
+                showModal({
+                    type: 'success',
+                    title: 'OTP Resent',
+                    message: 'A new One-Time Password has been sent to your email. Please check your inbox (and spam folder).',
+                    confirmText: 'OK',
+                    onConfirm: hideModal,
+                });
+            } else {
+                showModal({
+                    type: 'error',
+                    title: 'Failed to Resend OTP',
+                    message: result.message || 'An unexpected error occurred while resending OTP. Please try again.',
+                    confirmText: 'OK',
+                    onConfirm: hideModal,
+                });
+            }
+        } catch (err) {
+            showModal({
+                type: 'error',
+                title: 'Error Resending OTP',
+                message: err.response?.data?.message || 'Network error or unable to resend OTP. Please try again.',
                 confirmText: 'OK',
                 onConfirm: hideModal,
             });
@@ -226,7 +265,6 @@ const RegisterPage = () => {
 
     return (
         <>
-            {/* Add Helmet for SEO meta tags */}
             <Helmet>
                 <title>{isOtpSent ? 'Verify Email - Scholara Collective' : 'Register - Scholara Collective'}</title>
                 <meta name="description" content="Register for a new account on Scholara Collective and get access to academic resources. Verify your email with OTP." />
@@ -235,12 +273,12 @@ const RegisterPage = () => {
             <div className="min-h-screen flex items-center justify-center bg-platinum/80 bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx transition-colors duration-200 p-4 font-poppins animate-fade-in">
                 <div className="bg-white dark:bg-onyx/60 p-8 rounded-xl shadow-glow-sm w-full max-w-md border border-gray-200 dark:border-onyx transition-colors duration-200">
                     <h2 className="text-xl font-bold text-center bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 bg-clip-text text-transparent mb-6 font-poppins flex items-center justify-center gap-2">
-                        {isOtpSent ? <CheckCircle size={28} className="text-green-500"/> : <UserPlus size={28} className="text-amber-500"/>}
+                        {isOtpSent ? <CheckCircle size={28} className="text-green-500" /> : <UserPlus size={28} className="text-amber-500" />}
                         <span>{isOtpSent ? 'Verify Your Email' : 'Register for Scholara Collective'}</span>
                     </h2>
 
                     {!isOtpSent ? (
-                        <form onSubmit={handleSendOtp} className="space-y-4" aria-label="Register form">
+                        <form onSubmit={handleRegisterAndSendOtp} className="space-y-4" aria-label="Register form">
                             <div>
                                 <label className="block text-charcoal dark:text-platinum text-sm font-semibold mb-2" htmlFor="username">
                                     Username
@@ -328,17 +366,17 @@ const RegisterPage = () => {
                                 {isSendingOtp ? (
                                     <div className="flex items-center justify-center">
                                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                                        Sending OTP...
+                                        Registering...
                                     </div>
                                 ) : (
-                                    'Register'
+                                    'Register & Send OTP'
                                 )}
                             </button>
                         </form>
                     ) : (
                         <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4" aria-label="OTP verification form">
                             <p className="text-center text-gray-700 dark:text-gray-300 mb-4 flex flex-col items-center justify-center gap-2">
-                                <Mail size={20} className="text-blue-500"/>
+                                <Mail size={20} className="text-blue-500" />
                                 An OTP has been sent to <span className="font-bold text-amber-600 dark:text-amber-400">{email}</span>.
                                 <span className="text-sm text-gray-500 dark:text-gray-400">Time remaining: {formatTime(otpTimer)}</span>
                             </p>
@@ -352,9 +390,7 @@ const RegisterPage = () => {
                                     className="w-full p-3 rounded-lg bg-gray-50 dark:bg-onyx/90 border border-gray-300 dark:border-charcoal text-charcoal dark:text-platinum focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-colors duration-200 text-center tracking-widest text-lg"
                                     placeholder="Enter 6-digit OTP"
                                     value={otp}
-                                    onChange={(e) => {
-                                        setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
-                                    }}
+                                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                     required
                                     disabled={authLoading || isVerifyingOtp}
                                     maxLength={6}
@@ -377,7 +413,7 @@ const RegisterPage = () => {
                             </button>
                             <button
                                 type="button"
-                                onClick={handleSendOtp}
+                                onClick={handleResendOtp}
                                 disabled={authLoading || isSendingOtp || isVerifyingOtp || otpTimer > 0}
                                 className="w-full bg-gray-200 text-gray-700 p-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-charcoal dark:text-platinum dark:hover:bg-gray-700"
                             >
