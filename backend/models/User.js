@@ -149,14 +149,21 @@ userSchema.index({ isActive: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ otpExpires: 1 });
 
-// Pre-save middleware
+// Consolidated Pre-save middleware to prevent double hashing and set OTP expiry
 userSchema.pre('save', async function(next) {
     this.updatedAt = new Date();
     
+    // Hash password only if it's being modified
     if (this.isModified('password') && this.password) {
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
     }
+    
+    // Set OTP expiration only if the OTP field is being modified
+    if (this.isModified('otp') && this.otp) {
+        this.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    }
+    
     next();
 });
 
@@ -165,7 +172,7 @@ userSchema.methods.verifyOtp = function(enteredOtp) {
         storedOtp: this.otp,
         enteredOtp: enteredOtp,
         typeMatch: typeof this.otp === typeof enteredOtp,
-        timeRemaining: this.timeUntilOtpExpiry / 1000 + ' seconds'
+        timeRemaining: this.otpExpires ? (this.otpExpires.getTime() - new Date().getTime()) / 1000 + ' seconds' : 'N/A'
     });
 
     const cleanStored = String(this.otp).trim();
@@ -173,21 +180,6 @@ userSchema.methods.verifyOtp = function(enteredOtp) {
     
     return cleanStored === cleanEntered && this.otpExpires > new Date();
 };
-
-userSchema.pre('save', async function(next) {
-    this.updatedAt = new Date();
-    
-    if (this.isModified('password') && this.password) {
-        const salt = await bcrypt.genSalt(10);
-        this.password = await bcrypt.hash(this.password, salt);
-    }
-    
-    if (this.isModified('otp') && this.otp) {
-        this.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-    }
-    
-    next();
-});
 
 userSchema.methods.matchPassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
