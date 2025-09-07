@@ -6,6 +6,12 @@ const User = require('../models/User');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const cloudinary = require('cloudinary').v2;
 const mongoose = require('mongoose');
+const { 
+    notifyNewUser, 
+    notifyResourceFlagged, 
+    notifyNewResource,
+    notifySystemAlert 
+} = require('../socket/adminSocket');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -39,6 +45,19 @@ router.get('/dashboard', protect, authorize('admin', 'superadmin'), async (req, 
         const recentUsers = await User.countDocuments({ createdAt: { $gte: thirtyDaysAgo } });
         const recentResources = await Resource.countDocuments({ createdAt: { $gte: thirtyDaysAgo } });
 
+        // Get recent activities for notifications
+        const recentActivities = await Promise.all([
+            User.find({ createdAt: { $gte: thirtyDaysAgo } })
+                .select('username email createdAt')
+                .sort({ createdAt: -1 })
+                .limit(5),
+            Resource.find({ 'flags.0': { $exists: true } })
+                .populate('uploadedBy', 'username')
+                .populate('flags.postedBy', 'username')
+                .sort({ 'flags.createdAt': -1 })
+                .limit(5)
+        ]);
+
         const topSubjects = await Resource.aggregate([
             { $group: { _id: '$subject', count: { $sum: 1 } } },
             { $sort: { count: -1 } },
@@ -68,12 +87,105 @@ router.get('/dashboard', protect, authorize('admin', 'superadmin'), async (req, 
             topSubjects,
             topInstitutions,
             activeUsers,
+            recentActivities: {
+                newUsers: recentActivities[0],
+                flaggedResources: recentActivities[1]
+            }
         });
     } catch (err) {
         console.error('Admin dashboard error:', err.message);
+        
+        // Notify admins of system error
+        notifySystemAlert('dashboard-error', 'Dashboard data fetch failed', {
+            error: err.message,
+            timestamp: new Date()
+        });
+        
         res.status(500).json({ msg: 'Server error' });
     }
 });
+
+
+
+router.get('/notifications', protect, authorize('admin', 'superadmin'), async (req, res) => {
+    try {
+        const { page = 1, limit = 20, type } = req.query;
+        
+        // In a real application, you'd store notifications in a database
+        // For now, we'll return recent activities as notifications
+        const query = {};
+        
+        if (type && type !== 'all') {
+            // Filter by notification type if needed
+        }
+
+        // Get recent flagged resources as notifications
+        const flaggedResources = await Resource.find({ 'flags.0': { $exists: true } })
+            .populate('uploadedBy', 'username email')
+            .populate('flags.postedBy', 'username')
+            .sort({ 'flags.createdAt': -1 })
+            .limit(parseInt(limit))
+            .skip((page - 1) * parseInt(limit));
+
+        // Get recent users as notifications
+        const recentUsers = await User.find()
+            .sort({ createdAt: -1 })
+            .limit(parseInt(limit))
+            .skip((page - 1) * parseInt(limit))
+            .select('username email createdAt');
+
+        // Format as notifications
+        const notifications = [
+            ...flaggedResources.map(resource => ({
+                id: `flag_${resource._id}`,
+                type: 'resource-flagged',
+                title: 'Resource Flagged',
+                message: `Resource "${resource.title}" was flagged`,
+                timestamp: resource.flags[0]?.createdAt || resource.createdAt,
+                data: resource,
+                read: false
+            })),
+            ...recentUsers.map(user => ({
+                id: `user_${user._id}`,
+                type: 'new-user',
+                title: 'New User Registration',
+                message: `${user.username} joined the platform`,
+                timestamp: user.createdAt,
+                data: user,
+                read: false
+            }))
+        ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        const total = notifications.length;
+
+        res.json({
+            notifications: notifications.slice(0, parseInt(limit)),
+            totalPages: Math.ceil(total / limit),
+            currentPage: parseInt(page),
+            total
+        });
+
+    } catch (err) {
+        console.error('Get notifications error:', err.message);
+        res.status(500).json({ msg: 'Server error' });
+    }
+});
+
+
+router.post('/notifications/:id/read', protect, authorize('admin', 'superadmin'), async (req, res) => {
+    try {
+        // In a real implementation, you'd update the notification status in the database
+        console.log(`Notification ${req.params.id} marked as read by admin ${req.user.username}`);
+        
+        res.json({ msg: 'Notification marked as read' });
+    } catch (err) {
+        console.error('Mark notification read error:', err.message);
+        res.status(500).json({ msg: 'Server error' });
+    }
+});
+
+
+
 
 // @route   GET /api/admin/users
 // @desc    Get all users with pagination and search
@@ -102,21 +214,8 @@ router.get('/users', protect, authorize('admin', 'superadmin'), async (req, res)
 
         const total = await User.countDocuments(query);
 
-        // NOTE: The 'getStats' method is not defined on the User model
-        // in the provided schema. We will remove this for now to prevent errors.
-        // If you add this method later, you can re-integrate this logic.
-        const usersWithStats = users.map((user) => ({
-            _id: user._id,
-            username: user.username,
-            email: user.email,
-            role: user.role,
-            isActive: user.isActive,
-            createdAt: user.createdAt,
-            // Additional stats would go here
-        }));
-
         res.json({
-            users: usersWithStats,
+            users: users,
             totalPages: Math.ceil(total / limit),
             currentPage: parseInt(page),
             total,
@@ -130,7 +229,7 @@ router.get('/users', protect, authorize('admin', 'superadmin'), async (req, res)
 // @route   PUT /api/admin/users/:id/toggle-status
 // @desc    Toggle user active status
 // @access  Private (Admin or Superadmin)
-router.put('/users/:id/toggle-status', protect, authorize('admin', 'superadmin'), async (req, res) => {
+router.patch('/users/:id/toggle-status', protect, authorize('admin', 'superadmin'), async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
         if (!user) {
@@ -377,9 +476,6 @@ router.delete('/resources/:id', protect, authorize('admin', 'superadmin'), async
     }
 });
 
-// @route   PUT /api/admin/resources/:id/resolve-flags
-// @desc    Resolve all flags for a resource
-// @access  Private (Admin or Superadmin)
 router.put('/resources/:id/resolve-flags', protect, authorize('admin', 'superadmin'), async (req, res) => {
     try {
         const { action } = req.body;
@@ -390,6 +486,7 @@ router.put('/resources/:id/resolve-flags', protect, authorize('admin', 'superadm
         }
 
         if (action === 'remove') {
+            // Delete the resource completely
             if (resource.cloudinaryPublicId) {
                 try {
                     await cloudinary.uploader.destroy(resource.cloudinaryPublicId, {
@@ -400,17 +497,19 @@ router.put('/resources/:id/resolve-flags', protect, authorize('admin', 'superadm
                 }
             }
 
+            // Remove resource from users' saved lists
             await User.updateMany(
                 { savedResources: resource._id },
                 { $pull: { savedResources: resource._id } }
             );
 
             await Resource.findByIdAndDelete(req.params.id);
-            return res.json({ msg: 'Resource deleted successfully' });
+            return res.json({ msg: 'Flagged resource removed successfully' });
         } else if (action === 'approve') {
+            // Clear all flags and keep the resource
             resource.flags = [];
             await resource.save();
-            return res.json({ msg: 'Flags resolved and resource approved' });
+            return res.json({ msg: 'Flags cleared and resource approved' });
         } else {
             return res.status(400).json({ msg: 'Invalid action. Use "remove" or "approve".' });
         }
