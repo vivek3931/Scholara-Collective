@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/emailSender');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const { notifyNewUser } = require('../socket/adminSocket');
+
 const { JWT_SECRET } = process.env;
 
 const signToken = (payload) => {
@@ -25,84 +27,45 @@ const signToken = (payload) => {
 
 exports.register = async (req, res) => {
     const { username, email, password, role, bio } = req.body;
-
     try {
+        // Validate password strength
+        if (!password || password.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
+        }
+        if (!username || !email) {
+            return res.status(400).json({ message: 'Username and email are required.' });
+        }
         let user = await User.findOne({ email });
-        if (user) {
-            return res.status(400).json({ message: 'User already exists' });
-        }
-
-        user = new User({
-            username,
-            email,
-            password,
-            role: role || 'student',
-            bio: bio || '',
-            isVerified: false,
-        });
-
-        await user.save();
-
-        res.status(201).json({
-            message: 'Registration initiated. Please verify your email.',
-        });
-    } catch (err) {
-        console.error('Registration Error:', err.message);
-        res.status(500).send('Server Error during registration');
-    }
-};
-
-exports.sendRegistrationOtp = async (req, res) => {
-    const { email } = req.body;
-    try {
-        console.log('--- sendRegistrationOtp hit ---');
-        console.log('Email received:', email);
-
-        if (!email || !email.includes('@')) {
-            return res.status(400).json({ message: 'Valid email address is required.' });
-        }
-
-        let user = await User.findOne({ email }).select('+otp +otpExpires');
-
         if (user && user.isVerified) {
-            console.log('User already verified, rejecting request');
-            return res.status(400).json({ message: 'Email already registered and verified.' });
+            return res.status(400).json({ message: 'User already exists and is verified.' });
         }
-
-        if (!user || (user.username.startsWith('temp_user_') && !user.isVerified)) {
-            console.log('Creating/updating temporary user');
-            const tempPassword = crypto.randomBytes(16).toString('hex');
-            const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(tempPassword, salt);
-            
-            user = user || new User({
+        if (user) {
+            // Update existing unverified user
+            user.username = username;
+            user.password = password; // Will be hashed by pre-save middleware
+            user.role = role || 'student';
+            user.bio = bio || '';
+            user.isVerified = false;
+        } else {
+            // Create new user
+            user = new User({
+                username,
                 email,
-                username: `temp_user_${Date.now()}`,
-                password: hashedPassword,
+                password, // Will be hashed by pre-save middleware
+                role: role || 'student',
+                bio: bio || '',
                 isVerified: false,
             });
-
-            user.password = hashedPassword;
-            user.isVerified = false;
-            user.otp = undefined;
-            user.otpExpires = undefined;
-            
-            await user.save();
-            console.log('Temporary user created/updated');
         }
-
+        // Generate OTP
         const otp = crypto.randomInt(100000, 999999).toString();
         const otpExpires = Date.now() + 10 * 60 * 1000;
-
-        console.log('Generated OTP:', otp);
-        console.log('OTP expires at:', new Date(otpExpires));
-
         user.otp = otp;
         user.otpExpires = new Date(otpExpires);
         await user.save();
+        console.log('User saved with OTP:', { email, otp, otpExpires: new Date(otpExpires) });
 
-        console.log('OTP saved to user. User OTP:', user.otp, 'Expires:', user.otpExpires);
-
+        // Send OTP email (keeping your existing email template)
         const emailSubject = 'Your Scholara Collective Registration OTP';
         const emailHtml = `
             <div style="font-family: 'Inter', sans-serif; line-height: 1.6; color: #333; background-color: #f8f8f8; padding: 20px; border-radius: 8px; max-width: 600px; margin: 20px auto; border: 1px solid #e0e0e0; box-shadow: 0 4px 8px rgba(0,0,0,0.05);">
@@ -144,17 +107,98 @@ exports.sendRegistrationOtp = async (req, res) => {
                 </table>
             </div>
         `;
-
         await sendEmail({
             email: user.email,
             subject: emailSubject,
             html: emailHtml,
             text: `Your OTP for Scholara Collective registration is: ${otp}. It is valid for 10 minutes.`,
         });
+        console.log('OTP email sent successfully to:', user.email);
+        res.status(201).json({
+            message: 'Registration initiated. Please verify your email with the OTP sent.',
+        });
+    } catch (err) {
+        console.error('Registration Error:', err.message);
+        res.status(500).json({
+            message: 'Server Error during registration',
+            error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+        });
+    }
+};
 
+exports.sendRegistrationOtp = async (req, res) => {
+    const { email } = req.body;
+    try {
+        console.log('--- sendRegistrationOtp hit ---');
+        console.log('Email received:', email);
+        if (!email || !email.includes('@')) {
+            return res.status(400).json({ message: 'Valid email address is required.' });
+        }
+        let user = await User.findOne({ email }).select('+otp +otpExpires');
+        if (!user) {
+            return res.status(404).json({ message: 'No registration request found for this email.' });
+        }
+        if (user.isVerified) {
+            console.log('User already verified, rejecting request');
+            return res.status(400).json({ message: 'Email already registered and verified.' });
+        }
+        const otp = crypto.randomInt(100000, 999999).toString();
+        const otpExpires = Date.now() + 10 * 60 * 1000;
+        console.log('Generated OTP:', otp);
+        console.log('OTP expires at:', new Date(otpExpires));
+        user.otp = otp;
+        user.otpExpires = new Date(otpExpires);
+        await user.save();
+        console.log('OTP saved to user. User OTP:', user.otp, 'Expires:', user.otpExpires);
+        const emailSubject = 'Your Scholara Collective Registration OTP';
+        const emailHtml = `
+            <div style="font-family: 'Inter', sans-serif; line-height: 1.6; color: #333; background-color: #f8f8f8; padding: 20px; border-radius: 8px; max-width: 600px; margin: 20px auto; border: 1px solid #e0e0e0; box-shadow: 0 4px 8px rgba(0,0,0,0.05);">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td style="padding-bottom: 20px; text-align: center;">
+                            <h1 style="color: #F59E0B; font-size: 28px; margin: 0; padding: 0;">Scholara Collective</h1>
+                            <p style="color: #666; font-size: 14px; margin-top: 5px;">Your Hub for Knowledge Exchange</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 20px; background-color: #ffffff; border-radius: 8px;">
+                            <p style="font-size: 16px; margin-bottom: 15px;">Hello,</p>
+                            <p style="font-size: 16px; margin-bottom: 20px;">
+                                Thank you for registering with Scholara Collective. To complete your registration and verify your email address, please use the following One-Time Password (OTP):
+                            </p>
+                            <div style="text-align: center; margin-bottom: 30px;">
+                                <h2 style="background-color: #FFFBEB; color: #D97706; font-size: 36px; letter-spacing: 4px; padding: 15px 25px; border-radius: 8px; display: inline-block; border: 1px dashed #FCD34D;">
+                                    ${otp}
+                                </h2>
+                            </div>
+                            <p style="font-size: 14px; color: #555; margin-bottom: 15px;">
+                                This OTP is valid for the next <strong>10 minutes</strong>. Please do not share this code with anyone.
+                            </p>
+                            <p style="font-size: 14px; color: #555;">
+                                If you did not attempt to register with Scholara Collective, please disregard this email.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-top: 25px; text-align: center; font-size: 12px; color: #888;">
+                            <p>&copy; ${new Date().getFullYear()} Scholara Collective. All rights reserved.</p>
+                            <p>
+                                <a href="mailto:support@scholara.com" style="color: #F59E0B; text-decoration: none;">Support</a> |
+                                <a href="https://yourwebsite.com/privacy" style="color: #F59E0B; text-decoration: none;">Privacy Policy</a>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        `;
+        await sendEmail({
+            email: user.email,
+            subject: emailSubject,
+            html: emailHtml,
+            text: `Your OTP for Scholara Collective registration is: ${otp}. It is valid for 10 minutes.`,
+        });
         console.log('OTP email sent successfully');
-
-        res.status(200).json({ 
+        res.status(200).json({
             message: 'OTP sent successfully to your email.',
             debug: {
                 email: user.email,
@@ -162,11 +206,10 @@ exports.sendRegistrationOtp = async (req, res) => {
                 otpExpires: user.otpExpires
             }
         });
-
     } catch (err) {
         console.error('Send OTP Error:', err.message);
         console.error('Full error:', err);
-        res.status(500).json({ 
+        res.status(500).json({
             message: 'Server Error during OTP sending',
             error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
         });
@@ -176,32 +219,32 @@ exports.sendRegistrationOtp = async (req, res) => {
 exports.verifyRegistrationOtp = async (req, res) => {
     console.log('--- verifyRegistrationOtp hit ---');
     console.log('Request Body:', req.body);
-
     const { username, email, password, otp, referralCode } = req.body;
-
     if (!username || !email || !password || !otp) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             success: false,
-            message: 'All fields are required: username, email, password, and OTP.' 
+            message: 'All fields are required: username, email, password, and OTP.'
         });
     }
-
+    if (password.length < 6) {
+        return res.status(400).json({
+            success: false,
+            message: 'Password must be at least 6 characters long.'
+        });
+    }
     const session = await mongoose.startSession();
     session.startTransaction();
-    
     try {
         const user = await User.findOne({ email })
             .select('+otp +otpExpires +password')
             .session(session);
-
         if (!user) {
             await session.abortTransaction();
-            return res.status(404).json({ 
+            return res.status(404).json({
                 success: false,
-                message: 'No registration request found for this email.' 
+                message: 'No registration request found for this email.'
             });
         }
-
         console.log('Verification Context:', {
             dbOtp: user.otp,
             receivedOtp: otp,
@@ -211,9 +254,7 @@ exports.verifyRegistrationOtp = async (req, res) => {
             expiresAt: user.otpExpires,
             timeDifference: user.otpExpires ? new Date(user.otpExpires).getTime() - new Date().getTime() : 'N/A'
         });
-
-        const isAlreadyVerified = user.isVerified;
-        if (isAlreadyVerified) {
+        if (user.isVerified) {
             await session.abortTransaction();
             return res.status(409).json({
                 success: false,
@@ -221,18 +262,15 @@ exports.verifyRegistrationOtp = async (req, res) => {
                 isAlreadyVerified: true
             });
         }
-
         const isOtpValidAndNotExpired = user.verifyOtp(otp);
-
         if (!isOtpValidAndNotExpired) {
             const isOtpExpired = user.otpExpires ? new Date(user.otpExpires) < new Date() : true;
-            
             if (!user.otp || !user.otpExpires) {
-                 await session.abortTransaction();
-                 return res.status(400).json({
-                     success: false,
-                     message: 'No valid OTP found. Please request a new OTP.'
-                 });
+                await session.abortTransaction();
+                return res.status(400).json({
+                    success: false,
+                    message: 'No valid OTP found. Please request a new OTP.'
+                });
             } else if (isOtpExpired) {
                 await session.abortTransaction();
                 return res.status(400).json({
@@ -253,12 +291,10 @@ exports.verifyRegistrationOtp = async (req, res) => {
                 });
             }
         }
-
         const existingUsername = await User.findOne({
             username,
             _id: { $ne: user._id }
         }).session(session);
-
         if (existingUsername) {
             await session.abortTransaction();
             return res.status(400).json({
@@ -266,21 +302,16 @@ exports.verifyRegistrationOtp = async (req, res) => {
                 message: 'Username is already taken.'
             });
         }
-
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
         // Update user details and mark as verified
         user.username = username;
-        user.password = hashedPassword;
+        user.password = password; // Will be hashed by pre-save middleware
         user.isVerified = true;
         user.otp = undefined;
         user.otpExpires = undefined;
         user.stats.lastLogin = new Date();
-
         await user.save({ session });
-        
-        // Referral logic: Award coins to the referrer if a referral code exists
+
+        // Referral logic
         if (referralCode) {
             const referrer = await User.findById(referralCode).session(session);
             if (referrer) {
@@ -300,6 +331,21 @@ exports.verifyRegistrationOtp = async (req, res) => {
 
         await session.commitTransaction();
 
+        // 🚀 SEND NEW USER NOTIFICATION TO ADMINS
+        try {
+            notifyNewUser({
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                createdAt: new Date()
+            });
+            console.log(`✅ Admin notification sent for new user: ${user.username}`);
+        } catch (notificationError) {
+            console.error('❌ Failed to send new user notification:', notificationError.message);
+            // Don't fail the registration if notification fails
+        }
+
         return res.status(200).json({
             success: true,
             token,
@@ -312,7 +358,6 @@ exports.verifyRegistrationOtp = async (req, res) => {
             },
             message: 'Registration successful!',
         });
-
     } catch (transactionErr) {
         await session.abortTransaction();
         console.error('Verify OTP Transaction Error:', {
@@ -335,31 +380,33 @@ exports.verifyRegistrationOtp = async (req, res) => {
 
 exports.login = async (req, res) => {
     const { email, password } = req.body;
-
     try {
-        let user = await User.findOne({ email });
+        console.log('Login attempt:', { email });
+        let user = await User.findOne({ email }).select('+password');
         if (!user) {
-            return res.status(400).json({ message: 'Invalid credentials' });
+            console.log('User not found for email:', email);
+            return res.status(400).json({ message: 'Invalid credentials: Email not found' });
         }
-
         if (!user.isVerified) {
+            console.log('User not verified:', email);
             return res.status(403).json({ message: 'Please verify your email address before logging in.' });
         }
-
         const isMatch = await bcrypt.compare(password, user.password);
+        console.log('Password comparison:', {
+            providedPassword: password,
+            storedHash: user.password,
+            isMatch
+        });
         if (!isMatch) {
-            return res.status(400).json({ message: 'Invalid credentials' });
+            return res.status(400).json({ message: 'Invalid credentials: Incorrect password' });
         }
-
         const payload = {
             user: {
                 id: user.id,
                 roles: [user.role],
             },
         };
-
         const token = await signToken(payload);
-
         res.json({
             token,
             user: {
@@ -376,39 +423,39 @@ exports.login = async (req, res) => {
         });
     } catch (err) {
         console.error('Login Error:', err.message);
-        res.status(500).send('Server Error during login');
+        res.status(500).json({
+            message: 'Server Error during login',
+            error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+        });
     }
 };
 
 exports.verifyToken = (req, res) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ 
-      success: false,
-      message: 'No token found! The spaceship is adrift in deep space without a pilot.',
-    });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      console.error('Token verification failed:', err.message);
-      return res.status(403).json({
-        success: false,
-        message: 'Token verification failed. Your access key has expired! Looks like your warp drive needs a reboot.',
-      });
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({
+            success: false,
+            message: 'No token found! The spaceship is adrift in deep space without a pilot.',
+        });
     }
-    
-    res.status(200).json({
-      success: true,
-      message: 'Token verified! You are cleared for launch. Welcome aboard, Commander.',
-      user: {
-        id: user.id,
-        roles: user.roles,
-      },
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            console.error('Token verification failed:', err.message);
+            return res.status(403).json({
+                success: false,
+                message: 'Token verification failed. Your access key has expired! Looks like your warp drive needs a reboot.',
+            });
+        }
+        res.status(200).json({
+            success: true,
+            message: 'Token verified! You are cleared for launch. Welcome aboard, Commander.',
+            user: {
+                id: user.id,
+                roles: user.roles,
+            },
+        });
     });
-  });
 };
 
 exports.updateProfile = async (req, res) => {
@@ -435,7 +482,6 @@ exports.getMe = async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-
         res.json({
             _id: user._id,
             username: user.username,
@@ -448,7 +494,10 @@ exports.getMe = async (req, res) => {
         });
     } catch (err) {
         console.error('Get user data error:', err.message);
-        res.status(500).send('Server Error');
+        res.status(500).json({
+            message: 'Server Error',
+            error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+        });
     }
 };
 
@@ -459,69 +508,70 @@ exports.logout = async (req, res) => {
 exports.setupAdmin = async (req, res) => {
     const { email, password, secretKey, username } = req.body;
     const ADMIN_SETUP_KEY = process.env.ADMIN_SETUP_KEY;
-
     try {
         console.log('--- Admin Setup Attempt ---');
         console.log(`Backend ADMIN_SETUP_KEY: ${ADMIN_SETUP_KEY}`);
         console.log(`Frontend secretKey received: ${secretKey}`);
         console.log(`Keys match? ${secretKey === ADMIN_SETUP_KEY}`);
         console.log('---------------------------');
-
         if (secretKey !== ADMIN_SETUP_KEY || !ADMIN_SETUP_KEY) {
             return res.status(403).json({ message: 'Invalid or missing secret key.' });
         }
-
         const existingAdmin = await User.findOne({ role: 'admin' });
         if (existingAdmin) {
             return res.status(403).json({ message: 'An admin account has already been created. This route is now locked.' });
         }
-
         if (!email || !password || !username) {
-            return res.status(400).json({ message: 'Username, email and password are required.' });
+            return res.status(400).json({ message: 'Username, email, and password are required.' });
         }
-
+        if (password.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
+        }
         const newAdmin = new User({
             username,
             email,
-            password,
+            password, // Will be hashed by pre-save middleware
             role: 'admin',
             bio: '',
             isVerified: true,
         });
-
         await newAdmin.save();
         res.status(201).json({ message: 'Initial admin account created successfully.' });
     } catch (error) {
         console.error('Error in /setup-admin:', error);
-        res.status(500).json({ message: 'Server error during admin setup.' });
+        res.status(500).json({
+            message: 'Server error during admin setup.',
+            error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        });
     }
 };
 
 exports.changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
-        const user = await User.findById(req.user.id);
-
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: 'Current and new passwords are required.' });
+        }
+        const user = await User.findById(req.user.id).select('+password');
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-
         const isMatch = await bcrypt.compare(currentPassword, user.password);
         if (!isMatch) {
             return res.status(400).json({ message: 'Current password is incorrect' });
         }
-
         if (newPassword.length < 6) {
-            return res.status(400).json({ message: 'New password must be at least 6 characters' });
+            return res.status(400).json({ message: 'New password must be at least 6 characters long.' });
         }
-
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
         await user.save();
-
         res.status(200).json({ message: 'Password changed successfully' });
     } catch (error) {
         console.error('Change Password Error:', error.message);
-        res.status(500).json({ message: 'Server error during password change' });
+        res.status(500).json({
+            message: 'Server error during password change',
+            error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        });
     }
 };
