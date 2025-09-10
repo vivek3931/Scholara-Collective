@@ -42,12 +42,9 @@ import { useAuth } from "../../context/AuthContext/AuthContext";
 import { debounce, throttle } from "lodash";
 import { Document, Page, pdfjs } from "react-pdf";
 import coin from "../../assets/coin.svg";
-
 // Set PDF.js worker to a reliable CDN
 pdfjs.GlobalWorkerOptions.workerSrc = `../../../workers/pdf.worker.min.js`;
-
 const API_BASE_URL = import.meta.env.VITE_API_URL;
-
 // Utility functions
 const getIconForType = (type, size = 20) => {
   const iconMap = {
@@ -59,7 +56,6 @@ const getIconForType = (type, size = 20) => {
   };
   return iconMap[type] || iconMap.default;
 };
-
 const getIconForSubject = (subject, size = 20) => {
   const iconMap = {
     "Mathematics": <Calculator size={size} className="text-red-500 dark:text-red-300" />,
@@ -70,7 +66,6 @@ const getIconForSubject = (subject, size = 20) => {
   };
   return iconMap[subject] || iconMap.default;
 };
-
 // Loading Spinner
 const LoadingSpinner = ({ size = "md", text = "Loading..." }) => {
   const sizeMap = {
@@ -78,7 +73,6 @@ const LoadingSpinner = ({ size = "md", text = "Loading..." }) => {
     md: "text-lg",
     lg: "text-2xl"
   };
-
   return (
     <div className="flex items-center justify-center py-8">
       <FontAwesomeIcon
@@ -90,7 +84,6 @@ const LoadingSpinner = ({ size = "md", text = "Loading..." }) => {
     </div>
   );
 };
-
 // Error Display
 const ErrorDisplay = ({ error, onRetry, actionText = "Retry" }) => (
   <motion.div
@@ -115,7 +108,6 @@ const ErrorDisplay = ({ error, onRetry, actionText = "Retry" }) => (
     </div>
   </motion.div>
 );
-
 // StarRating Component
 const StarRating = React.memo(
   ({ rating = 0, onRate, editable = true, starSize = 24, showValue = false, isLoading = false, className = "" }) => {
@@ -123,18 +115,15 @@ const StarRating = React.memo(
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [localRating, setLocalRating] = useState(rating);
     const [feedback, setFeedback] = useState("");
-
     useEffect(() => {
       setLocalRating(rating);
     }, [rating]);
-
     const debouncedRate = useCallback(
       debounce(async (starValue) => {
         if (!editable || isLoading || isSubmitting || !onRate) return;
         setLocalRating(starValue);
         setIsSubmitting(true);
         setFeedback("Saving rating...");
-
         try {
           await onRate(starValue);
           setFeedback("Rating saved!");
@@ -150,10 +139,9 @@ const StarRating = React.memo(
       }, 300),
       [editable, isLoading, isSubmitting, onRate, rating]
     );
-
     const displayRating = hoverRating || localRating;
-
     return (
+     
       <div className={`flex flex-col gap-2 ${className}`}>
         <div className="flex items-center gap-1">
           {[1, 2, 3, 4, 5].map((star) => (
@@ -202,19 +190,16 @@ const StarRating = React.memo(
     );
   }
 );
-
 // Comment Component
 const Comment = React.memo(({ comment, onReply, currentUserId, userName, isSubmittingReply }) => {
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
-
   const formattedDate = useMemo(() =>
     comment.timestamp ? new Date(comment.timestamp).toLocaleString() : "N/A",
     [comment.timestamp]
   );
-
   const handleReplySubmit = useCallback(async () => {
     if (!replyText.trim()) return;
     setIsLoading(true);
@@ -229,13 +214,11 @@ const Comment = React.memo(({ comment, onReply, currentUserId, userName, isSubmi
       setIsLoading(false);
     }
   }, [replyText, onReply, comment.id]);
-
   const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       handleReplySubmit();
     }
   }, [handleReplySubmit]);
-
   return (
     <motion.div
       layout
@@ -262,7 +245,6 @@ const Comment = React.memo(({ comment, onReply, currentUserId, userName, isSubmi
           </p>
         </div>
       </div>
-
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {currentUserId && (
@@ -285,7 +267,6 @@ const Comment = React.memo(({ comment, onReply, currentUserId, userName, isSubmi
           )}
         </div>
       </div>
-
       <AnimatePresence>
         {showReplyInput && currentUserId && (
           <motion.div
@@ -324,7 +305,6 @@ const Comment = React.memo(({ comment, onReply, currentUserId, userName, isSubmi
             </div>
           </motion.div>
         )}
-
         {showReplies && comment.replies && comment.replies.length > 0 && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
@@ -365,7 +345,6 @@ const Comment = React.memo(({ comment, onReply, currentUserId, userName, isSubmi
     </motion.div>
   );
 });
-
 // ResourceCommentsSection Component
 const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userName }) => {
   const [comments, setComments] = useState([]);
@@ -377,17 +356,14 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
   const { token, isAuthenticated } = useAuth();
   const pollIntervalRef = useRef(null);
   const textareaRef = useRef(null);
-
   const refreshComments = useCallback(async (showLoading = false) => {
     if (!resourceId) return;
     if (showLoading) setIsLoadingComments(true);
     setErrorComments(null);
-
     try {
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/comments`);
       if (!response.ok) throw new Error(`Failed to fetch comments: ${response.status}`);
       const data = await response.json();
-
       const processedComments = data.map((c) => ({
         id: c._id,
         userId: c.postedBy._id,
@@ -403,7 +379,6 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
             }))
           : [],
       }));
-
       setComments(processedComments);
     } catch (err) {
       console.error("Error fetching comments:", err);
@@ -412,7 +387,6 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
       if (showLoading) setIsLoadingComments(false);
     }
   }, [resourceId]);
-
   const sortedComments = useMemo(() => {
     const sorted = [...comments];
     switch (sortBy) {
@@ -425,7 +399,6 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
         return sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     }
   }, [comments, sortBy]);
-
   useEffect(() => {
     console.log('useEffect: Comments polling');
     if (resourceId) {
@@ -434,16 +407,13 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
       return () => clearInterval(pollIntervalRef.current);
     }
   }, [resourceId, refreshComments]);
-
   const handleCommentSubmit = useCallback(async () => {
     if (!isAuthenticated || !resourceId || !newCommentText.trim()) {
       setErrorComments("You must be logged in and provide comment text.");
       return;
     }
-
     setIsSubmittingComment(true);
     setErrorComments(null);
-
     try {
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/comment`, {
         method: "POST",
@@ -453,12 +423,10 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
         },
         body: JSON.stringify({ text: newCommentText.trim() }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.msg || `Failed to post comment: ${response.status}`);
       }
-
       setNewCommentText("");
       await refreshComments(false);
       if (textareaRef.current) {
@@ -471,13 +439,11 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
       setIsSubmittingComment(false);
     }
   }, [isAuthenticated, resourceId, newCommentText, token, refreshComments]);
-
   const handleReplySubmit = useCallback(async (commentId, replyText) => {
     if (!isAuthenticated || !resourceId || !commentId || !replyText.trim()) {
       setErrorComments("You must be logged in and provide reply text.");
       return;
     }
-
     try {
       const response = await fetch(
         `${API_BASE_URL}/resources/${resourceId}/comments/${commentId}/replies`,
@@ -490,25 +456,21 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
           body: JSON.stringify({ text: replyText.trim() }),
         }
       );
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.msg || `Failed to post reply: ${response.status}`);
       }
-
       await refreshComments(false);
     } catch (e) {
       console.error("Error adding reply:", e);
       setErrorComments(`Failed to post reply: ${e.message}`);
     }
   }, [isAuthenticated, resourceId, token, refreshComments]);
-
   const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       handleCommentSubmit();
     }
   }, [handleCommentSubmit]);
-
   if (isLoadingComments) {
     return (
       <div className="mt-10 pt-6 border-t border-gray-200 dark:border-charcoal">
@@ -516,7 +478,6 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
       </div>
     );
   }
-
   return (
     <div className="mt-10 pt-6 border-t border-gray-200 dark:border-charcoal">
       <div className="flex items-center justify-between mb-6">
@@ -524,7 +485,6 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
           <Send size={24} />
           Comments ({comments.length})
         </h2>
-
         {comments.length > 1 && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
@@ -540,7 +500,6 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
           </div>
         )}
       </div>
-
       {errorComments && (
         <ErrorDisplay
           error={errorComments}
@@ -548,7 +507,6 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
           actionText="Dismiss"
         />
       )}
-
       {isAuthenticated ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -600,7 +558,6 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
           <p className="text-sm text-gray-500 dark:text-gray-500">Please log in to post comments and engage with the community.</p>
         </motion.div>
       )}
-
       {comments.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
@@ -630,7 +587,7 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
   );
 });
 
-// Main ResourceDetailPage Component
+
 const ResourceDetailPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -642,7 +599,6 @@ const ResourceDetailPage = () => {
   const [resource, setResource] = useState(initialResourceFromState);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  console.log(resource)
 
   // Rating state
   const [userRating, setUserRating] = useState(0);
@@ -680,13 +636,11 @@ const ResourceDetailPage = () => {
   const isAdmin = user?.roles === "admin";
   const userCoins = user?.scholaraCoins || 0;
   const cost = 30;
-
   const canDownload = useMemo(() => {
     if (!isAuthenticated) return false;
     if (isAdmin) return true;
     return isPurchased;
   }, [isAuthenticated, isAdmin, isPurchased]);
-
   const fileUrl = useMemo(() => {
     if (!resource) return null;
     return (
@@ -699,31 +653,33 @@ const ResourceDetailPage = () => {
     );
   }, [resource]);
 
-    useEffect(() => {
-      if (isFullscreen) {
-        document.body.style.overflow = 'hidden';
-      } else {
-        document.body.style.overflow = 'auto';
-      }
-    }, [isFullscreen]);
+  // Handle fullscreen body overflow
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isFullscreen]);
 
   // Window resize handler
   useEffect(() => {
-    console.log('useEffect: Window resize');
     const handleResize = throttle(() => {
       const newIsMobile = window.innerWidth < 768;
       setIsMobile(newIsMobile);
-
       if (pdfContainerRef.current) {
         const containerWidth = pdfContainerRef.current.clientWidth;
         const maxWidth = newIsMobile ? containerWidth - 20 : Math.min(containerWidth - 40, 800);
+        const aspectRatio = 1.414; // Standard A4 aspect ratio
         setPdfDimensions({
           width: maxWidth,
-          height: maxWidth * 1.414,
+          height: maxWidth * aspectRatio,
         });
       }
     }, 100);
-
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => {
@@ -734,52 +690,36 @@ const ResourceDetailPage = () => {
 
   // Resource loading
   useEffect(() => {
-    console.log('useEffect: Resource loading');
     if (!resourceId) {
       setError("No resource ID provided");
       setLoading(false);
       return;
     }
-
     const loadResource = async () => {
       setLoading(true);
       setError(null);
-
       try {
         let fetchedResource = initialResourceFromState;
         const cacheKey = `resource_${resourceId}`;
-
         const cachedResource = sessionStorage.getItem(cacheKey);
         if (cachedResource && !fetchedResource) {
           fetchedResource = JSON.parse(cachedResource);
         }
-
         if (!fetchedResource || fetchedResource._id !== resourceId) {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-          try {
-            const response = await fetch(`${API_BASE_URL}/resources/${resourceId}`, {
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            fetchedResource = await response.json();
-            fetchedResource = fetchedResource.resource || fetchedResource;
-            sessionStorage.setItem(cacheKey, JSON.stringify(fetchedResource));
-          } catch (fetchError) {
-            clearTimeout(timeoutId);
-            if (fetchError.name === 'AbortError') {
-              throw new Error('Request timeout - please check your connection');
-            }
-            throw fetchError;
+          const response = await fetch(`${API_BASE_URL}/resources/${resourceId}`, {
+            signal: controller.signal,
+            headers: { Authorization: `Bearer ${token}` }, // Add token if required
+          });
+          clearTimeout(timeoutId);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
+          fetchedResource = await response.json();
+          fetchedResource = fetchedResource.resource || fetchedResource;
+          sessionStorage.setItem(cacheKey, JSON.stringify(fetchedResource));
         }
-
         setResource(fetchedResource);
       } catch (err) {
         console.error("Error fetching resource:", err);
@@ -788,35 +728,28 @@ const ResourceDetailPage = () => {
         setLoading(false);
       }
     };
-
     loadResource();
-  }, [resourceId, initialResourceFromState]);
+  }, [resourceId, initialResourceFromState, token]);
 
   // Purchase status fetching
   useEffect(() => {
-    console.log('useEffect: Purchase status');
     const fetchPurchaseStatus = async () => {
       if (!isAuthenticated || !token || !user || !resource?._id) {
         setIsPurchased(false);
         return;
       }
-
       if (isAdmin) {
         setIsPurchased(true);
         return;
       }
-
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
-
         const response = await fetch(`${API_BASE_URL}/resources/${resource._id}/purchase-status`, {
           headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal
+          signal: controller.signal,
         });
-
         clearTimeout(timeoutId);
-
         if (response.ok) {
           const data = await response.json();
           setIsPurchased(data.isPurchased || false);
@@ -829,28 +762,22 @@ const ResourceDetailPage = () => {
         setIsPurchased(purchased);
       }
     };
-
     fetchPurchaseStatus();
   }, [isAuthenticated, token, user?.purchasedResources, resource?._id, user, isAdmin]);
 
   // Ratings fetching
   const refreshRatings = useCallback(async () => {
-    console.log('useEffect: Ratings refresh');
     if (!resourceId) return;
-
     setIsRatingLoading(true);
     try {
       const url = `${API_BASE_URL}/resources/${resourceId}/ratings${userId ? `?userId=${userId}` : ""}`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-
       const response = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
-
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: Failed to fetch ratings`);
       }
-
       const data = await response.json();
       setOverallRating(data.overallRating ?? overallRating);
       if (userId) setUserRating(data.userRating ?? userRating);
@@ -875,9 +802,7 @@ const ResourceDetailPage = () => {
       setError("Please login to rate");
       return;
     }
-
     setUserRating(value);
-
     try {
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/rate`, {
         method: "POST",
@@ -887,12 +812,10 @@ const ResourceDetailPage = () => {
         },
         body: JSON.stringify({ value }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `Rating failed: ${response.status}`);
       }
-
       const data = await response.json();
       setUserRating(data.userRating);
       setOverallRating(data.overallRating);
@@ -902,44 +825,27 @@ const ResourceDetailPage = () => {
       setUserRating(userRating);
       setOverallRating(overallRating);
     }
-  }, [isAuthenticated, resourceId, token]);
-
-  // PDF document handlers
-  const onDocumentLoadSuccess = useCallback(({ numPages }) => {
-    console.log(`PDF loaded successfully with ${numPages} pages`);
-    setNumPages(numPages);
-    setPreviewLoading(false);
-    setPreviewError(null);
-    setCurrentPage(1);
-  }, []);
-
-  const onDocumentLoadError = useCallback((error) => {
-    console.error("Error loading PDF document:", error);
-    setPreviewError("Failed to load PDF preview. Please try downloading or refreshing.");
-    setPreviewLoading(false);
-  }, []);
+  }, [isAuthenticated, resourceId, token, userRating, overallRating]);
 
   // Preview handler
   const handlePreview = useCallback(async () => {
     if (!isAuthenticated) {
       setError("You need to be logged in to preview resources.");
+      navigate('/login'); // Redirect to login
       return;
     }
-    if (previewDataUrl) return;
+    if (previewDataUrl) return; // Skip if already loaded
     setPreviewLoading(true);
     setPreviewError(null);
+    setPreviewRetryCount(0); // Reset retry count
     try {
-      const cachedPreview = sessionStorage.getItem(`preview_${resourceId}`);
-      if (cachedPreview) {
-        setPreviewDataUrl(cachedPreview);
-        setPreviewLoading(false);
-        return;
-      }
+      // Clear stale sessionStorage entry
+      sessionStorage.removeItem(`preview_${resourceId}`);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/preview`, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal
+        signal: controller.signal,
       });
       clearTimeout(timeoutId);
       if (!response.ok) {
@@ -954,43 +860,88 @@ const ResourceDetailPage = () => {
       sessionStorage.setItem(`preview_${resourceId}`, url);
     } catch (err) {
       console.error("Preview failed:", err);
-      if (err.name === 'AbortError') {
-        setPreviewError("Preview request timeout - please try again");
-      } else {
-        setPreviewError(err.message);
+      let errorMessage = err.name === 'AbortError' ? "Preview request timeout - please try again" : err.message;
+      if (err.message.includes("401")) {
+        errorMessage = "Authentication failed. Please log in again.";
+        navigate('/login');
       }
-      if (previewRetryCount < 1) {
+      setPreviewError(errorMessage);
+      if (previewRetryCount < 3) { // Increased retry limit to 3
         setPreviewRetryCount(prev => prev + 1);
         setTimeout(() => handlePreview(), 2000);
       }
     } finally {
       setPreviewLoading(false);
     }
-  }, [isAuthenticated, resourceId, token, previewDataUrl, previewRetryCount]);
+  }, [isAuthenticated, resourceId, token, previewDataUrl, previewRetryCount, navigate]);
+
+  // Automatically trigger preview on mount
+  useEffect(() => {
+    if (isAuthenticated && resourceId && !previewDataUrl && !previewLoading) {
+      // Clear stale sessionStorage entry on mount
+      sessionStorage.removeItem(`preview_${resourceId}`);
+      handlePreview();
+    }
+    return () => {
+      if (previewDataUrl) {
+        URL.revokeObjectURL(previewDataUrl);
+        sessionStorage.removeItem(`preview_${resourceId}`);
+        setPreviewDataUrl(null);
+      }
+    };
+  }, [isAuthenticated, resourceId, handlePreview, previewDataUrl]);
+
+  // PDF document handlers
+  const onDocumentLoadSuccess = useCallback(({ numPages }) => {
+    console.log(`PDF loaded successfully with ${numPages} pages`);
+    setNumPages(numPages);
+    setPreviewLoading(false);
+    setPreviewError(null);
+    setCurrentPage(1);
+    setPreviewRetryCount(0); // Reset retry count on success
+  }, []);
+
+  const onDocumentLoadError = useCallback((error) => {
+    console.error("Error loading PDF document:", error);
+    setPreviewError("Failed to load PDF preview. Please try downloading or refreshing.");
+    setPreviewLoading(false);
+    if (previewRetryCount < 3) { // Increased retry limit to 3
+      setPreviewRetryCount(prev => prev + 1);
+      setTimeout(() => {
+        sessionStorage.removeItem(`preview_${resourceId}`);
+        handlePreview();
+      }, 2000);
+    }
+  }, [previewRetryCount, resourceId, handlePreview]);
 
   // Zoom handlers
   const handleZoomIn = useCallback(() => {
-    setZoom((prev) => Math.min(prev + 0.2, 3));
+    setZoom((prev) => Math.min(prev + 0.2, 2));
   }, []);
+
   const handleZoomOut = useCallback(() => {
     setZoom((prev) => Math.max(prev - 0.2, 0.5));
   }, []);
+
   const resetZoom = useCallback(() => {
     setZoom(1);
   }, []);
+
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen((prev) => !prev);
   }, []);
+
   const handleMobileFullscreen = useCallback(async () => {
     if (!isAuthenticated) {
       setError("You need to be logged in to preview resources.");
+      navigate('/login');
       return;
     }
     if (!previewDataUrl && !previewLoading) {
       await handlePreview();
     }
     setIsFullscreen(true);
-  }, [isAuthenticated, previewDataUrl, previewLoading, handlePreview]);
+  }, [isAuthenticated, previewDataUrl, previewLoading, handlePreview, navigate]);
 
   // Download validation and handler
   const validateDownload = useCallback(() => {
@@ -1013,7 +964,7 @@ const ResourceDetailPage = () => {
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/download`, {
         method: "GET",
         headers: { Authorization: `Bearer ${token}`, Accept: "*/*" },
-        signal: controller.signal
+        signal: controller.signal,
       });
       clearTimeout(timeoutId);
       if (!response.ok) {
@@ -1050,6 +1001,7 @@ const ResourceDetailPage = () => {
   const handlePurchase = async () => {
     if (!isAuthenticated) {
       setError("You need to be logged in to purchase resources.");
+      navigate('/login');
       return;
     }
     if (userCoins < cost) {
@@ -1090,17 +1042,6 @@ const ResourceDetailPage = () => {
     }
   };
 
-  // Preview cleanup
-  useEffect(() => {
-    console.log('useEffect: Preview cleanup');
-    return () => {
-      if (previewDataUrl) {
-        URL.revokeObjectURL(previewDataUrl);
-        sessionStorage.removeItem(`preview_${resourceId}`);
-      }
-    };
-  }, [previewDataUrl, resourceId]);
-
   // Fullscreen scroll handler
   const showAndScheduleHide = useCallback(() => {
     setShowFullscreenControls(true);
@@ -1113,25 +1054,20 @@ const ResourceDetailPage = () => {
   }, []);
 
   useEffect(() => {
-    console.log('useEffect: Fullscreen controls');
     if (!pdfContainerRef.current) {
       if (hideControlsTimeoutRef.current) {
         clearTimeout(hideControlsTimeoutRef.current);
       }
       return;
     }
-
     const handleScroll = throttle(showAndScheduleHide, 200);
     const handleTouchMove = showAndScheduleHide;
-
     const container = pdfContainerRef.current;
     container.addEventListener('scroll', handleScroll);
     container.addEventListener('touchmove', handleTouchMove);
-
     if (isFullscreen) {
       showAndScheduleHide();
     }
-
     return () => {
       container.removeEventListener('scroll', handleScroll);
       container.removeEventListener('touchmove', handleTouchMove);
@@ -1148,16 +1084,31 @@ const ResourceDetailPage = () => {
     const pagesToRender = [];
     for (let pageNumber = 1; pageNumber <= numPages; pageNumber++) {
       pagesToRender.push(
-        <div key={pageNumber} className="mb-4 flex justify-center" style={{ minHeight: pdfDimensions.height }}>
+        <div
+          key={pageNumber}
+          className="mb-4 flex justify-center"
+          style={{
+            minHeight: pdfDimensions.height * zoom,
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
           <div
-            className="bg-gray-100 dark:bg-charcoal rounded-lg flex items-center justify-center shadow-lg"
-            style={{ width: pdfDimensions.width, height: pdfDimensions.height }}
+            className="bg-gray-100 dark:bg-charcoal rounded-lg shadow-lg"
+            style={{
+              width: pdfDimensions.width * zoom,
+              height: pdfDimensions.height * zoom,
+              maxWidth: '100%',
+              overflow: 'hidden',
+            }}
           >
             <Page
               pageNumber={pageNumber}
               width={pdfDimensions.width}
-              scale={isMobile ? Math.min(zoom, 1.5) : zoom}
-              className="rounded-lg overflow-hidden"
+              scale={zoom}
+              className="rounded-lg"
               renderTextLayer={false}
               renderAnnotationLayer={false}
               onRenderSuccess={() => console.log(`Page ${pageNumber} rendered successfully`)}
@@ -1176,7 +1127,7 @@ const ResourceDetailPage = () => {
       );
     }
     return pagesToRender;
-  }, [numPages, zoom, isMobile, pdfDimensions]);
+  }, [numPages, zoom, pdfDimensions]);
 
   // Page Indicator Component
   const PageIndicator = ({ className = "" }) => {
@@ -1184,27 +1135,21 @@ const ResourceDetailPage = () => {
     const scrollContainerRef = pdfContainerRef;
 
     useEffect(() => {
-      console.log('useEffect: PageIndicator scroll');
       if (!scrollContainerRef.current || !numPages || numPages <= 1) {
         return;
       }
-
       const handleScroll = throttle(() => {
         const { scrollTop } = scrollContainerRef.current;
-        const pageHeight = pdfDimensions.height + 16;
+        const pageHeight = pdfDimensions.height * zoom + 16;
         const newPage = Math.min(Math.ceil(scrollTop / pageHeight) + 1, numPages);
-
         if (newPage !== pageRef.current) {
           pageRef.current = newPage;
           setCurrentPage(newPage);
         }
-
         showAndScheduleHide();
       }, 200);
-
       scrollContainerRef.current.addEventListener('scroll', handleScroll);
       scrollContainerRef.current.addEventListener('touchmove', showAndScheduleHide);
-
       return () => {
         if (scrollContainerRef.current) {
           scrollContainerRef.current.removeEventListener('scroll', handleScroll);
@@ -1212,17 +1157,17 @@ const ResourceDetailPage = () => {
         }
         handleScroll.cancel();
       };
-    }, [pdfDimensions, numPages, showAndScheduleHide]);
+    }, [numPages, pdfDimensions, showAndScheduleHide]);
 
     return (
       <AnimatePresence>
         {showFullscreenControls && numPages > 1 && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
+            exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
-            className={`fixed ${isFullscreen ? 'top-4 right-4' : 'bottom-4 right-4'} z-50 flex items-center gap-3 px-4 py-2 bg-black/70 text-white rounded-lg backdrop-blur-sm ${className}`}
+            className={`absolute top-12 right-4 z-50 flex items-center gap-3 px-4 py-2 bg-black/70 text-white rounded-lg backdrop-blur-sm ${className}`}
           >
             <span className="text-sm font-medium">
               Page {currentPage} of {numPages}
@@ -1282,18 +1227,18 @@ const ResourceDetailPage = () => {
       icon: <Eye className="text-blue-500" />,
       label: "Views",
       value: viewStats,
-      trend: resource?.viewTrend
+      trend: resource?.viewTrend,
     },
     {
       icon: <Download className="text-green-500" />,
       label: "Downloads",
       value: downloadStats,
-      trend: resource?.downloadTrend
+      trend: resource?.downloadTrend,
     },
     {
       icon: <Star className="text-yellow-500" />,
       label: "Rating",
-      value: overallRating > 0 ? overallRating.toFixed(1) : "N/A"
+      value: overallRating > 0 ? overallRating.toFixed(1) : "N/A",
     },
   ], [viewStats, downloadStats, overallRating, resource?.viewTrend, resource?.downloadTrend]);
 
@@ -1327,16 +1272,22 @@ const ResourceDetailPage = () => {
       initial={{ y: 20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="bg-white dark:bg-onyx/60 rounded-2xl shadow-xl overflow-hidden p-4 lg:p-8"
+      className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm overflow-hidden p-4 lg:p-8 relative"
     >
       <div
-        className="mt-8 bg-gray-200 dark:bg-charcoal rounded-xl shadow-lg relative "
+        className="mt-8 bg-gray-200 dark:bg-charcoal rounded-xl shadow-lg relative"
         style={{
           backgroundImage: !previewDataUrl ? `url(${resource.thumbnailUrl || ''})` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          // filter: !previewDataUrl ? 'blur(8px)' : 'none',
           position: 'relative',
+          width: '100%',
+          maxWidth: isFullscreen ? '100vw' : '100%',
+          height: isFullscreen ? '100vh' : 'calc(100vh - 200px)',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
         }}
       >
         {previewLoading ? (
@@ -1355,16 +1306,20 @@ const ResourceDetailPage = () => {
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="overflow-y-auto w-full h-full p-4 flex flex-col items-center custom-scrollbar"
+            className="w-full flex flex-col items-center custom-scrollbar"
             ref={pdfContainerRef}
-            style={{ height: 'calc(100vh - 200px)' }}
+            style={{
+              maxWidth: isFullscreen ? '100%' : pdfDimensions.width * zoom + 40,
+              margin: '0 auto',
+              padding: '20px 0',
+            }}
           >
             {previewDataUrl ? (
               <Document
                 file={previewDataUrl}
                 onLoadSuccess={onDocumentLoadSuccess}
                 onLoadError={onDocumentLoadError}
-                className="w-full h-full"
+                className="w-full"
                 loading={
                   <div className="w-full h-full flex items-center justify-center">
                     <LoadingSpinner text="Loading PDF..." />
@@ -1379,7 +1334,7 @@ const ResourceDetailPage = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handlePreview}
-                  className="flex items-center gap-3 px-6 py-4 bg-amber-600 text-white font-semibold rounded-lg shadow-lg hover:bg-amber-700 transition-colors z-10 "
+                  className="flex items-center gap-3 px-6 py-4 bg-amber-600 text-white font-semibold rounded-lg shadow-lg hover:bg-amber-700 transition-colors z-10"
                 >
                   <Eye size={24} />
                   Preview Resource
@@ -1388,49 +1343,51 @@ const ResourceDetailPage = () => {
             )}
           </motion.div>
         )}
-        {previewDataUrl && numPages && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
-            <div className="p-2 flex items-center gap-2 bg-black/70 rounded-lg text-white backdrop-blur-sm shadow-xl">
-              <motion.button
-                onClick={() => {
-                  handleZoomOut();
-                  if (isMobile && isFullscreen) showAndScheduleHide();
-                }}
-                disabled={zoom <= 0.5}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
-              >
-                <ZoomOut size={20} />
-              </motion.button>
-              <motion.button
-                onClick={() => {
-                  handleZoomIn();
-                  if (isMobile && isFullscreen) showAndScheduleHide();
-                }}
-                disabled={zoom >= 3}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
-              >
-                <ZoomIn size={20} />
-              </motion.button>
-              <motion.button
-                onClick={() => {
-                  toggleFullscreen();
-                  if (isMobile && isFullscreen) showAndScheduleHide();
-                }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="p-2 rounded-full hover:bg-white/20 transition-colors"
-              >
-                {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-              </motion.button>
-            </div>
-          </div>
-        )}
-        <PageIndicator className="lg:hidden" />
       </div>
+      {previewDataUrl && numPages && !isFullscreen && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-10">
+          <div className="p-2 flex items-center gap-2 bg-black/70 rounded-lg text-white backdrop-blur-sm shadow-xl">
+            <motion.button
+              onClick={() => {
+                handleZoomOut();
+                if (isMobile && isFullscreen) showAndScheduleHide();
+              }}
+              disabled={zoom <= 0.5}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <ZoomOut size={20} />
+            </motion.button>
+            <motion.button
+              onClick={() => {
+                handleZoomIn();
+                if (isMobile && isFullscreen) showAndScheduleHide();
+              }}
+              disabled={zoom >= 2}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <ZoomIn size={20} />
+            </motion.button>
+            <motion.button
+              onClick={() => {
+                toggleFullscreen();
+                if (isMobile && isFullscreen) showAndScheduleHide();
+              }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="p-2 rounded-full hover:bg-white/20 transition-colors"
+            >
+              {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+            </motion.button>
+          </div>
+        </div>
+      )}
+      {previewDataUrl && numPages && !isFullscreen && (
+        <PageIndicator />
+      )}
     </motion.div>
   );
 
@@ -1513,7 +1470,6 @@ const ResourceDetailPage = () => {
           </button>
         </div>
       </motion.div>
-
       <motion.div
         className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6 mt-6"
         initial={{ scale: 0.95, opacity: 0 }}
@@ -1548,7 +1504,6 @@ const ResourceDetailPage = () => {
           </li>
         </ul>
       </motion.div>
-
       <motion.div
         className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6 mt-6"
         initial={{ scale: 0.95, opacity: 0 }}
@@ -1611,8 +1566,142 @@ const ResourceDetailPage = () => {
     </motion.div>
   );
 
+  const renderFullscreen = () => (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[10000] bg-onyx/95 flex flex-col items-center justify-center p-4"
+    >
+      <AnimatePresence>
+        {showFullscreenControls && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="absolute top-4 right-4 z-10 flex lg:justify-end justify-between w-[90%] items-center gap-4"
+          >
+            <motion.div
+              className="flex items-center gap-3 px-4 py-2 bg-black/70 text-white shadow-glow-sm rounded-lg backdrop-blur-sm"
+            >
+              <span className="text-sm font-medium">
+                Page {currentPage} of {numPages}
+              </span>
+              {numPages > 5 && (
+                <div className="lg:flex hidden items-center gap-1">
+                  <div className="w-16 h-1 bg-white/30 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-white rounded-full transition-all duration-300"
+                      style={{ width: `${(currentPage / numPages) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </motion.div>
+            <motion.button
+              onClick={() => {
+                toggleFullscreen();
+                if (isMobile) showAndScheduleHide();
+              }}
+              className="p-3 bg-black/20 text-white rounded-full backdrop-blur-sm"
+              whileHover={{ scale: 1.1, rotate: 90 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <Minimize2 size={24} />
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {previewDataUrl && (
+        <div
+          className="w-full h-full flex flex-col items-center overflow-auto custom-scrollbar"
+          ref={pdfContainerRef}
+          style={{
+            maxWidth: '100%',
+            padding: '20px 0',
+          }}
+        >
+          <Document
+            file={previewDataUrl}
+            onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={onDocumentLoadError}
+            className="w-full"
+          >
+            {renderPdfPages}
+          </Document>
+        </div>
+      )}
+      <AnimatePresence>
+        {showFullscreenControls && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3 }}
+            className="absolute bottom-4  -translate-x-1/2 flex items-center gap-3 z-10"
+          >
+            <div className="p-2 flex items-center gap-2 bg-black/70 rounded-lg text-white backdrop-blur-sm shadow-glow-sm">
+              <motion.button
+                onClick={() => {
+                  handleZoomOut();
+                  if (isMobile) showAndScheduleHide();
+                }}
+                disabled={zoom <= 0.5}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
+              >
+                <ZoomOut size={20} />
+              </motion.button>
+              <motion.button
+                onClick={() => {
+                  resetZoom();
+                  if (isMobile) showAndScheduleHide();
+                }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="p-2 rounded-full hover:bg-white/20 transition-colors"
+              >
+                <RefreshCw size={20} />
+              </motion.button>
+              <motion.button
+                onClick={() => {
+                  handleZoomIn();
+                  if (isMobile) showAndScheduleHide();
+                }}
+                disabled={zoom >= 2}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
+              >
+                <ZoomIn size={20} />
+              </motion.button>
+              <motion.button
+                onClick={() => {
+                  handleDownload();
+                  if (isMobile) showAndScheduleHide();
+                }}
+                disabled={!canDownload}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
+              >
+                <Download size={20} />
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+
   return (
-    <div className={`font-sans antialiased text-gray-900 dark:text-gray-100 min-h-screen bg-gray-50 dark:bg-onyx/80 transition-colors duration-300 ${isFullscreen ? "overflow-hidden" : ""}`}  >
+    <div
+      className={`font-sans antialiased text-gray-900 dark:text-gray-100 min-h-screen bg-gray-50 dark:bg-onyx/80 transition-colors duration-300 ${
+        isFullscreen ? "overflow-hidden" : ""
+      }`}
+    >
       <div className="p-4 lg:p-8 relative">
         <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
           <div className="flex-1 lg:w-2/3">
@@ -1634,133 +1723,8 @@ const ResourceDetailPage = () => {
           {!isMobile && renderSidebar()}
         </div>
       </div>
-
       <AnimatePresence>
-        {isFullscreen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[10000] bg-onyx/95 flex flex-col items-center justify-center p-4"
-          >
-            <AnimatePresence>
-              {showFullscreenControls && (
-                <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="absolute top-4 right-4 z-10 flex lg:justify-end justify-between w-[90%] items-center gap-4"
-                >
-                  <motion.div
-                    className="flex items-center gap-3 px-4 py-2 bg-black/70 text-white shadow-glow-sm rounded-lg backdrop-blur-sm"
-                  >
-                    <span className="text-sm font-medium">
-                      Page {currentPage} of {numPages}
-                    </span>
-                    {numPages > 5 && (
-                      <div className="lg:flex hidden items-center gap-1">
-                        <div className="w-16 h-1 bg-white/30 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-white  rounded-full transition-all duration-300"
-                            style={{ width: `${(currentPage / numPages) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                  <motion.button
-                    onClick={() => {
-                      toggleFullscreen();
-                      if (isMobile) showAndScheduleHide();
-                    }}
-                    className="p-3 bg-black/20 text-white rounded-full backdrop-blur-sm"
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                whileTap={{ scale: 0.9 }}
-                  >
-                    <Minimize2 size={24} />
-                  </motion.button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            {previewDataUrl && (
-              <div
-                className="w-full h-full flex items-center justify-center overflow-auto custom-scrollbar"
-                ref={pdfContainerRef}
-              >
-                <Document
-                  file={previewDataUrl}
-                  onLoadSuccess={onDocumentLoadSuccess}
-                  onLoadError={onDocumentLoadError}
-                  className="w-full h-full"
-                >
-                  {renderPdfPages}
-                </Document>
-              </div>
-            )}
-            <AnimatePresence>
-              {showFullscreenControls && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 20 }}
-                  transition={{ duration: 0.3 }}
-                  className="absolute bottom-4  -translate-x-1/2 flex items-center gap-3 z-10"
-                >
-                  <div className="p-2 flex items-center gap-2 bg-black/70 rounded-lg text-white backdrop-blur-sm shadow-glow-sm">
-                    <motion.button
-                      onClick={() => {
-                        handleZoomOut();
-                        if (isMobile) showAndScheduleHide();
-                      }}
-                      disabled={zoom <= 0.5}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
-                    >
-                      <ZoomOut size={20} />
-                    </motion.button>
-                    <motion.button
-                      onClick={() => {
-                        resetZoom();
-                        if (isMobile) showAndScheduleHide();
-                      }}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="p-2 rounded-full hover:bg-white/20 transition-colors"
-                    >
-                      <RefreshCw size={20} />
-                    </motion.button>
-                    <motion.button
-                      onClick={() => {
-                        handleZoomIn();
-                        if (isMobile) showAndScheduleHide();
-                      }}
-                      disabled={zoom >= 3}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
-                    >
-                      <ZoomIn size={20} />
-                    </motion.button>
-                    <motion.button
-                      onClick={() => {
-                        handleDownload();
-                        if (isMobile) showAndScheduleHide();
-                      }}
-                      disabled={!canDownload}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
-                    >
-                      <Download size={20} />
-                    </motion.button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
+        {isFullscreen && renderFullscreen()}
       </AnimatePresence>
     </div>
   );
