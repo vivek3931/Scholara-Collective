@@ -66,6 +66,7 @@ const UniversalResourceCard = React.memo(
       const handleClickOutside = (event) => {
         if (menuRef.current && !menuRef.current.contains(event.target)) {
           setIsMenuOpen(false);
+          event.stopPropagation(); // Prevent bubbling to any parent navigators
         }
       };
 
@@ -118,8 +119,8 @@ const UniversalResourceCard = React.memo(
           buttons.push({
             key: "unsave",
             onClick: (e) => {
-              e?.preventDefault?.();
-              e?.stopPropagation?.();
+              e.preventDefault();
+              e.stopPropagation();
               handleUnsave(resource._id);
             },
             disabled: false,
@@ -133,8 +134,8 @@ const UniversalResourceCard = React.memo(
           buttons.push({
             key: "save",
             onClick: (e) => {
-              e?.preventDefault?.();
-              e?.stopPropagation?.();
+              e.preventDefault();
+              e.stopPropagation();
               handleSave(resource._id);
             },
             disabled: false,
@@ -149,8 +150,8 @@ const UniversalResourceCard = React.memo(
         buttons.push({
           key: "flag",
           onClick: (e) => {
-            e?.preventDefault?.();
-            e?.stopPropagation?.();
+            e.preventDefault();
+            e.stopPropagation();
             handleFlag(resource._id);
           },
           disabled: false,
@@ -165,8 +166,8 @@ const UniversalResourceCard = React.memo(
           buttons.push({
             key: "delete",
             onClick: (e) => {
-              e?.preventDefault?.();
-              e?.stopPropagation?.();
+              e.preventDefault();
+              e.stopPropagation();
               handleDelete(resource._id);
             },
             disabled: false,
@@ -189,32 +190,35 @@ const UniversalResourceCard = React.memo(
         <div className="relative z-10 flex flex-col h-full">
           {/* Thumbnail with FileType Badge */}
           <div className="mb-3 relative overflow-hidden rounded-lg">
-            <img
-              src={resource.thumbnailUrl || "https://res.cloudinary.com/dr9zse9a6/image/upload/v1756788547/scholara_note_qzpglu.svg"}
-              alt={resource.title}
-              onError={(e) => {
-                e.target.onerror = null; // Prevent infinite loop
-                e.target.src = "https://res.cloudinary.com/dr9zse9a6/image/upload/v1756788547/scholara_note_qzpglu.svg";
-              }}
-              className="w-full h-[200px] object-fit rounded-lg group-hover:scale-105 transition-transform duration-300 ease-in-out"
-            />
-            {/* FileType Badge - positioned at top-right of thumbnail */}
+            <Link to={`/resources/${resource._id}`} onClick={(e) => e.stopPropagation()}>
+              <img
+                src={resource.thumbnailUrl || "https://res.cloudinary.com/dr9zse9a6/image/upload/v1756788547/scholara_note_qzpglu.svg"}
+                alt={resource.title}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = "https://res.cloudinary.com/dr9zse9a6/image/upload/v1756788547/scholara_note_qzpglu.svg";
+                }}
+                className="w-full h-[200px] object-fit rounded-lg group-hover:scale-105 transition-transform duration-300 ease-in-out"
+              />
+            </Link>
             <span
               className="absolute top-2 right-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold
-                bg-gradient-to-r from-amber-200 to-amber-300 text-amber-800
-                dark:from-charcoal dark:to-ash/20 dark:text-white
-                shadow-soft-sm border border-amber-300 dark:border-charcoal/50
-                transition-all duration-200 uppercase"
+                         bg-gradient-to-r from-amber-200 to-amber-300 text-amber-800
+                         dark:from-charcoal dark:to-ash/20 dark:text-white
+                         shadow-soft-sm border border-amber-300 dark:border-charcoal/50
+                         transition-all duration-200 uppercase"
             >
               {resource.fileType || "DOC"}
             </span>
           </div>
 
-          {/* Header Section - Title only */}
+          {/* Header Section - Title */}
           <div className="mb-2">
-            <h3 className={getTitleClasses()}>
-              {resource.title.length > 25 ? resource.title.slice(0, 25) + "..." : resource.title}
-            </h3>
+            <Link to={`/resources/${resource._id}`} onClick={(e) => e.stopPropagation()}>
+              <h3 className={getTitleClasses()}>
+                {resource.title.length > 25 ? resource.title.slice(0, 25) + "..." : resource.title}
+              </h3>
+            </Link>
           </div>
 
           {/* Description - More compact */}
@@ -243,23 +247,19 @@ const UniversalResourceCard = React.memo(
           )}
 
           {/* Actions Section - Tighter layout */}
-          <div className="mt-auto">
-            <div className="flex items-center justify-between p-1.5 bg-[#80808009] shadow-inner dark:shadow-[inset_0_2px_4px_0_rgb(0_0_0_/_0.3)] dark:bg-gradient-to-r dark:from-charcoal rounded-lg border border-silver/50 dark:border-0">
-              {/* Preview Button */}
-              <Link to={`/resources/${resource._id}`}>
+          <div className="mt-auto" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="flex items-center justify-between p-1.5 bg-[#80808009] shadow-inner dark:shadow-[inset_0_2px_4px_0_rgb(0_0_0_/_0.3)] dark:bg-gradient-to-r dark:from-charcoal rounded-lg border border-silver/50 dark:border-0"
+            >
+              {/* Preview Button - Now a Link */}
               {showPreview && (isPDF || isImage) && (
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  whileHover={{ scale: 1.05 }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    showModal("preview", { resource });
-                  }}
+                <Link
+                  to={`/resources/${resource._id}`}
                   className="px-3 py-2 rounded-md bg-ivory dark:bg-charcoal hover:bg-cream dark:hover:bg-charcoal/70
-                    shadow-soft-md hover:shadow-soft-lg transition-all duration-200
-                    border  border-silver/50 dark:border-charcoal/60 flex items-center gap-1"
+                             shadow-soft-md hover:shadow-soft-lg transition-all duration-200
+                             border border-silver/50 dark:border-charcoal/60 flex items-center gap-1"
                   title="Preview"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <FontAwesomeIcon
                     icon={faEye}
@@ -268,9 +268,8 @@ const UniversalResourceCard = React.memo(
                   <span className="text-[12px] text-amber-600 dark:text-amber-400 font-medium">
                     Preview
                   </span>
-                </motion.button>
+                </Link>
               )}
-              </Link>
 
               {/* Dropdown Menu */}
               {actionButtons.length > 0 && (
@@ -279,12 +278,13 @@ const UniversalResourceCard = React.memo(
                     whileTap={{ scale: 0.9 }}
                     whileHover={{ scale: 1.05 }}
                     onClick={(e) => {
-                      setIsMenuOpen(!isMenuOpen);
                       e.preventDefault();
+                      e.stopPropagation();
+                      setIsMenuOpen((prev) => !prev);
                     }}
                     className="px-1.5 py-1 rounded-md bg-ivory dark:bg-charcoal hover:bg-cream dark:hover:bg-charcoal/70
-                      shadow-soft-md hover:shadow-soft-lg transition-all duration-200
-                      border border-silver/50 dark:border-charcoal/60"
+                               shadow-soft-md hover:shadow-soft-lg transition-all duration-200
+                               border border-silver/50 dark:border-charcoal/60"
                     title="More actions"
                   >
                     <FontAwesomeIcon
@@ -298,7 +298,11 @@ const UniversalResourceCard = React.memo(
                       <>
                         <div
                           className="fixed inset-0 z-[9998]"
-                          onClick={() => setIsMenuOpen(false)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsMenuOpen(false);
+                          }}
                         />
                         <motion.div
                           initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -306,21 +310,24 @@ const UniversalResourceCard = React.memo(
                           exit={{ opacity: 0, y: 10, scale: 0.95 }}
                           transition={{ duration: 0.15 }}
                           className="absolute bottom-full mb-2 right-0 bg-ivory dark:bg-charcoal border border-silver dark:border-charcoal
-                            rounded-lg shadow-2xl dark:shadow-glow-sm min-w-[120px] overflow-hidden z-[9999]"
+                                   rounded-lg shadow-2xl dark:shadow-glow-sm min-w-[120px] overflow-hidden z-[9999]"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {actionButtons.map((button, index) => (
                             <button
                               key={button.key}
                               onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 button.onClick(e);
                                 setIsMenuOpen(false);
                               }}
                               disabled={button.disabled}
                               className={`w-full px-3 py-2 text-left hover:bg-cream dark:hover:bg-midnight/50
-                                transition-all duration-150 flex items-center gap-2 text-xs font-medium
-                                disabled:opacity-50 ${button.className} ${
-                                  index === 0 ? "" : "border-t border-silver/30 dark:border-charcoal/60"
-                                }`}
+                                       transition-all duration-150 flex items-center gap-2 text-xs font-medium
+                                       disabled:opacity-50 ${button.className} ${
+                                         index === 0 ? "" : "border-t border-silver/30 dark:border-charcoal/60"
+                                       }`}
                             >
                               <FontAwesomeIcon
                                 icon={button.icon}

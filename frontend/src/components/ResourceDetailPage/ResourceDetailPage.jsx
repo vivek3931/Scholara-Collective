@@ -877,11 +877,7 @@ const ResourceDetailPage = () => {
 
   // Automatically trigger preview on mount
   useEffect(() => {
-    if (isAuthenticated && resourceId && !previewDataUrl && !previewLoading) {
-      // Clear stale sessionStorage entry on mount
-      sessionStorage.removeItem(`preview_${resourceId}`);
-      handlePreview();
-    }
+    
     return () => {
       if (previewDataUrl) {
         URL.revokeObjectURL(previewDataUrl);
