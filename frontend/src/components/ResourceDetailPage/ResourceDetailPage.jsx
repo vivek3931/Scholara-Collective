@@ -26,20 +26,23 @@ import {
   Clock,
   Users,
   TrendingUp,
+  Save,
+  Flag,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSpinner,
   faStar as faSolidStar,
-  faArrowLeft,
-  faTimes,
-  faDownload,
-  faImage,
+  
   faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faRegularStar } from "@fortawesome/free-regular-svg-icons";
 import { useAuth } from "../../context/AuthContext/AuthContext";
 import { debounce, throttle } from "lodash";
+import { useModal } from "../../context/ModalContext/ModalContext";
+import { useResource } from "../../context/ResourceContext/ResourceContext";
 import { Document, Page, pdfjs } from "react-pdf";
 import coin from "../../assets/coin.svg";
 // Set PDF.js worker to a reliable CDN
@@ -588,11 +591,17 @@ const ResourceCommentsSection = React.memo(({ resourceId, currentUserId, userNam
 });
 
 
+const PAGES_TO_RENDER = 3; // Only render 3 pages at a time
+const PAGE_BUFFER = 1; // Buffer pages before/after visible area
+const RENDER_DELAY = 100; // Delay between renders to prevent lag
+
 const ResourceDetailPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { resourceId } = useParams();
   const { user, token, isAuthenticated, updateUser } = useAuth();
+  const { showModal } = useModal();
+  const { handleSave, handleFlag, handleDelete } = useResource();
   const { resource: initialResourceFromState } = location.state || {};
 
   // Core state
@@ -605,7 +614,7 @@ const ResourceDetailPage = () => {
   const [overallRating, setOverallRating] = useState(0);
   const [isRatingLoading, setIsRatingLoading] = useState(false);
 
-  // Preview state
+  // Preview state - Optimized for performance
   const [zoom, setZoom] = useState(1);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
@@ -614,21 +623,28 @@ const ResourceDetailPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [numPages, setNumPages] = useState(null);
   const [pdfDimensions, setPdfDimensions] = useState({ width: 500, height: 707 });
-  const [previewRetryCount, setPreviewRetryCount] = useState(0);
-  const [showFullscreenControls, setShowFullscreenControls] = useState(true);
+  const [visiblePages, setVisiblePages] = useState(new Set([1])); // Track visible pages
+  const [renderedPages, setRenderedPages] = useState(new Set()); // Track rendered pages
+  const [showPreview, setShowPreview] = useState(false); // Control preview visibility
 
   // Purchase state
   const [isPurchased, setIsPurchased] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
 
   // UI state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showStats, setShowStats] = useState(false);
+  const [showFullscreenControls, setShowFullscreenControls] = useState(true);
+  const [isCursorOnControls, setIsCursorOnControls] = useState(false); // Track cursor on controls
 
   // Refs
-  const pollIntervalRef = useRef(null);
   const pdfContainerRef = useRef(null);
   const hideControlsTimeoutRef = useRef(null);
+  const renderQueueRef = useRef([]);
+  const isRenderingRef = useRef(false);
+  const intersectionObserverRef = useRef(null);
+  const pageRefsMap = useRef(new Map());
 
   // Computed values
   const userId = user?._id;
@@ -641,17 +657,154 @@ const ResourceDetailPage = () => {
     if (isAdmin) return true;
     return isPurchased;
   }, [isAuthenticated, isAdmin, isPurchased]);
-  const fileUrl = useMemo(() => {
-    if (!resource) return null;
-    return (
-      resource.fileUrl ||
-      resource.filePath ||
-      resource.file ||
-      resource.url ||
-      resource.downloadUrl ||
-      resource.cloudinaryUrl
+
+  const isOwner = useMemo(() => {
+    return user && resource?.uploadedBy?._id === user._id;
+  }, [user, resource]);
+
+  // Cleanup function for PDF
+  const cleanupPdf = useCallback(() => {
+    if (previewDataUrl) {
+      URL.revokeObjectURL(previewDataUrl);
+      setPreviewDataUrl(null);
+    }
+    setVisiblePages(new Set([1]));
+    setRenderedPages(new Set());
+    pageRefsMap.current.clear();
+    setShowPreview(false); // Reset preview visibility
+  }, [previewDataUrl]);
+
+  // Virtual scrolling setup with IntersectionObserver
+  useEffect(() => {
+    if (!pdfContainerRef.current || !numPages) return;
+
+    // Disconnect previous observer
+    if (intersectionObserverRef.current) {
+      intersectionObserverRef.current.disconnect();
+    }
+
+    // Create intersection observer for lazy loading
+    intersectionObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        const newVisiblePages = new Set();
+        
+        entries.forEach((entry) => {
+          const pageNum = parseInt(entry.target.dataset.pageNumber);
+          if (entry.isIntersecting) {
+            newVisiblePages.add(pageNum);
+            // Update currentPage based on the most visible page
+            const rect = entry.target.getBoundingClientRect();
+            if (rect.top >= 0 && rect.top <= window.innerHeight / 2) {
+              setCurrentPage(pageNum);
+            }
+            // Add buffer pages
+            for (let i = Math.max(1, pageNum - PAGE_BUFFER); 
+                 i <= Math.min(numPages, pageNum + PAGE_BUFFER); i++) {
+              newVisiblePages.add(i);
+            }
+          }
+        });
+
+        if (newVisiblePages.size > 0) {
+          setVisiblePages(newVisiblePages);
+        }
+      },
+      {
+        root: isFullscreen ? document.querySelector('.fullscreen-container') : pdfContainerRef.current,
+        rootMargin: '300px 0px', // Increased for better preloading
+        threshold: 0.2 // Increased for more reliable detection
+      }
     );
-  }, [resource]);
+
+    // Observe all page placeholders
+    pageRefsMap.current.forEach((ref, pageNum) => {
+      if (ref && intersectionObserverRef.current) {
+        intersectionObserverRef.current.observe(ref);
+      }
+    });
+
+    return () => {
+      if (intersectionObserverRef.current) {
+        intersectionObserverRef.current.disconnect();
+      }
+    };
+  }, [numPages, isFullscreen]);
+
+  // Fallback scroll handler for fullscreen mode
+  useEffect(() => {
+    if (!isFullscreen || !pdfContainerRef.current || !numPages) return;
+
+    const handleScroll = throttle(() => {
+      const container = pdfContainerRef.current;
+      const scrollTop = container.scrollTop;
+      const containerHeight = container.clientHeight;
+
+      // Calculate visible pages based on scroll position
+      const newVisiblePages = new Set();
+      pageRefsMap.current.forEach((ref, pageNum) => {
+        if (ref) {
+          const rect = ref.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const relativeTop = rect.top - containerRect.top;
+          if (relativeTop >= -100 && relativeTop <= containerHeight + 100) {
+            newVisiblePages.add(pageNum);
+            // Add buffer pages
+            for (let i = Math.max(1, pageNum - PAGE_BUFFER); 
+                 i <= Math.min(numPages, pageNum + PAGE_BUFFER); i++) {
+              newVisiblePages.add(i);
+            }
+            // Update currentPage based on the most visible page
+            if (relativeTop >= 0 && relativeTop <= containerHeight / 2) {
+              setCurrentPage(pageNum);
+            }
+          }
+        }
+      });
+
+      if (newVisiblePages.size > 0) {
+        setVisiblePages(newVisiblePages);
+      }
+    }, 100);
+
+    pdfContainerRef.current.addEventListener('scroll', handleScroll);
+    return () => {
+      pdfContainerRef.current?.removeEventListener('scroll', handleScroll);
+      handleScroll.cancel();
+    };
+  }, [isFullscreen, numPages]);
+
+  // Process render queue with throttling
+  const processRenderQueue = useCallback(() => {
+    if (isRenderingRef.current || renderQueueRef.current.length === 0) return;
+
+    isRenderingRef.current = true;
+    const pagesToRender = renderQueueRef.current.splice(0, PAGES_TO_RENDER);
+    
+    setRenderedPages(prev => {
+      const newSet = new Set(prev);
+      pagesToRender.forEach(page => newSet.add(page));
+      return newSet;
+    });
+
+    setTimeout(() => {
+      isRenderingRef.current = false;
+      if (renderQueueRef.current.length > 0) {
+        processRenderQueue();
+      }
+    }, RENDER_DELAY);
+  }, []);
+
+  // Update render queue when visible pages change
+  useEffect(() => {
+    const newPagesToRender = Array.from(visiblePages).filter(
+      page => !renderedPages.has(page)
+    );
+    
+    if (newPagesToRender.length > 0) {
+      renderQueueRef.current = newPagesToRender;
+      processRenderQueue();
+    }
+  }, [visiblePages, renderedPages, processRenderQueue]);
 
   // Handle fullscreen body overflow
   useEffect(() => {
@@ -673,13 +826,14 @@ const ResourceDetailPage = () => {
       if (pdfContainerRef.current) {
         const containerWidth = pdfContainerRef.current.clientWidth;
         const maxWidth = newIsMobile ? containerWidth - 20 : Math.min(containerWidth - 40, 800);
-        const aspectRatio = 1.414; // Standard A4 aspect ratio
+        const aspectRatio = 1.414;
         setPdfDimensions({
           width: maxWidth,
           height: maxWidth * aspectRatio,
         });
       }
     }, 100);
+    
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => {
@@ -695,31 +849,26 @@ const ResourceDetailPage = () => {
       setLoading(false);
       return;
     }
+
     const loadResource = async () => {
       setLoading(true);
       setError(null);
       try {
         let fetchedResource = initialResourceFromState;
-        const cacheKey = `resource_${resourceId}`;
-        const cachedResource = sessionStorage.getItem(cacheKey);
-        if (cachedResource && !fetchedResource) {
-          fetchedResource = JSON.parse(cachedResource);
-        }
+        
         if (!fetchedResource || fetchedResource._id !== resourceId) {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000);
           const response = await fetch(`${API_BASE_URL}/resources/${resourceId}`, {
-            signal: controller.signal,
-            headers: { Authorization: `Bearer ${token}` }, // Add token if required
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
-          clearTimeout(timeoutId);
+          
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
+          
           fetchedResource = await response.json();
           fetchedResource = fetchedResource.resource || fetchedResource;
-          sessionStorage.setItem(cacheKey, JSON.stringify(fetchedResource));
         }
+        
         setResource(fetchedResource);
       } catch (err) {
         console.error("Error fetching resource:", err);
@@ -728,8 +877,16 @@ const ResourceDetailPage = () => {
         setLoading(false);
       }
     };
+    
     loadResource();
   }, [resourceId, initialResourceFromState, token]);
+
+  // Check if user has saved this resource
+  useEffect(() => {
+    if (user?.savedResources && resource?._id) {
+      setHasSaved(user.savedResources.includes(resource._id));
+    }
+  }, [user?.savedResources, resource?._id]);
 
   // Purchase status fetching
   useEffect(() => {
@@ -738,18 +895,17 @@ const ResourceDetailPage = () => {
         setIsPurchased(false);
         return;
       }
-      if (isAdmin) {
+      
+      if (isAdmin || isOwner) {
         setIsPurchased(true);
         return;
       }
+      
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
         const response = await fetch(`${API_BASE_URL}/resources/${resource._id}/purchase-status`, {
           headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal,
         });
-        clearTimeout(timeoutId);
+        
         if (response.ok) {
           const data = await response.json();
           setIsPurchased(data.isPurchased || false);
@@ -762,46 +918,51 @@ const ResourceDetailPage = () => {
         setIsPurchased(purchased);
       }
     };
+    
     fetchPurchaseStatus();
-  }, [isAuthenticated, token, user?.purchasedResources, resource?._id, user, isAdmin]);
+  }, [isAuthenticated, token, user, resource?._id, isAdmin, isOwner]);
 
-  // Ratings fetching
+  // Rating handlers
   const refreshRatings = useCallback(async () => {
     if (!resourceId) return;
     setIsRatingLoading(true);
     try {
       const url = `${API_BASE_URL}/resources/${resourceId}/ratings${userId ? `?userId=${userId}` : ""}`;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      const response = await fetch(url);
+      
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: Failed to fetch ratings`);
       }
+      
       const data = await response.json();
-      setOverallRating(data.overallRating ?? overallRating);
-      if (userId) setUserRating(data.userRating ?? userRating);
+      setOverallRating(data.overallRating ?? 0);
+      if (userId) setUserRating(data.userRating ?? 0);
     } catch (err) {
       console.error("Error fetching ratings:", err);
     } finally {
       setIsRatingLoading(false);
     }
-  }, [resourceId, userId, overallRating, userRating]);
+  }, [resourceId, userId]);
 
   useEffect(() => {
     if (resourceId) {
       refreshRatings();
-      pollIntervalRef.current = setInterval(refreshRatings, 60000);
-      return () => clearInterval(pollIntervalRef.current);
     }
   }, [resourceId, refreshRatings]);
 
-  // Rating handler
   const handleRate = useCallback(async (value) => {
     if (!isAuthenticated || !resourceId) {
-      setError("Please login to rate");
+      showModal({
+        type: "warning",
+        title: "Authentication Required",
+        message: "Please login to rate this resource",
+        confirmText: "Go to Login",
+        onConfirm: () => navigate('/login'),
+        cancelText: "Cancel",
+      });
       return;
     }
+    
     setUserRating(value);
     try {
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/rate`, {
@@ -812,166 +973,149 @@ const ResourceDetailPage = () => {
         },
         body: JSON.stringify({ value }),
       });
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `Rating failed: ${response.status}`);
       }
+      
       const data = await response.json();
       setUserRating(data.userRating);
       setOverallRating(data.overallRating);
+      
+      showModal({
+        type: "success",
+        title: "Rating Saved",
+        message: "Your rating has been saved successfully!",
+        confirmText: "OK",
+      });
     } catch (e) {
       console.error("Rating error:", e);
-      setError(e.message);
-      setUserRating(userRating);
-      setOverallRating(overallRating);
+      showModal({
+        type: "error",
+        title: "Rating Failed",
+        message: e.message,
+        confirmText: "OK",
+      });
     }
-  }, [isAuthenticated, resourceId, token, userRating, overallRating]);
+  }, [isAuthenticated, resourceId, token, showModal, navigate]);
 
-  // Preview handler
+  // Optimized preview handler
   const handlePreview = useCallback(async () => {
     if (!isAuthenticated) {
-      setError("You need to be logged in to preview resources.");
-      navigate('/login'); // Redirect to login
+      showModal({
+        type: "warning",
+        title: "Authentication Required",
+        message: "You need to be logged in to preview resources.",
+        confirmText: "Go to Login",
+        onConfirm: () => navigate('/login'),
+        cancelText: "Cancel",
+      });
       return;
     }
-    if (previewDataUrl) return; // Skip if already loaded
+    
+    if (previewDataUrl) {
+      setShowPreview(true); // Show preview if already loaded
+      return;
+    }
+    
     setPreviewLoading(true);
     setPreviewError(null);
-    setPreviewRetryCount(0); // Reset retry count
+    
     try {
-      // Clear stale sessionStorage entry
-      sessionStorage.removeItem(`preview_${resourceId}`);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/preview`, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal,
       });
-      clearTimeout(timeoutId);
+      
       if (!response.ok) {
         throw new Error(`Failed to fetch preview: HTTP ${response.status}`);
       }
+      
       const blob = await response.blob();
       if (blob.type !== "application/pdf") {
         throw new Error("Invalid PDF file received");
       }
+      
       const url = URL.createObjectURL(blob);
       setPreviewDataUrl(url);
-      sessionStorage.setItem(`preview_${resourceId}`, url);
+      setShowPreview(true); // Show preview after loading
     } catch (err) {
       console.error("Preview failed:", err);
-      let errorMessage = err.name === 'AbortError' ? "Preview request timeout - please try again" : err.message;
+      let errorMessage = err.message;
       if (err.message.includes("401")) {
         errorMessage = "Authentication failed. Please log in again.";
         navigate('/login');
       }
       setPreviewError(errorMessage);
-      if (previewRetryCount < 3) { // Increased retry limit to 3
-        setPreviewRetryCount(prev => prev + 1);
-        setTimeout(() => handlePreview(), 2000);
-      }
+      showModal({
+        type: "error",
+        title: "Preview Failed",
+        message: errorMessage,
+        confirmText: "OK",
+      });
     } finally {
       setPreviewLoading(false);
     }
-  }, [isAuthenticated, resourceId, token, previewDataUrl, previewRetryCount, navigate]);
-
-  // Automatically trigger preview on mount
-  useEffect(() => {
-    
-    return () => {
-      if (previewDataUrl) {
-        URL.revokeObjectURL(previewDataUrl);
-        sessionStorage.removeItem(`preview_${resourceId}`);
-        setPreviewDataUrl(null);
-      }
-    };
-  }, [isAuthenticated, resourceId, handlePreview, previewDataUrl]);
+  }, [isAuthenticated, resourceId, token, previewDataUrl, navigate, showModal]);
 
   // PDF document handlers
   const onDocumentLoadSuccess = useCallback(({ numPages }) => {
-    console.log(`PDF loaded successfully with ${numPages} pages`);
+    console.log(`PDF loaded with ${numPages} pages`);
     setNumPages(numPages);
     setPreviewLoading(false);
     setPreviewError(null);
     setCurrentPage(1);
-    setPreviewRetryCount(0); // Reset retry count on success
+    // Only render first few pages initially
+    setVisiblePages(new Set([1, 2, 3]));
+    setRenderedPages(new Set());
   }, []);
 
   const onDocumentLoadError = useCallback((error) => {
-    console.error("Error loading PDF document:", error);
-    setPreviewError("Failed to load PDF preview. Please try downloading or refreshing.");
+    console.error("Error loading PDF:", error);
+    setPreviewError("Failed to load PDF preview");
     setPreviewLoading(false);
-    if (previewRetryCount < 3) { // Increased retry limit to 3
-      setPreviewRetryCount(prev => prev + 1);
-      setTimeout(() => {
-        sessionStorage.removeItem(`preview_${resourceId}`);
-        handlePreview();
-      }, 2000);
-    }
-  }, [previewRetryCount, resourceId, handlePreview]);
+    showModal({
+      type: "error",
+      title: "PDF Load Error",
+      message: "Failed to load PDF preview. Please try downloading the file instead.",
+      confirmText: "OK",
+    });
+  }, [showModal]);
 
-  // Zoom handlers
-  const handleZoomIn = useCallback(() => {
-    setZoom((prev) => Math.min(prev + 0.2, 2));
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setZoom((prev) => Math.max(prev - 0.2, 0.5));
-  }, []);
-
-  const resetZoom = useCallback(() => {
-    setZoom(1);
-  }, []);
-
-  const toggleFullscreen = useCallback(() => {
-    setIsFullscreen((prev) => !prev);
-  }, []);
-
-  const handleMobileFullscreen = useCallback(async () => {
+  // Download handler
+  const handleDownload = useCallback(async () => {
     if (!isAuthenticated) {
-      setError("You need to be logged in to preview resources.");
-      navigate('/login');
+      showModal({
+        type: "warning",
+        title: "Authentication Required",
+        message: "You need to be logged in to download resources.",
+        confirmText: "Go to Login",
+        onConfirm: () => navigate('/login'),
+        cancelText: "Cancel",
+      });
       return;
     }
-    if (!previewDataUrl && !previewLoading) {
-      await handlePreview();
-    }
-    setIsFullscreen(true);
-  }, [isAuthenticated, previewDataUrl, previewLoading, handlePreview, navigate]);
-
-  // Download validation and handler
-  const validateDownload = useCallback(() => {
-    if (!isAuthenticated) {
-      alert("You need to be logged in to download resources.");
-      return false;
-    }
+    
     if (!canDownload) {
-      alert(`This resource requires purchase (${cost} coins). You currently have ${userCoins} coins.`);
-      return false;
+      showModal({
+        type: "info",
+        title: "Purchase Required",
+        message: `This resource requires purchase (${cost} coins). You currently have ${userCoins} coins.`,
+        confirmText: "OK",
+      });
+      return;
     }
-    return true;
-  }, [isAuthenticated, canDownload, cost, userCoins]);
-
-  const handleDownload = useCallback(async () => {
-    if (!validateDownload()) return;
+    
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/download`, {
         method: "GET",
-        headers: { Authorization: `Bearer ${token}`, Accept: "*/*" },
-        signal: controller.signal,
+        headers: { Authorization: `Bearer ${token}` },
       });
-      clearTimeout(timeoutId);
+      
       if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(errorData.msg || "Download failed due to server error.");
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        throw new Error(`Download failed: ${response.status}`);
       }
+      
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -981,267 +1125,238 @@ const ResourceDetailPage = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
+      
+      showModal({
+        type: "success",
+        title: "Download Started",
+        message: "Your download has started successfully!",
+        confirmText: "OK",
+      });
+      
       await fetch(`${API_BASE_URL}/resources/${resourceId}/increment-download`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch (err) {
       console.error("Download failed:", err);
-      const errorMessage = err.name === 'AbortError' ? "Download timeout - please try again" : `Download failed: ${err.message}`;
-      setError(errorMessage);
-      alert(errorMessage);
+      showModal({
+        type: "error",
+        title: "Download Failed",
+        message: err.message,
+        confirmText: "OK",
+      });
     }
-  }, [resourceId, token, resource?.title, validateDownload]);
+  }, [isAuthenticated, canDownload, cost, userCoins, resourceId, token, resource?.title, showModal, navigate]);
 
   // Purchase handler
   const handlePurchase = async () => {
     if (!isAuthenticated) {
-      setError("You need to be logged in to purchase resources.");
-      navigate('/login');
+      showModal({
+        type: "warning",
+        title: "Authentication Required",
+        message: "You need to be logged in to purchase resources.",
+        confirmText: "Go to Login",
+        onConfirm: () => navigate('/login'),
+        cancelText: "Cancel",
+      });
       return;
     }
+    
     if (userCoins < cost) {
-      alert(
-        `You need ${cost} ScholaraCoins to purchase this resource. You currently have ${userCoins} coins. Earn more coins by uploading resources or referring friends!`
-      );
+      showModal({
+        type: "info",
+        title: "Insufficient Coins",
+        message: `You need ${cost} ScholaraCoins to purchase this resource. You currently have ${userCoins} coins.`,
+        confirmText: "OK",
+      });
       return;
     }
+    
     setPurchasing(true);
     try {
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/purchase`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({ cost }),
       });
+      
       const data = await response.json();
       if (response.ok && data.success) {
         setIsPurchased(true);
         if (updateUser && data.user) {
           updateUser(data.user);
-        } else if (updateUser) {
-          updateUser({
-            ...user,
-            scholaraCoins: data.scholaraCoins,
-            purchasedResources: data.purchasedResources || [...(user.purchasedResources || []), resourceId],
-          });
         }
-        alert("Resource unlocked successfully! You can now download it.");
+        showModal({
+          type: "success",
+          title: "Purchase Successful",
+          message: "Resource unlocked! You now have lifetime access to download it.",
+          confirmText: "Great!",
+        });
       } else {
         throw new Error(data.message || "Purchase failed.");
       }
     } catch (error) {
       console.error("Purchase failed:", error);
-      setIsPurchased(false);
-      setError("Purchase failed. Please try again.");
+      showModal({
+        type: "error",
+        title: "Purchase Failed",
+        message: error.message,
+        confirmText: "OK",
+      });
     } finally {
       setPurchasing(false);
     }
   };
 
-  // Fullscreen scroll handler
+  // Save/Unsave handler
+  const handleSaveToggle = async () => {
+    if (hasSaved) {
+      // Unsave logic
+      showModal({
+        type: "warning",
+        title: "Remove from Library?",
+        message: "Are you sure you want to remove this resource from your library?",
+        confirmText: "Remove",
+        onConfirm: async () => {
+          try {
+            const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/unsave`, {
+              method: "PUT",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            });
+            
+            if (response.ok) {
+              setHasSaved(false);
+              showModal({
+                type: "success",
+                title: "Removed",
+                message: "Resource removed from your library.",
+                confirmText: "OK",
+              });
+            }
+          } catch (error) {
+            console.error("Unsave failed:", error);
+          }
+        },
+        cancelText: "Cancel",
+      });
+    } else {
+      await handleSave(resourceId);
+      setHasSaved(true);
+    }
+  };
+
+  // Zoom handlers
+  const handleZoomIn = useCallback(() => setZoom(prev => Math.min(prev + 0.2, 2)), []);
+  const handleZoomOut = useCallback(() => setZoom(prev => Math.max(prev - 0.2, 0.5)), []);
+  const resetZoom = useCallback(() => setZoom(1), []);
+  const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
+
+  // Show/hide controls
   const showAndScheduleHide = useCallback(() => {
     setShowFullscreenControls(true);
     if (hideControlsTimeoutRef.current) {
       clearTimeout(hideControlsTimeoutRef.current);
     }
-    hideControlsTimeoutRef.current = setTimeout(() => {
-      setShowFullscreenControls(false);
-    }, 3000);
+    if (!isCursorOnControls) {
+      hideControlsTimeoutRef.current = setTimeout(() => {
+        setShowFullscreenControls(false);
+      }, 3000);
+    }
+  }, [isCursorOnControls]);
+
+  // Handle cursor entering/leaving controls
+  const handleControlsMouseEnter = useCallback(() => {
+    setIsCursorOnControls(true);
+    if (hideControlsTimeoutRef.current) {
+      clearTimeout(hideControlsTimeoutRef.current);
+    }
   }, []);
 
-  useEffect(() => {
-    if (!pdfContainerRef.current) {
-      if (hideControlsTimeoutRef.current) {
-        clearTimeout(hideControlsTimeoutRef.current);
-      }
-      return;
+  const handleControlsMouseLeave = useCallback(() => {
+    setIsCursorOnControls(false);
+    if (showFullscreenControls) {
+      hideControlsTimeoutRef.current = setTimeout(() => {
+        setShowFullscreenControls(false);
+      }, 3000);
     }
-    const handleScroll = throttle(showAndScheduleHide, 200);
-    const handleTouchMove = showAndScheduleHide;
-    const container = pdfContainerRef.current;
-    container.addEventListener('scroll', handleScroll);
-    container.addEventListener('touchmove', handleTouchMove);
-    if (isFullscreen) {
-      showAndScheduleHide();
-    }
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      container.removeEventListener('touchmove', handleTouchMove);
-      if (hideControlsTimeoutRef.current) {
-        clearTimeout(hideControlsTimeoutRef.current);
-      }
-      handleScroll.cancel();
-    };
-  }, [isFullscreen, showAndScheduleHide]);
+  }, [showFullscreenControls]);
 
-  // Render PDF pages
-  const renderPdfPages = useMemo(() => {
-    if (!numPages) return null;
-    const pagesToRender = [];
-    for (let pageNumber = 1; pageNumber <= numPages; pageNumber++) {
-      pagesToRender.push(
-        <div
-          key={pageNumber}
-          className="mb-4 flex justify-center"
-          style={{
-            minHeight: pdfDimensions.height * zoom,
-            width: '100%',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
+  // Optimized PDF page rendering
+  const renderPdfPage = useCallback((pageNumber) => {
+    const shouldRender = renderedPages.has(pageNumber) || visiblePages.has(pageNumber);
+    
+    return (
+      <div
+        key={`page-${pageNumber}`}
+        ref={(el) => {
+          if (el) pageRefsMap.current.set(pageNumber, el);
+        }}
+        data-page-number={pageNumber}
+        className="mb-4 flex justify-center"
+        style={{
+          minHeight: pdfDimensions.height * zoom,
+          width: '100%',
+        }}
+      >
+        {shouldRender ? (
           <div
-            className="bg-gray-100 dark:bg-charcoal rounded-lg shadow-lg"
+            className="bg-white rounded-lg shadow-lg"
             style={{
               width: pdfDimensions.width * zoom,
               height: pdfDimensions.height * zoom,
               maxWidth: '100%',
-              overflow: 'hidden',
             }}
           >
             <Page
               pageNumber={pageNumber}
               width={pdfDimensions.width}
               scale={zoom}
-              className="rounded-lg"
               renderTextLayer={false}
               renderAnnotationLayer={false}
-              onRenderSuccess={() => console.log(`Page ${pageNumber} rendered successfully`)}
-              onRenderError={(error) => console.error(`Page ${pageNumber} render error:`, error)}
               loading={
                 <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <FontAwesomeIcon icon={faSpinner} spin className="text-blue-500 text-xl mb-2" />
-                    <span className="text-gray-500 dark:text-gray-400 text-sm">Loading page {pageNumber}...</span>
-                  </div>
+                  <LoadingSpinner size="sm" text={`Loading page ${pageNumber}...`} />
                 </div>
               }
             />
           </div>
-        </div>
-      );
-    }
-    return pagesToRender;
-  }, [numPages, zoom, pdfDimensions]);
-
-  // Page Indicator Component
-  const PageIndicator = ({ className = "" }) => {
-    const pageRef = useRef(1);
-    const scrollContainerRef = pdfContainerRef;
-
-    useEffect(() => {
-      if (!scrollContainerRef.current || !numPages || numPages <= 1) {
-        return;
-      }
-      const handleScroll = throttle(() => {
-        const { scrollTop } = scrollContainerRef.current;
-        const pageHeight = pdfDimensions.height * zoom + 16;
-        const newPage = Math.min(Math.ceil(scrollTop / pageHeight) + 1, numPages);
-        if (newPage !== pageRef.current) {
-          pageRef.current = newPage;
-          setCurrentPage(newPage);
-        }
-        showAndScheduleHide();
-      }, 200);
-      scrollContainerRef.current.addEventListener('scroll', handleScroll);
-      scrollContainerRef.current.addEventListener('touchmove', showAndScheduleHide);
-      return () => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.removeEventListener('scroll', handleScroll);
-          scrollContainerRef.current.removeEventListener('touchmove', showAndScheduleHide);
-        }
-        handleScroll.cancel();
-      };
-    }, [numPages, pdfDimensions, showAndScheduleHide]);
-
-    return (
-      <AnimatePresence>
-        {showFullscreenControls && numPages > 1 && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className={`absolute top-12 right-4 z-50 flex items-center gap-3 px-4 py-2 bg-black/70 text-white rounded-lg backdrop-blur-sm ${className}`}
+        ) : (
+          <div
+            className="bg-gray-200 dark:bg-gray-700 rounded-lg shadow-lg flex items-center justify-center"
+            style={{
+              width: pdfDimensions.width * zoom,
+              height: pdfDimensions.height * zoom,
+              maxWidth: '100%',
+            }}
           >
-            <span className="text-sm font-medium">
-              Page {currentPage} of {numPages}
-            </span>
-            {numPages > 5 && (
-              <div className="flex items-center gap-1">
-                <div className="w-16 h-1 bg-white/30 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-white rounded-full transition-all duration-300"
-                    style={{ width: `${(currentPage / numPages) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </motion.div>
+            <span className="text-gray-500">Page {pageNumber}</span>
+          </div>
         )}
-      </AnimatePresence>
+      </div>
     );
-  };
+  }, [renderedPages, visiblePages, pdfDimensions, zoom]);
 
   // Stats Card Component
-  const StatsCard = React.memo(({ icon, label, value, trend }) => (
+  const StatsCard = React.memo(({ icon, label, value }) => (
     <div className="flex items-center gap-3 bg-white dark:bg-charcoal p-4 rounded-xl shadow-inner">
       <div className="text-2xl">{icon}</div>
       <div className="flex-1">
         <p className="text-gray-600 dark:text-gray-400 text-sm">{label}</p>
-        <div className="flex items-center gap-2">
-          <p className="text-lg font-bold text-gray-900 dark:text-white">{value}</p>
-          {trend && (
-            <span className="text-xs font-semibold text-green-500 flex items-center gap-1">
-              <TrendingUp size={12} />
-              {trend}%
-            </span>
-          )}
-        </div>
+        <p className="text-lg font-bold text-gray-900 dark:text-white">{value}</p>
       </div>
     </div>
   ));
 
-  const formatCount = useCallback((count) => {
-    if (count >= 1000) {
-      return (count / 1000).toFixed(1) + 'k';
-    }
-    return count;
-  }, []);
-
-  const downloadStats = useMemo(() => {
-    return resource?.downloads ? formatCount(resource.downloads) : 'N/A';
-  }, [resource?.downloads, formatCount]);
-
-  const viewStats = useMemo(() => {
-    return resource?.viewCount ? formatCount(resource.viewCount) : 'N/A';
-  }, [resource?.viewCount, formatCount]);
-
-  const stats = useMemo(() => [
-    {
-      icon: <Eye className="text-blue-500" />,
-      label: "Views",
-      value: viewStats,
-      trend: resource?.viewTrend,
-    },
-    {
-      icon: <Download className="text-green-500" />,
-      label: "Downloads",
-      value: downloadStats,
-      trend: resource?.downloadTrend,
-    },
-    {
-      icon: <Star className="text-yellow-500" />,
-      label: "Rating",
-      value: overallRating > 0 ? overallRating.toFixed(1) : "N/A",
-    },
-  ], [viewStats, downloadStats, overallRating, resource?.viewTrend, resource?.downloadTrend]);
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-onyx">
-        <LoadingSpinner size="lg" text="Fetching resource details..." />
+        <LoadingSpinner size="lg" text="Loading resource..." />
       </div>
     );
   }
@@ -1262,465 +1377,378 @@ const ResourceDetailPage = () => {
     );
   }
 
-  // Render functions
-  const renderPreview = () => (
-    <motion.div
-      initial={{ y: 20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm overflow-hidden p-4 lg:p-8 relative"
-    >
-      <div
-        className="mt-8 bg-gray-200 dark:bg-charcoal rounded-xl shadow-lg relative"
-        style={{
-          backgroundImage: !previewDataUrl ? `url(${resource.thumbnailUrl || ''})` : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          position: 'relative',
-          width: '100%',
-          maxWidth: isFullscreen ? '100vw' : '100%',
-          height: isFullscreen ? '100vh' : 'calc(100vh - 200px)',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        {previewLoading ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <LoadingSpinner text="Preparing preview..." size="lg" />
-          </div>
-        ) : previewError ? (
-          <div className="absolute inset-0 flex items-center justify-center p-4">
-            <ErrorDisplay
-              error={previewError}
-              onRetry={handlePreview}
-              actionText="Try Again"
-            />
-          </div>
-        ) : (
+  return (
+    <div className={`min-h-screen bg-gray-50 dark:bg-onyx transition-colors duration-300 ${isFullscreen ? "overflow-hidden" : ""}`}>
+      <div className="p-4 lg:p-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Title Section */}
           <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-full flex flex-col items-center custom-scrollbar"
-            ref={pdfContainerRef}
-            style={{
-              maxWidth: isFullscreen ? '100%' : pdfDimensions.width * zoom + 40,
-              margin: '0 auto',
-              padding: '20px 0',
-            }}
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6 mb-6"
           >
-            {previewDataUrl ? (
-              <Document
-                file={previewDataUrl}
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={onDocumentLoadError}
-                className="w-full"
-                loading={
-                  <div className="w-full h-full flex items-center justify-center">
-                    <LoadingSpinner text="Loading PDF..." />
-                  </div>
-                }
-              >
-                {renderPdfPages}
-              </Document>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center p-4">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handlePreview}
-                  className="flex items-center gap-3 px-6 py-4 bg-amber-600 text-white font-semibold rounded-lg shadow-lg hover:bg-amber-700 transition-colors z-10"
-                >
-                  <Eye size={24} />
-                  Preview Resource
-                </motion.button>
+            <div className="flex items-center gap-4">
+              <div className="bg-amber-100 dark:bg-amber-900 p-3 rounded-xl">
+                {getIconForType(resource.type, 36)}
               </div>
-            )}
+              <div className="flex-1">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {resource.title}
+                </h1>
+                <p className="text-gray-500 dark:text-gray-400">
+                  by {resource?.uploadedBy?.username || "Anonymous"}
+                </p>
+              </div>
+            </div>
           </motion.div>
-        )}
-      </div>
-      {previewDataUrl && numPages && !isFullscreen && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-10">
-          <div className="p-2 flex items-center gap-2 bg-black/70 rounded-lg text-white backdrop-blur-sm shadow-xl">
-            <motion.button
-              onClick={() => {
-                handleZoomOut();
-                if (isMobile && isFullscreen) showAndScheduleHide();
-              }}
-              disabled={zoom <= 0.5}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
-            >
-              <ZoomOut size={20} />
-            </motion.button>
-            <motion.button
-              onClick={() => {
-                handleZoomIn();
-                if (isMobile && isFullscreen) showAndScheduleHide();
-              }}
-              disabled={zoom >= 2}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
-            >
-              <ZoomIn size={20} />
-            </motion.button>
-            <motion.button
-              onClick={() => {
-                toggleFullscreen();
-                if (isMobile && isFullscreen) showAndScheduleHide();
-              }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="p-2 rounded-full hover:bg-white/20 transition-colors"
-            >
-              {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-            </motion.button>
-          </div>
-        </div>
-      )}
-      {previewDataUrl && numPages && !isFullscreen && (
-        <PageIndicator />
-      )}
-    </motion.div>
-  );
 
-  const renderTitleAndInfo = () => (
-    <motion.div
-      initial={{ y: 20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm overflow-hidden p-4 lg:p-8"
-    >
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="bg-amber-100 dark:bg-amber-900 p-3 rounded-xl">
-            {getIconForType(resource.type, 36)}
-          </div>
-          <div>
-            <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-1 leading-tight">
-              {resource.title}
-            </h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">
-              by <span className="font-medium text-gray-700 dark:text-gray-300">{resource?.uploadedBy?.username || "Anonymous"}</span>
-            </p>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Main Content */}
+            <div className="flex-1">
+              {/* Preview Section */}
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6"
+              >
+                <div
+                  ref={pdfContainerRef}
+                  className="bg-gray-100 dark:bg-charcoal rounded-lg overflow-auto"
+                  style={{
+                    maxHeight: isFullscreen ? '100vh' : '600px',
+                    position: 'relative',
+                  }}
+                >
+                  {!showPreview ? (
+                    <div className="flex items-center justify-center h-96">
+                      <button
+                        onClick={handlePreview}
+                        disabled={previewLoading}
+                        className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {previewLoading ? (
+                          <>
+                            <LoadingSpinner size="sm" className="inline mr-2" />
+                            Loading Preview...
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="inline mr-2" size={20} />
+                            Load Preview Resource
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : previewError ? (
+                    <div className="flex items-center justify-center h-96">
+                      <ErrorDisplay error={previewError} onRetry={handlePreview} />
+                    </div>
+                  ) : previewDataUrl ? (
+                    <Document
+                      file={previewDataUrl}
+                      onLoadSuccess={onDocumentLoadSuccess}
+                      onLoadError={onDocumentLoadError}
+                      loading={<LoadingSpinner text="Loading PDF..." />}
+                    >
+                      {numPages && Array.from({ length: numPages }, (_, i) => i + 1).map(renderPdfPage)}
+                    </Document>
+                  ) : null}
+                </div>
 
-  const renderSidebar = () => (
-    <motion.div
-      initial={{ y: 20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
-      className="w-full lg:w-1/3 lg:sticky lg:top-24 lg:h-[calc(100vh-4rem)] lg:overflow-y-auto custom-scrollbar"
-    >
-      <motion.div
-        className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6"
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.4 }}
-      >
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Actions</h2>
-        <div className="space-y-4">
-          <button
-            onClick={handleDownload}
-            disabled={!canDownload}
-            className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Download size={20} />
-            {canDownload ? "Download" : "Purchase to Download"}
-          </button>
-          {!isPurchased && (
-            <button
-              onClick={handlePurchase}
-              disabled={purchasing || userCoins < cost}
-              className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-amber-600 text-white font-semibold rounded-lg shadow-md hover:bg-amber-700 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {purchasing ? (
-                <>
-                  <FontAwesomeIcon icon={faSpinner} spin />
-                  Purchasing...
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-1">
-                    <img src={coin} alt="coin" className="w-5 h-5" />
-                    <span>{cost}</span>
+                {/* Preview Controls */}
+                {previewDataUrl && !isFullscreen && numPages && (
+                  <div className="flex justify-center items-center gap-2 mt-4">
+                    <span className="px-3 py-2 bg-gray-100 dark:bg-charcoal rounded-lg shadow-glow-sm text-sm">
+                      Page {currentPage} / {numPages}
+                    </span>
+                    <button
+                      onClick={handleZoomOut}
+                      disabled={zoom <= 0.5}
+                      className="p-2 bg-gray-200 dark:bg-charcoal rounded-lg disabled:opacity-50"
+                    >
+                      <ZoomOut size={20} />
+                    </button>
+                    <button
+                      onClick={resetZoom}
+                      className="p-2 bg-gray-200 dark:bg-charcoal rounded-lg"
+                    >
+                      <RefreshCw size={20} />
+                    </button>
+                    <button
+                      onClick={handleZoomIn}
+                      disabled={zoom >= 2}
+                      className="p-2 bg-gray-200 dark:bg-charcoal rounded-lg disabled:opacity-50"
+                    >
+                      <ZoomIn size={20} />
+                    </button>
+                    <button
+                      onClick={toggleFullscreen}
+                      className="p-2 bg-gray-200 dark:bg-charcoal rounded-lg"
+                    >
+                      <Maximize2 size={20} />
+                    </button>
                   </div>
-                  Unlock & Download
-                </>
-              )}
-            </button>
-          )}
-          <button
-            onClick={handleMobileFullscreen}
-            className="w-full lg:hidden flex items-center justify-center gap-3 px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold rounded-lg shadow-glow-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-300"
-          >
-            <Maximize2 size={20} />
-            View Fullscreen
-          </button>
-        </div>
-      </motion.div>
-      <motion.div
-        className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6 mt-6"
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.5 }}
-      >
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Details</h2>
-        <ul className="space-y-3 text-gray-700 dark:text-gray-300">
-          <li className="flex items-center gap-3">
-            <GraduationCap size={20} className="text-gray-500 dark:text-gray-400" />
-            <span className="font-medium">Subject:</span>
-            <span className="flex items-center gap-2">
-              {getIconForSubject(resource.subject, 18)}
-              {resource.subject}
-            </span>
-          </li>
-          <li className="flex items-center gap-3">
-            <FileText size={20} className="text-gray-500 dark:text-gray-400" />
-            <span className="font-medium">Type:</span>
-            <span>{resource.type}</span>
-          </li>
-          <li className="flex items-center gap-3">
-            <Star size={20} className="text-yellow-500 dark:text-yellow-400" />
-            <span className="font-medium">Your Rating:</span>
-            <StarRating
-              rating={userRating}
-              onRate={handleRate}
-              isLoading={isRatingLoading}
-              editable={isAuthenticated}
-              starSize={20}
-            />
-          </li>
-        </ul>
-      </motion.div>
-      <motion.div
-        className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6 mt-6"
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.6 }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Statistics</h2>
-          <motion.button
-            whileHover={{ rotate: 180 }}
-            onClick={() => setShowStats(!showStats)}
-            className="text-gray-500 dark:text-gray-400 p-1"
-          >
-            <RefreshCw size={18} />
-          </motion.button>
-        </div>
-        <AnimatePresence>
-          {showStats && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="overflow-hidden"
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {stats.map((stat, index) => (
-                  <StatsCard key={index} {...stat} />
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        {!showStats && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {stats.slice(0, 2).map((stat, index) => (
-              <StatsCard key={index} {...stat} />
-            ))}
-          </div>
-        )}
-      </motion.div>
-    </motion.div>
-  );
+                )}
+              </motion.div>
+            </div>
 
-  const renderComments = () => (
-    <motion.div
-      className="max-w-6xl p-4 lg:p-8 mx-auto bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm overflow-hidden mt-4 sm:mt-8"
-      animate={{ opacity: isFullscreen ? 0 : 1, y: isFullscreen ? 50 : 0 }}
-      transition={{
-        duration: 0.3,
-        ease: "easeInOut",
-        opacity: { duration: isFullscreen ? 0.1 : 0.3 },
-      }}
-    >
-      <ResourceCommentsSection
-        resourceId={resourceId}
-        currentUserId={userId}
-        userName={userName}
-      />
-    </motion.div>
-  );
+            {/* Sidebar */}
+            <div className="lg:w-96">
+              {/* Actions Card */}
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6 mb-6"
+              >
+                <h2 className="text-xl font-bold mb-4">Actions</h2>
+                
+                {/* Purchase/Download Button */}
+                {!canDownload ? (
+                  <button
+                    onClick={handlePurchase}
+                    disabled={purchasing || userCoins < cost}
+                    className="w-full mb-3 flex items-center justify-center gap-2 px-4 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {purchasing ? (
+                      <>
+                        <FontAwesomeIcon icon={faSpinner} spin />
+                        Purchasing...
+                      </>
+                    ) : (
+                      <>
+                        <img src={coin} alt="coin" className="w-5 h-5" />
+                        <span>{cost} - Unlock & Download</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleDownload}
+                    className="w-full mb-3 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Download size={20} />
+                    Download Resource
+                  </button>
+                )}
 
-  const renderFullscreen = () => (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[10000] bg-onyx/95 flex flex-col items-center justify-center p-4"
-    >
-      <AnimatePresence>
-        {showFullscreenControls && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="absolute top-4 right-4 z-10 flex lg:justify-end justify-between w-[90%] items-center gap-4"
-          >
-            <motion.div
-              className="flex items-center gap-3 px-4 py-2 bg-black/70 text-white shadow-glow-sm rounded-lg backdrop-blur-sm"
-            >
-              <span className="text-sm font-medium">
-                Page {currentPage} of {numPages}
-              </span>
-              {numPages > 5 && (
-                <div className="lg:flex hidden items-center gap-1">
-                  <div className="w-16 h-1 bg-white/30 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-white rounded-full transition-all duration-300"
-                      style={{ width: `${(currentPage / numPages) * 100}%` }}
+                {/* Save/Flag Actions */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveToggle}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                      hasSaved 
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300' 
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300'
+                    }`}
+                  >
+                    <Save size={18} />
+                    {hasSaved ? 'Saved' : 'Save'}
+                  </button>
+                  
+                  <button
+                    onClick={() => handleFlag(resourceId)}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 transition-colors"
+                  >
+                    <Flag size={18} />
+                    Report
+                  </button>
+
+                  {isOwner && (
+                    <button
+                      onClick={() => handleDelete(resourceId)}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 dark:bg-red-900 dark:text-red-300 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+
+              {/* Details Card */}
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6 mb-6"
+              >
+                <h2 className="text-xl font-bold mb-4">Details</h2>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <GraduationCap size={20} className="text-gray-500" />
+                    <span className="font-medium">Subject:</span>
+                    <span className="flex items-center gap-2">
+                      {getIconForSubject(resource.subject, 18)}
+                      {resource.subject}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <FileText size={20} className="text-gray-500" />
+                    <span className="font-medium">Type:</span>
+                    <span>{resource.type}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Star size={20} className="text-yellow-500" />
+                    <span className="font-medium">Rating:</span>
+                    <StarRating
+                      rating={userRating}
+                      onRate={handleRate}
+                      isLoading={isRatingLoading}
+                      editable={isAuthenticated}
+                      starSize={20}
                     />
                   </div>
                 </div>
-              )}
-            </motion.div>
-            <motion.button
-              onClick={() => {
-                toggleFullscreen();
-                if (isMobile) showAndScheduleHide();
-              }}
-              className="p-3 bg-black/20 text-white rounded-full backdrop-blur-sm"
-              whileHover={{ scale: 1.1, rotate: 90 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Minimize2 size={24} />
-            </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {previewDataUrl && (
-        <div
-          className="w-full h-full flex flex-col items-center overflow-auto custom-scrollbar"
-          ref={pdfContainerRef}
-          style={{
-            maxWidth: '100%',
-            padding: '20px 0',
-          }}
-        >
-          <Document
-            file={previewDataUrl}
-            onLoadSuccess={onDocumentLoadSuccess}
-            onLoadError={onDocumentLoadError}
-            className="w-full"
-          >
-            {renderPdfPages}
-          </Document>
-        </div>
-      )}
-      <AnimatePresence>
-        {showFullscreenControls && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
-            className="absolute bottom-4  -translate-x-1/2 flex items-center gap-3 z-10"
-          >
-            <div className="p-2 flex items-center gap-2 bg-black/70 rounded-lg text-white backdrop-blur-sm shadow-glow-sm">
-              <motion.button
-                onClick={() => {
-                  handleZoomOut();
-                  if (isMobile) showAndScheduleHide();
-                }}
-                disabled={zoom <= 0.5}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
-              >
-                <ZoomOut size={20} />
-              </motion.button>
-              <motion.button
-                onClick={() => {
-                  resetZoom();
-                  if (isMobile) showAndScheduleHide();
-                }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="p-2 rounded-full hover:bg-white/20 transition-colors"
-              >
-                <RefreshCw size={20} />
-              </motion.button>
-              <motion.button
-                onClick={() => {
-                  handleZoomIn();
-                  if (isMobile) showAndScheduleHide();
-                }}
-                disabled={zoom >= 2}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
-              >
-                <ZoomIn size={20} />
-              </motion.button>
-              <motion.button
-                onClick={() => {
-                  handleDownload();
-                  if (isMobile) showAndScheduleHide();
-                }}
-                disabled={!canDownload}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="p-2 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
-              >
-                <Download size={20} />
-              </motion.button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
+              </motion.div>
 
-  return (
-    <div
-      className={`font-sans antialiased text-gray-900 dark:text-gray-100 min-h-screen bg-gray-50 dark:bg-onyx/80 transition-colors duration-300 ${
-        isFullscreen ? "overflow-hidden" : ""
-      }`}
-    >
-      <div className="p-4 lg:p-8 relative">
-        <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
-          <div className="flex-1 lg:w-2/3">
-            {isMobile ? (
-              <>
-                {renderPreview()}
-                {renderTitleAndInfo()}
-                {renderSidebar()}
-                {renderComments()}
-              </>
-            ) : (
-              <>
-                {renderTitleAndInfo()}
-                {renderPreview()}
-                {renderComments()}
-              </>
-            )}
+              {/* Stats Card */}
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6"
+              >
+                <h2 className="text-xl font-bold mb-4">Statistics</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatsCard
+                    icon={<Eye className="text-blue-500" />}
+                    label="Views"
+                    value={resource?.viewCount || 0}
+                  />
+                  <StatsCard
+                    icon={<Download className="text-green-500" />}
+                    label="Downloads"
+                    value={resource?.downloads || 0}
+                  />
+                  <div className="col-span-2">
+                    <StatsCard
+                      icon={<Star className="text-yellow-500" />}
+                      label="Average Rating"
+                      value={overallRating > 0 ? overallRating.toFixed(1) : "N/A"}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            </div>
           </div>
-          {!isMobile && renderSidebar()}
+
+          {/* Comments Section */}
+          {!isFullscreen && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6 mt-8"
+            >
+              <ResourceCommentsSection
+                resourceId={resourceId}
+                currentUserId={userId}
+                userName={userName}
+              />
+            </motion.div>
+          )}
         </div>
       </div>
+
+      {/* Fullscreen Overlay */}
       <AnimatePresence>
-        {isFullscreen && renderFullscreen()}
+        {isFullscreen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[99999] bg-black/95 flex flex-col fullscreen-container"
+          >
+            {/* Fullscreen Header */}
+            <AnimatePresence>
+              {showFullscreenControls && numPages && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="absolute top-4 left-0 right-0 z-10 flex justify-between items-center px-4"
+                  onMouseEnter={handleControlsMouseEnter}
+                  onMouseLeave={handleControlsMouseLeave}
+                >
+                  <div className="bg-black/70 backdrop-blur shadow-glow-sm rounded-lg px-4 py-2 text-white">
+                    Page {currentPage} / {numPages}
+                  </div>
+                  <button
+                    onClick={toggleFullscreen}
+                    className="bg-black/70 shadow-glow-sm backdrop-blur rounded-lg p-2 text-white hover:bg-black/80"
+                  >
+                    <Minimize2 size={24} />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Fullscreen PDF Container */}
+            <div
+              ref={pdfContainerRef}
+              className="flex-1 overflow-auto"
+              onMouseMove={showAndScheduleHide}
+              onTouchStart={showAndScheduleHide}
+            >
+              {previewDataUrl && (
+                <Document
+                  file={previewDataUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={onDocumentLoadError}
+                  loading={<LoadingSpinner text="Loading PDF..." />}
+                >
+                  {numPages && Array.from({ length: numPages }, (_, i) => i + 1).map(renderPdfPage)}
+                </Document>
+              )}
+            </div>
+
+            {/* Fullscreen Footer Controls */}
+            <AnimatePresence>
+              {showFullscreenControls && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 "
+                  onMouseEnter={handleControlsMouseEnter}
+                  onMouseLeave={handleControlsMouseLeave}
+                >
+                  <div className="bg-black/70 backdrop-blur rounded-lg p-2 flex items-center gap-2">
+                    <button
+                      onClick={handleZoomOut}
+                      disabled={zoom <= 0.5}
+                      className="p-2 text-white hover:bg-white/20 rounded disabled:opacity-50"
+                    >
+                      <ZoomOut size={20} />
+                    </button>
+                    <button
+                      onClick={resetZoom}
+                      className="p-2 text-white hover:bg-white/20 rounded"
+                    >
+                      <RefreshCw size={20} />
+                    </button>
+                    <button
+                      onClick={handleZoomIn}
+                      disabled={zoom >= 2}
+                      className="p-2 text-white hover:bg-white/20 rounded disabled:opacity-50"
+                    >
+                      <ZoomIn size={20} />
+                    </button>
+                    {canDownload && (
+                      <button
+                        onClick={handleDownload}
+                        className="p-2 text-white hover:bg-white/20 rounded"
+                      >
+                        <Download size={20} />
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
