@@ -53,15 +53,18 @@ const Navbar = () => {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1); // Track selected suggestion
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const { isAuthenticated, user, logout } = useAuth();
   const { performSearch, fetchSuggestions, suggestions, clearSearchResults } = useResource();
   const navigate = useNavigate();
   const location = useLocation();
   const profileDropdownRef = useRef(null);
+  const profileButtonRef = useRef(null);
+  const mobileProfileDropdownRef = useRef(null);
   const mobileMenuRef = useRef(null);
   const searchInputRef = useRef(null);
   const mobileSearchInputRef = useRef(null);
+  const mobileProfileButtonRef = useRef(null); // New ref for the mobile profile button
 
   const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
 
@@ -92,7 +95,7 @@ const Navbar = () => {
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
       fetchSuggestions(searchQuery);
-      setSelectedSuggestionIndex(-1); // Reset selection when query changes
+      setSelectedSuggestionIndex(-1);
     }, 300);
 
     return () => clearTimeout(debounceTimer);
@@ -160,9 +163,24 @@ const Navbar = () => {
   };
 
   // Profile Dropdown Toggle
-  const toggleProfileDropdown = () => {
+  const toggleProfileDropdown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsProfileDropdownOpen((prev) => !prev);
+    // When opening profile dropdown, close other menus
     setIsSearchActive(false);
+    setIsMobileSearchActive(false);
+    setIsMobileMenuOpen(false);
+  };
+
+  // Handle profile dropdown item click
+  const handleProfileDropdownClick = (callback) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsProfileDropdownOpen(false);
+    if (callback) {
+      setTimeout(callback, 50);
+    }
   };
 
   // Handle Logout
@@ -200,47 +218,51 @@ const Navbar = () => {
   };
 
   // Handle Suggestion Click
- const handleSuggestionClick = (suggestion) => {
-  const searchTerm = suggestion.title;
-  const filters = {
-    subject: "",
-    year: "",
-    tags: "",
-    sort: "newest",
+  const handleSuggestionClick = (suggestion) => {
+    const searchTerm = suggestion.title;
+    const filters = {
+      subject: "",
+      year: "",
+      tags: "",
+      sort: "newest",
+    };
+
+    setSearchQuery(searchTerm);
+    setIsSearchActive(false);
+    setIsMobileSearchActive(false);
+    setSelectedSuggestionIndex(-1);
+
+    navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
+    performSearch(searchTerm, filters, 1);
+
+    setTimeout(() => setSearchQuery(""), 100);
   };
-  
-  setSearchQuery(searchTerm);
-  setIsSearchActive(false);
-  setIsMobileSearchActive(false);
-  setSelectedSuggestionIndex(-1);
-  
-  // Navigate to search results page
-  navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
-  // Perform the search
-  performSearch(searchTerm, filters, 1);
-  
-  // Clear the search query after navigation (optional)
-  setTimeout(() => setSearchQuery(""), 100);
-};
 
   // Close handlers for clicking outside dropdowns/menus
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (
-        profileDropdownRef.current &&
-        !profileDropdownRef.current.contains(event.target)
-      ) {
-        setIsProfileDropdownOpen(false);
+      const isClickOnDesktopProfile = profileDropdownRef.current && profileDropdownRef.current.contains(event.target);
+      const isClickOnDesktopButton = profileButtonRef.current && profileButtonRef.current.contains(event.target);
+      const isClickOnMobileProfile = mobileProfileDropdownRef.current && mobileProfileDropdownRef.current.contains(event.target);
+      const isClickOnMobileButton = mobileProfileButtonRef.current && mobileProfileButtonRef.current.contains(event.target);
+      const isClickOnMobileMenu = mobileMenuRef.current && mobileMenuRef.current.contains(event.target);
+      const isClickOnMobileMenuButton = event.target.closest('[aria-label="Toggle mobile menu"]');
+
+      if (isProfileDropdownOpen) {
+        if (!isClickOnDesktopProfile && !isClickOnDesktopButton && !isClickOnMobileProfile && !isClickOnMobileButton) {
+          setIsProfileDropdownOpen(false);
+        }
       }
+
       if (
         isMobileMenuOpen &&
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(event.target) &&
-        !event.target.closest('[aria-label="Toggle mobile menu"]')
+        !isClickOnMobileMenu &&
+        !isClickOnMobileMenuButton
       ) {
         toggleMobileMenu();
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -291,6 +313,7 @@ const Navbar = () => {
             </button>
           )}
         </div>
+
         {/* Center Section - Navigation Links or Search Bar */}
         <div className="flex-1 max-w-2xl mx-4">
           <div className="hidden lg:block">
@@ -403,6 +426,7 @@ const Navbar = () => {
             )}
           </div>
         </div>
+
         {(!isSearchActive && !isMobileSearchActive) && (
           <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0 min-w-0">
             <button
@@ -414,8 +438,9 @@ const Navbar = () => {
             </button>
             <div className="hidden lg:flex items-center space-x-3">
               {isAuthenticated ? (
-                <div className="relative" ref={profileDropdownRef}>
+                <div className="relative">
                   <button
+                    ref={profileButtonRef}
                     onClick={toggleProfileDropdown}
                     className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 group relative overflow-hidden hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 z-10"
                     aria-label="Profile menu"
@@ -434,7 +459,10 @@ const Navbar = () => {
                     />
                   </button>
                   {isProfileDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50" onClickCapture={(e) => e.stopPropagation()}>
+                    <div
+                      ref={profileDropdownRef}
+                      className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
+                    >
                       {user && (
                         <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
                           <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -451,6 +479,7 @@ const Navbar = () => {
                       </div>
                       <Link
                         to="/referral"
+                        onClick={handleProfileDropdownClick(() => navigate("/referral"))}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
                         <FontAwesomeIcon
@@ -463,6 +492,7 @@ const Navbar = () => {
                       {isAdmin && (
                         <Link
                           to="/admin"
+                          onClick={handleProfileDropdownClick(() => navigate("/admin"))}
                           className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                         >
                           <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
@@ -470,19 +500,21 @@ const Navbar = () => {
                       )}
                       <Link
                         to="/profile"
+                        onClick={handleProfileDropdownClick(() => navigate("/profile"))}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
                         <User size={16} className="mr-3" /> Profile
                       </Link>
                       <Link
                         to="/settings"
+                        onClick={handleProfileDropdownClick(() => navigate("/settings"))}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
                         <Settings size={16} className="mr-3" /> Settings
                       </Link>
                       <div className="border-t border-gray-100 dark:border-charcoal my-1"></div>
                       <button
-                        onClick={handleLogout}
+                        onClick={handleProfileDropdownClick(handleLogout)}
                         className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
                         <LogOut size={16} className="mr-3" /> Logout
@@ -507,27 +539,25 @@ const Navbar = () => {
                 </div>
               )}
             </div>
-            <div className="lg:hidden flex items-center">
-              <button
-                onClick={toggleMobileSearch}
-                className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0"
-                aria-label="Search"
-              >
-                <Search size={20} />
-              </button>
+            {/* START: Added a separate section for small screen logged-in user profile */}
+            <div className="lg:hidden flex items-center space-x-2">
               {isAuthenticated ? (
-                <div className="relative ml-2" ref={profileDropdownRef}>
+                <div className="relative">
                   <button
+                    ref={mobileProfileButtonRef}
                     onClick={toggleProfileDropdown}
-                    className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 dark:bg-charcoal hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 transform active:scale-95 flex-shrink-0"
+                    className="flex items-center gap-2 px-2 py-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
                     aria-label="Profile menu"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
                       {user?.username?.charAt(0).toUpperCase() || "U"}
                     </div>
                   </button>
                   {isProfileDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                    <div
+                      ref={mobileProfileDropdownRef}
+                      className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
+                    >
                       {user && (
                         <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
                           <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -544,7 +574,7 @@ const Navbar = () => {
                       </div>
                       <Link
                         to="/referral"
-                        onClick={handleNavLinkClick}
+                        onClick={handleProfileDropdownClick(() => navigate("/referral"))}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
                         <FontAwesomeIcon
@@ -557,7 +587,7 @@ const Navbar = () => {
                       {isAdmin && (
                         <Link
                           to="/admin"
-                          onClick={handleNavLinkClick}
+                          onClick={handleProfileDropdownClick(() => navigate("/admin"))}
                           className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                         >
                           <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
@@ -565,47 +595,54 @@ const Navbar = () => {
                       )}
                       <Link
                         to="/profile"
-                        onClick={handleNavLinkClick}
+                        onClick={handleProfileDropdownClick(() => navigate("/profile"))}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
                         <User size={16} className="mr-3" /> Profile
                       </Link>
                       <Link
                         to="/settings"
-                        onClick={handleNavLinkClick}
+                        onClick={handleProfileDropdownClick(() => navigate("/settings"))}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
                         <Settings size={16} className="mr-3" /> Settings
                       </Link>
                       <div className="border-t border-gray-100 dark:border-charcoal my-1"></div>
                       <button
-                        onClick={handleLogout}
+                        onClick={handleProfileDropdownClick(handleLogout)}
                         className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors duration-200"
                       >
-                        <LogOut size={16} />
-                        Logout
+                        <LogOut size={16} className="mr-3" /> Logout
                       </button>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center flex-1 justify-end ml-2 mr-2 space-x-1">
+                <div className="flex items-center space-x-2">
                   <Link
                     to="/login"
-                    className="flex-1 text-center px-2 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
-                    onClick={handleNavLinkClick}
+                    className="px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
                   >
                     Log In
                   </Link>
                   <Link
                     to="/register"
-                    className="flex-1 text-center px-2 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-xs font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
-                    onClick={handleNavLinkClick}
+                    className="px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
                   >
                     Sign Up
                   </Link>
                 </div>
               )}
+            </div>
+            {/* END: Added a separate section for small screen logged-in user profile */}
+            <div className="lg:hidden flex items-center space-x-2">
+              <button
+                onClick={toggleMobileSearch}
+                className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95 flex-shrink-0"
+                aria-label="Search"
+              >
+                <Search size={20} />
+              </button>
               <button
                 onClick={toggleMobileMenu}
                 className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95 flex-shrink-0"
@@ -651,20 +688,20 @@ const Navbar = () => {
             <div className="flex flex-col h-[calc(100dvh-64px)]">
               <div className="flex-1 p-4 space-y-1 overflow-y-auto bg-white/90 dark:bg-onyx backdrop-blur-sm">
                 <nav className="space-y-1">
-                  <MobileNavLink
-                    to="/"
-                    icon={<Home size={18} />}
-                    text="Home"
-                    onClick={handleNavLinkClick}
-                  />
-                  <MobileNavLink
-                    to="/resources"
-                    icon={<BookOpen size={18} />}
-                    text="Resources"
-                    onClick={handleNavLinkClick}
-                  />
                   {isAuthenticated && (
-                    <>
+                    <div className="space-y-1">
+                      <MobileNavLink
+                        to="/profile"
+                        icon={<User size={18} />}
+                        text="Profile"
+                        onClick={handleNavLinkClick}
+                      />
+                      <MobileNavLink
+                        to="/settings"
+                        icon={<Settings size={18} />}
+                        text="Settings"
+                        onClick={handleNavLinkClick}
+                      />
                       <MobileNavLink
                         to="/saved"
                         icon={<Bookmark size={18} />}
@@ -685,14 +722,35 @@ const Navbar = () => {
                           onClick={handleNavLinkClick}
                         />
                       )}
-                    </>
+                    </div>
                   )}
+                  <MobileNavLink
+                    to="/"
+                    icon={<Home size={18} />}
+                    text="Home"
+                    onClick={handleNavLinkClick}
+                  />
+                  <MobileNavLink
+                    to="/resources"
+                    icon={<BookOpen size={18} />}
+                    text="Resources"
+                    onClick={handleNavLinkClick}
+                  />
                   <MobileNavLink
                     to="/about"
                     icon={<Info size={18} />}
                     text="About"
                     onClick={handleNavLinkClick}
                   />
+                  {isAuthenticated && (
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-3 w-full p-3 rounded-lg text-red-600 dark:text-red-400 font-medium hover:bg-red-50 dark:hover:bg-gray-800 transition-colors duration-200"
+                    >
+                      <LogOut size={18} className="text-red-500 dark:text-red-400" />
+                      <span className="text-sm">Logout</span>
+                    </button>
+                  )}
                 </nav>
               </div>
               <div className="p-4 border-t border-gray-200 dark:border-charcoal bg-gray-50/80 dark:bg-onyx backdrop-blur-sm">
