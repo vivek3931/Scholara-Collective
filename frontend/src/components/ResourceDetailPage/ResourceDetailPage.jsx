@@ -23,13 +23,12 @@ import {
   FileCheck2,
   RefreshCw,
   Share2,
+  Trash2,
   Clock,
   Users,
   TrendingUp,
   Save,
   Flag,
-  ChevronLeft,
-  ChevronRight
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {

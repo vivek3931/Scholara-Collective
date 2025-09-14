@@ -10,7 +10,7 @@ const ScholaraFeatures = () => {
         {/* Left: Features List */}
         <div className="space-y-6">
           <h1 className="text-4xl font-bold font-poppins text-gray-900 dark:text-white leading-tight">
-            Unlock <span className="text-amber-500">Free Learning Tools</span> with Scholara
+            Unlock <span className="bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-600 bg-clip-text text-transparent">Free Learning Tools</span> with Scholara
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300">
             Scholara helps students study smarter with AI-powered assistance and free resources — all in one place.

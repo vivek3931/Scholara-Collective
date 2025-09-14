@@ -147,7 +147,7 @@ export default function FeatureShowcaseMobile() {
     <section className="min-h-full w-full overflow-y-auto px-3 lg:px-5 py-10 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200 dark:from-onyx dark:via-charcoal dark:to-onyx relative">
       {/* Header */}
       <div className="text-center mb-8">
-        <h2 className="lg:text-3xl text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-amber-500 to-orange-400 dark:from-amber-400 dark:to-orange-300 mb-2">
+        <h2 className="lg:text-3xl text-xl font-bold bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-600 bg-clip-text text-transparent mb-2">
           Scholara Features
         </h2>
         <p className="text-gray-600 lg:text-xl text-xs dark:text-gray-300">

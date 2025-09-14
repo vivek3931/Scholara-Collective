@@ -976,7 +976,7 @@ const EnhancedResourcesSection = React.memo(({
               transition={{ duration: 0.6 }}
               className="text-center mb-12"
             >
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 bg-clip-text text-transparent mb-4">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-600 bg-clip-text text-transparent mb-4">
                 Discover Learning Resources
               </h1>
               <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">

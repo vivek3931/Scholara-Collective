@@ -38,7 +38,8 @@ const ChatBot = ({ isDragging }) => {
   const { user } = useAuth();
 
   // The API URL for your Python AI service
-  const API_URL = "http://localhost:8000";
+  // const API_URL = "http://localhost:8000";
+  const API_URL = import.meta.env.VITE_AI_SERVICE_KEY;
 
   // Mock for chatbotStats
   const chatbotStats = {

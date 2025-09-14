@@ -199,7 +199,7 @@ const SavedResourcesPage = () => {
               className="text-white text-xl sm:text-2xl"
             />
           </div>
-          <h1 className="text-3xl sm:text-4xl font-poppins font-bold text-gray-900 dark:text-white">
+          <h1 className="text-3xl sm:text-4xl font-poppins font-bold bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-600 bg-clip-text text-transparent">
             My Saved Resources
           </h1>
         </div>
@@ -402,22 +402,23 @@ const SavedResourcesPage = () => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredAndSortedResources.map((resource, index) => (
-              <div
-                key={resource._id}
-                className="animate-fade-in"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <UniversalResourceCard
-                  resource={resource}
-                  variant="saved"
-                  onUnsave={handleUnsave}
-                  onSave={fetchSavedResources}
-                />
-              </div>
-            ))}
-          </div>
+          <div className="flex overflow-x-auto gap-20 scroll-container-none">
+  {filteredAndSortedResources.map((resource, index) => (
+    <div
+      key={resource._id}
+      className="animate-fade-in flex-shrink-0 basis-60" // 👈 control width here
+      style={{ animationDelay: `${index * 0.1}s` }}
+    >
+      <UniversalResourceCard
+        resource={resource}
+        variant="saved"
+        onUnsave={handleUnsave}
+        onSave={fetchSavedResources}
+      />
+    </div>
+  ))}
+</div>
+
         )}
       </div>
 
