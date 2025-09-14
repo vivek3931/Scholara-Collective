@@ -27,7 +27,7 @@ import coin from '../../assets/coin.svg';
 const DesktopNavLink = ({ to, text }) => (
   <NavLink
     to={to}
-    className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 group overflow-hidden"
+    className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 font-medium hover:text-amber-600 dark:hover:text-amber-400 transition-colors duration-200 group overflow-hidden"
   >
     <span className="text-sm">{text}</span>
     <span className="absolute bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-orange-400 to-yellow-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out origin-left"></span>
@@ -39,7 +39,7 @@ const MobileNavLink = ({ to, icon, text, onClick }) => (
   <Link
     to={to}
     onClick={onClick}
-    className="flex items-center gap-3 p-3 rounded-lg text-gray-700 dark:text-gray-200 font-medium hover:bg-white dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
+    className="flex items-center gap-3 p-3 rounded-lg text-gray-700 dark:text-gray-200 font-medium hover:bg-white dark:hover:bg-gray-800 hover:text-amber-600 dark:hover:text-amber-400 transition-colors duration-200"
   >
     <span className="text-gray-500 dark:text-gray-400">{icon}</span>
     <span className="text-sm">{text}</span>
@@ -445,7 +445,7 @@ const Navbar = () => {
                     className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 group relative overflow-hidden hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 z-10"
                     aria-label="Profile menu"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
                       {user?.username?.charAt(0).toUpperCase() || "U"}
                     </div>
                     <span className="hidden xl:block text-gray-700 dark:text-gray-200 font-medium text-sm whitespace-nowrap">
@@ -526,13 +526,13 @@ const Navbar = () => {
                 <div className="flex items-center space-x-2 xl:space-x-3">
                   <Link
                     to="/login"
-                    className="px-3 xl:px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
+                    className="px-3 xl:px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
                   >
                     Log In
                   </Link>
                   <Link
                     to="/register"
-                    className="px-3 xl:px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
+                    className="px-3 xl:px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg text-sm font-medium shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
                   >
                     Sign Up
                   </Link>
@@ -549,7 +549,7 @@ const Navbar = () => {
                     className="flex items-center gap-2 px-2 py-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
                     aria-label="Profile menu"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
                       {user?.username?.charAt(0).toUpperCase() || "U"}
                     </div>
                   </button>
@@ -627,7 +627,7 @@ const Navbar = () => {
                   </Link>
                   <Link
                     to="/register"
-                    className="px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
+                    className="px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
                   >
                     Sign Up
                   </Link>
@@ -757,7 +757,7 @@ const Navbar = () => {
                 {isAuthenticated ? (
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 p-3 bg-white/90 dark:bg-onyx/80 backdrop-blur-sm rounded-lg shadow-sm">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
                         {user?.username?.charAt(0).toUpperCase() || "U"}
                       </div>
                       <div className="flex-1 min-w-0">

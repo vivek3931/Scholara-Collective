@@ -185,7 +185,7 @@ const UniversalResourceCard = React.memo(
     const actionButtons = getActionButtons();
 
     return (
-      <div className="flex flex-col relative overflow-visible h-full w-full dark:bg-onyx bg-white shadow-md dark:shadow-glow-sm rounded-2xl p-3 max-w-[220px] group">
+      <div className="flex flex-col relative overflow-visible h-[370px] w-full dark:bg-onyx bg-white shadow-md dark:shadow-glow-sm rounded-2xl p-3 max-w-[220px] group">
         <div className="absolute inset-0 bg-light-subtle dark:bg-gradient-to-br dark:from-transparent dark:via-transparent dark:to-charcoal/30 pointer-events-none rounded-xl" />
         <div className="relative z-10 flex flex-col h-full">
           {/* Thumbnail with FileType Badge */}

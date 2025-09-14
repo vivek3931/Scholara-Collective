@@ -167,9 +167,6 @@ const Profile = () => {
     }
   };
 
-  const handleGoBack = () => {
-    window.history.back();
-  };
 
   const displayError = error || authError;
 
@@ -189,7 +186,7 @@ const Profile = () => {
 
   return (
     <section className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-onyx dark:via-charcoal dark:to-onyx transition-all duration-300 animate-fade-in">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
         
         {/* Profile Header */}
         <div className="flex flex-col pt-10 sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
@@ -208,7 +205,7 @@ const Profile = () => {
                 ${
                   isEditing
                     ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
-                    : "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                    : "bg-blue-100 text-amber-700 hover:bg-blue-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
                 }
                 hover:shadow-md`}
             >
@@ -219,7 +216,7 @@ const Profile = () => {
               onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 font-medium rounded-lg
                        bg-gray-100 text-gray-700 hover:bg-gray-200
-                       dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600
+                       dark:bg-amber-700 dark:text-amber-200 dark:hover:bg-amber-600
                        transition-all duration-200 hover:shadow-md"
             >
               <FontAwesomeIcon icon={faSignOutAlt} />
@@ -271,8 +268,8 @@ const Profile = () => {
         {!loadingResources && !displayError && user && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
             {/* Profile Card */}
-            <div className="lg:col-span-1">
-              <div className="bg-white bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx shadow-glow-sm rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl lg:sticky lg:top-6">
+            <div className="lg:col-span-1 ">
+              <div className="bg-white bg-gradient-to-br dark:from-onyx dark:via-charcoal dark:to-onyx shadow-glow-sm rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl lg:sticky lg:top-24 ">
                 <div className="p-6">
                   <div className="flex flex-col items-center ">
                     <div className="relative mb-4">
@@ -396,7 +393,7 @@ const Profile = () => {
                       onClick={() => setActiveTab("uploads")}
                       className={`${
                         activeTab === "uploads"
-                          ? "border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-300"
+                          ? "border-amber-500 text-amber-500 dark:border-amber-400 dark:text-amber-300"
                           : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200"
                       } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 flex items-center gap-2`}
                     >
@@ -407,7 +404,7 @@ const Profile = () => {
                       onClick={() => setActiveTab("saved")}
                       className={`${
                         activeTab === "saved"
-                          ? "border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-300"
+                          ? "border-amber-500 text-amber-500 dark:border-amber-400 dark:text-amber-300"
                           : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200"
                       } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 flex items-center gap-2`}
                     >
@@ -441,7 +438,7 @@ const Profile = () => {
                       
                       {resources.length > 0 ? (
                         <>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                          <div className="flex overflow-x-scroll gap-12 scroll-container-none w-full items-stretch">
                             {currentResources.map((resource) => (
                               <UniversalResourceCard
                                 key={resource._id}

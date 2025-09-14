@@ -156,20 +156,54 @@ const SearchResults = () => {
                 {/* Filter Toggle */}
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-white/95 dark:bg-charcoal/95 border border-gray-300 dark:border-charcoal rounded-xl hover:bg-gray-50 dark:text-white dark:hover:bg-gray-700 transition-all duration-200 shadow-sm"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white/95 dark:bg-onyx/50 border border-gray-300 dark:border-charcoal rounded-xl hover:bg-gray-50 dark:text-white dark:hover:bg-amber-950/30 transition-all duration-200 shadow-glow-sm"
                 >
                   <Filter className="w-4 h-4" /> Filters
                 </button>
                 {/* Sort Dropdown */}
-                <select
-                  value={filters.sort}
-                  onChange={(e) => handleFilterChange("sort", e.target.value)}
-                  className="px-4 py-2 bg-white/95 dark:bg-charcoal/95 border dark:text-white border-gray-300 dark:border-charcoal rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all duration-200 shadow-sm"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="downloads">Most Downloaded</option>
-                  <option value="rating">Highest Rated</option>
-                </select>
+                <div className="relative inline-block w-56">
+                  <select
+                    value={filters.sort}
+                    onChange={(e) => handleFilterChange("sort", e.target.value)}
+                    className="w-full appearance-none px-4 py-2 pr-10 bg-white/95 dark:bg-onyx/50 border border-gray-300 dark:border-charcoal 
+               rounded-xl text-gray-800 dark:text-white shadow-sm transition-all duration-200 
+               focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
+                  >
+                    <option
+                      value="newest"
+                      className="bg-white dark:bg-onyx text-gray-800 dark:text-white"
+                    >
+                      Newest First
+                    </option>
+                    <option
+                      value="downloads"
+                      className="bg-white dark:bg-onyx text-gray-800 dark:text-white"
+                    >
+                      Most Downloaded
+                    </option>
+                    <option
+                      value="rating"
+                      className="bg-white dark:bg-onyx text-gray-800 dark:text-white"
+                    >
+                      Highest Rated
+                    </option>
+                  </select>
+
+                  {/* Custom arrow */}
+                  <svg
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-300"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </div>
               </div>
             </div>
 
@@ -292,10 +326,14 @@ const SearchResults = () => {
                   >
                     {resource.fileType === "pdf" ? (
                       <img
-                        src={resource.thumbnailUrl || "https://res.cloudinary.com/dr9zse9a6/image/upload/v1756788547/scholara_note_qzpglu.svg"}
-                        onError={(e)=>{
+                        src={
+                          resource.thumbnailUrl ||
+                          "https://res.cloudinary.com/dr9zse9a6/image/upload/v1756788547/scholara_note_qzpglu.svg"
+                        }
+                        onError={(e) => {
                           e.target.onerror = null;
-                           e.target.src = "https://res.cloudinary.com/dr9zse9a6/image/upload/v1756788547/scholara_note_qzpglu.svg"
+                          e.target.src =
+                            "https://res.cloudinary.com/dr9zse9a6/image/upload/v1756788547/scholara_note_qzpglu.svg";
                         }}
                         alt={`Thumbnail for ${resource.title}`}
                         className="w-full h-full object-contain"

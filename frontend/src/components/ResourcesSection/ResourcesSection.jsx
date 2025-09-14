@@ -1035,15 +1035,14 @@ const EnhancedResourcesSection = React.memo(({
                     scale: 1.05,
                   }}
                   whileTap={{ scale: 0.95 }}
-                  className="group relative overflow-hidden inline-flex items-center gap-4 px-4 lg:px-10 py-3 lg:py-5 bg-gradient-to-r from-orange-500 via-amber-600 to-yellow-600 text-white font-semibold rounded-2xl shadow-2xl transition-all lg:text-lg text-xs duration-300"
+                  className="group relative overflow-hidden inline-flex items-center gap-4 px-4 lg:px-4 py-3 lg:py-4 bg-gradient-to-r from-amber-600 to-amber-500 text-white font-semibold rounded-2xl shadow-2xl transition-all  duration-300"
                 >
-                  {/* Animated background */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-orange-600 via-amber-700 to-red-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                 
 
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
 
-                  <Search size={22} className="relative z-10 group -hover:rotate-12 transition-transform duration-300" />
-                  <span className="relative z-10 text-lg">Browse All Resources</span>
+                  <Search size={22} className="relative z-10 group hover:rotate-12 transition-transform duration-300" />
+                  <span className="relative z-10 lg:text-md text-sm">Browse All Resources</span>
                   <motion.div
                     className="relative z-10"
                     animate={{ x: 0 }}
