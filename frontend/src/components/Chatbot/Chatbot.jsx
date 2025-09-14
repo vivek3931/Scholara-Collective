@@ -797,7 +797,9 @@ const ChatBot = ({ isDragging }) => {
       )}
 
       {/* Main Content Container */}
-      <div className="max-w-7xl mx-auto lg:px-6 lg:py-6 px-0 py-0 flex gap-6 relative lg:h-[calc(100vh-100px)] h-[calc(100vh-75px)]">
+      <div className="max-w-7xl mx-auto lg:px-6 lg:py-6 px-0 py-0 flex gap-6 relative lg:h-[calc(100vh-100px)] h-[calc(100dvh-75px)] min-h-[calc(100dvh-75px)]"
+
+>
         {/* Enhanced Chat History Sidebar */}
         <div
           className={`fixed inset-y-0 left-0 w-80 bg-white/70 dark:bg-charcoal/70 backdrop-blur-lg z-40 transform transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 lg:left-auto lg:z-[30] lg:w-80 lg:block lg:rounded-2xl rounded-r-xl shadow-glow-sm border-r border-silver/20 dark:border-ash/20 lg:border-r-0 lg:border lg:border-silver/20 lg:dark:border-ash/20 ${
