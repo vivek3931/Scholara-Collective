@@ -648,14 +648,14 @@ const ResourceDetailPage = () => {
   // Computed values
   const userId = user?._id;
   const userName = user?.username || "Anonymous User";
-  const isAdmin = user?.roles === "admin";
+  const isAdmin = user?.role === "admin";
   const userCoins = user?.scholaraCoins || 0;
   const cost = 30;
-  const canDownload = useMemo(() => {
+const canDownload = useMemo(() => {
     if (!isAuthenticated) return false;
-    if (isAdmin) return true;
+    if (isAdmin || resource?.uploadedBy?._id === userId) return true;
     return isPurchased;
-  }, [isAuthenticated, isAdmin, isPurchased]);
+  }, [isAuthenticated, isAdmin, isPurchased, resource, userId]);
 
   const isOwner = useMemo(() => {
     return user && resource?.uploadedBy?._id === user._id;
@@ -842,32 +842,31 @@ const ResourceDetailPage = () => {
   }, []);
 
   // Resource loading
-  useEffect(() => {
+useEffect(() => {
     if (!resourceId) {
       setError("No resource ID provided");
       setLoading(false);
       return;
     }
-
     const loadResource = async () => {
       setLoading(true);
       setError(null);
       try {
         let fetchedResource = initialResourceFromState;
-        
+
         if (!fetchedResource || fetchedResource._id !== resourceId) {
           const response = await fetch(`${API_BASE_URL}/resources/${resourceId}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
-          
+
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
-          
+
           fetchedResource = await response.json();
           fetchedResource = fetchedResource.resource || fetchedResource;
         }
-        
+
         setResource(fetchedResource);
       } catch (err) {
         console.error("Error fetching resource:", err);
@@ -876,7 +875,7 @@ const ResourceDetailPage = () => {
         setLoading(false);
       }
     };
-    
+
     loadResource();
   }, [resourceId, initialResourceFromState, token]);
 
@@ -888,38 +887,53 @@ const ResourceDetailPage = () => {
   }, [user?.savedResources, resource?._id]);
 
   // Purchase status fetching
-  useEffect(() => {
+useEffect(() => {
     const fetchPurchaseStatus = async () => {
       if (!isAuthenticated || !token || !user || !resource?._id) {
         setIsPurchased(false);
         return;
       }
-      
+
       if (isAdmin || isOwner) {
         setIsPurchased(true);
         return;
       }
-      
+
       try {
+        // Check local user state first
+        if (user.purchasedResources?.includes(resource._id)) {
+          setIsPurchased(true);
+          return;
+        }
+
+        // Fetch from API
         const response = await fetch(`${API_BASE_URL}/resources/${resource._id}/purchase-status`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setIsPurchased(data.isPurchased || false);
-        } else {
-          const purchased = user.purchasedResources?.includes(resource._id) || false;
-          setIsPurchased(purchased);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to fetch purchase status`);
+        }
+
+        const data = await response.json();
+        setIsPurchased(data.isPurchased || false);
+
+        // Update user state if necessary
+        if (data.isPurchased && !user.purchasedResources?.includes(resource._id)) {
+          updateUser({
+            ...user,
+            purchasedResources: [...(user.purchasedResources || []), resource._id],
+          });
         }
       } catch (error) {
-        const purchased = user.purchasedResources?.includes(resource._id) || false;
-        setIsPurchased(purchased);
+        console.error("Error fetching purchase status:", error);
+        // Fallback to user.purchasedResources
+        setIsPurchased(user.purchasedResources?.includes(resource._id) || false);
       }
     };
-    
+
     fetchPurchaseStatus();
-  }, [isAuthenticated, token, user, resource?._id, isAdmin, isOwner]);
+  }, [isAuthenticated, token, user, resource?._id, isAdmin, isOwner, updateUser]);
 
   // Rating handlers
   const refreshRatings = useCallback(async () => {
@@ -949,7 +963,7 @@ const ResourceDetailPage = () => {
     }
   }, [resourceId, refreshRatings]);
 
-  const handleRate = useCallback(async (value) => {
+const handleRate = useCallback(async (value) => {
     if (!isAuthenticated || !resourceId) {
       showModal({
         type: "warning",
@@ -961,7 +975,7 @@ const ResourceDetailPage = () => {
       });
       return;
     }
-    
+
     setUserRating(value);
     try {
       const response = await fetch(`${API_BASE_URL}/resources/${resourceId}/rate`, {
@@ -972,16 +986,16 @@ const ResourceDetailPage = () => {
         },
         body: JSON.stringify({ value }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `Rating failed: ${response.status}`);
       }
-      
+
       const data = await response.json();
       setUserRating(data.userRating);
       setOverallRating(data.overallRating);
-      
+
       showModal({
         type: "success",
         title: "Rating Saved",
@@ -998,6 +1012,39 @@ const ResourceDetailPage = () => {
       });
     }
   }, [isAuthenticated, resourceId, token, showModal, navigate]);
+
+  // Purchase handler
+  const handleLocalPurchase = async () => {
+    if (!isAuthenticated) {
+      showModal({
+        type: "warning",
+        title: "Authentication Required",
+        message: "You need to be logged in to purchase resources.",
+        confirmText: "Go to Login",
+        onConfirm: () => navigate('/login'),
+        cancelText: "Cancel",
+      });
+      return;
+    }
+
+    if (userCoins < cost) {
+      showModal({
+        type: "info",
+        title: "Insufficient Coins",
+        message: `You need ${cost} ScholaraCoins to purchase this resource. You currently have ${userCoins} coins.`,
+        confirmText: "OK",
+      });
+      return;
+    }
+
+    setPurchasing(true);
+    try {
+      await handlePurchase(resource, cost); // Use ResourceContext's handlePurchase
+      setIsPurchased(true); // Update local state
+    } finally {
+      setPurchasing(false);
+    }
+  };
 
   // Optimized preview handler
   const handlePreview = useCallback(async () => {
@@ -1400,7 +1447,6 @@ const ResourceDetailPage = () => {
               </div>
             </div>
           </motion.div>
-
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Main Content */}
             <div className="flex-1">
@@ -1453,7 +1499,6 @@ const ResourceDetailPage = () => {
                     </Document>
                   ) : null}
                 </div>
-
                 {/* Preview Controls */}
                 {previewDataUrl && !isFullscreen && numPages && (
                   <div className="flex justify-center items-center gap-2 mt-4">
@@ -1490,7 +1535,6 @@ const ResourceDetailPage = () => {
                 )}
               </motion.div>
             </div>
-
             {/* Sidebar */}
             <div className="lg:w-96">
               {/* Actions Card */}
@@ -1501,11 +1545,10 @@ const ResourceDetailPage = () => {
                 className="bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm p-6 mb-6"
               >
                 <h2 className="text-xl font-bold mb-4">Actions</h2>
-                
                 {/* Purchase/Download Button */}
                 {!canDownload ? (
                   <button
-                    onClick={handlePurchase}
+                    onClick={handleLocalPurchase}
                     disabled={purchasing || userCoins < cost}
                     className="w-full mb-3 flex items-center justify-center gap-2 px-4 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -1530,21 +1573,19 @@ const ResourceDetailPage = () => {
                     Download Resource
                   </button>
                 )}
-
                 {/* Save/Flag Actions */}
                 <div className="flex gap-2">
                   <button
                     onClick={handleSaveToggle}
                     className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                      hasSaved 
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300' 
+                      hasSaved
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300'
                     }`}
                   >
                     <Save size={18} />
                     {hasSaved ? 'Saved' : 'Save'}
                   </button>
-                  
                   <button
                     onClick={() => handleFlag(resourceId)}
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 transition-colors"
@@ -1552,7 +1593,6 @@ const ResourceDetailPage = () => {
                     <Flag size={18} />
                     Report
                   </button>
-
                   {isOwner && (
                     <button
                       onClick={() => handleDelete(resourceId)}
@@ -1564,7 +1604,6 @@ const ResourceDetailPage = () => {
                   )}
                 </div>
               </motion.div>
-
               {/* Details Card */}
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
@@ -1600,7 +1639,6 @@ const ResourceDetailPage = () => {
                   </div>
                 </div>
               </motion.div>
-
               {/* Stats Card */}
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
@@ -1631,7 +1669,6 @@ const ResourceDetailPage = () => {
               </motion.div>
             </div>
           </div>
-
           {/* Comments Section */}
           {!isFullscreen && (
             <motion.div
@@ -1649,7 +1686,6 @@ const ResourceDetailPage = () => {
           )}
         </div>
       </div>
-
       {/* Fullscreen Overlay */}
       <AnimatePresence>
         {isFullscreen && (
@@ -1682,7 +1718,6 @@ const ResourceDetailPage = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-
             {/* Fullscreen PDF Container */}
             <div
               ref={pdfContainerRef}
@@ -1701,7 +1736,6 @@ const ResourceDetailPage = () => {
                 </Document>
               )}
             </div>
-
             {/* Fullscreen Footer Controls */}
             <AnimatePresence>
               {showFullscreenControls && (
@@ -1709,7 +1743,7 @@ const ResourceDetailPage = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
-                  className="absolute bottom-4 left-1/2 -translate-x-1/2 "
+  className="absolute bottom-4 inset-x-0 flex justify-center"
                   onMouseEnter={handleControlsMouseEnter}
                   onMouseLeave={handleControlsMouseLeave}
                 >
