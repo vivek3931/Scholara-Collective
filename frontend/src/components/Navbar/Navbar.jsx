@@ -54,6 +54,8 @@ const Navbar = () => {
   const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [searchAnimation, setSearchAnimation] = useState("idle"); // idle | expanding | expanded | collapsing
+  const [mobileSearchAnimation, setMobileSearchAnimation] = useState("idle"); // idle | expanding | expanded | collapsing
   const { isAuthenticated, user, logout } = useAuth();
   const { performSearch, fetchSuggestions, suggestions, clearSearchResults } = useResource();
   const navigate = useNavigate();
@@ -64,7 +66,8 @@ const Navbar = () => {
   const mobileMenuRef = useRef(null);
   const searchInputRef = useRef(null);
   const mobileSearchInputRef = useRef(null);
-  const mobileProfileButtonRef = useRef(null); // New ref for the mobile profile button
+  const mobileProfileButtonRef = useRef(null);
+  const searchContainerRef = useRef(null);
 
   const isAdmin = user?.roles?.includes("admin") || user?.roles?.includes("superadmin");
 
@@ -84,10 +87,19 @@ const Navbar = () => {
   // Focus search input when search becomes active
   useEffect(() => {
     if (isSearchActive && searchInputRef.current) {
-      searchInputRef.current.focus();
+      // Start expanding animation
+      setSearchAnimation("expanding");
+      setTimeout(() => {
+        searchInputRef.current.focus();
+        setSearchAnimation("expanded");
+      }, 300);
     }
     if (isMobileSearchActive && mobileSearchInputRef.current) {
-      mobileSearchInputRef.current.focus();
+      setMobileSearchAnimation("expanding");
+      setTimeout(() => {
+        mobileSearchInputRef.current.focus();
+        setMobileSearchAnimation("expanded");
+      }, 300);
     }
   }, [isSearchActive, isMobileSearchActive]);
 
@@ -136,29 +148,42 @@ const Navbar = () => {
     }
   };
 
-  // Search Toggle Functions
+  // JioSaavn-style Search Toggle Functions
   const toggleSearch = () => {
-    setIsSearchActive(!isSearchActive);
     if (!isSearchActive) {
+      setIsSearchActive(true);
       setIsProfileDropdownOpen(false);
-    }
-    if (isSearchActive) {
-      setSearchQuery("");
-      setSelectedSuggestionIndex(-1);
-      clearSearchResults();
+    } else if (searchQuery.trim() === "") {
+      // Start collapsing animation
+      setSearchAnimation("collapsing");
+      setTimeout(() => {
+        setIsSearchActive(false);
+        setSearchQuery("");
+        setSelectedSuggestionIndex(-1);
+        clearSearchResults();
+        setSearchAnimation("idle");
+      }, 300);
+    } else {
+      handleSearchSubmit(new Event('submit'));
     }
   };
 
   const toggleMobileSearch = () => {
-    setIsMobileSearchActive(!isMobileSearchActive);
     if (!isMobileSearchActive) {
+      setIsMobileSearchActive(true);
       setIsMobileMenuOpen(false);
       setIsProfileDropdownOpen(false);
-    }
-    if (isMobileSearchActive) {
-      setSearchQuery("");
-      setSelectedSuggestionIndex(-1);
-      clearSearchResults();
+    } else if (searchQuery.trim() === "") {
+      setMobileSearchAnimation("collapsing");
+      setTimeout(() => {
+        setIsMobileSearchActive(false);
+        setSearchQuery("");
+        setSelectedSuggestionIndex(-1);
+        clearSearchResults();
+        setMobileSearchAnimation("idle");
+      }, 300);
+    } else {
+      handleSearchSubmit(new Event('submit'));
     }
   };
 
@@ -200,7 +225,7 @@ const Navbar = () => {
 
   // Handle Search Submit
   const handleSearchSubmit = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (searchQuery.trim()) {
       const filters = {
         subject: "",
@@ -247,6 +272,11 @@ const Navbar = () => {
       const isClickOnMobileButton = mobileProfileButtonRef.current && mobileProfileButtonRef.current.contains(event.target);
       const isClickOnMobileMenu = mobileMenuRef.current && mobileMenuRef.current.contains(event.target);
       const isClickOnMobileMenuButton = event.target.closest('[aria-label="Toggle mobile menu"]');
+      const isClickOnSearchContainer = searchContainerRef.current && searchContainerRef.current.contains(event.target);
+      const isClickOnMobileSearchInput = mobileSearchInputRef.current && mobileSearchInputRef.current.contains(event.target);
+      const isClickOnMobileSearchButton = event.target.closest('[aria-label="Search"]');
+      const isClickOnBackButton = event.target.closest('[aria-label="Close search"]');
+
 
       if (isProfileDropdownOpen) {
         if (!isClickOnDesktopProfile && !isClickOnDesktopButton && !isClickOnMobileProfile && !isClickOnMobileButton) {
@@ -261,13 +291,37 @@ const Navbar = () => {
       ) {
         toggleMobileMenu();
       }
+      
+      // Close desktop search if clicked outside and search query is empty
+      if (isSearchActive && !isClickOnSearchContainer && searchQuery.trim() === "") {
+        // Start collapsing animation
+        setSearchAnimation("collapsing");
+        setTimeout(() => {
+          setIsSearchActive(false);
+          setSearchQuery("");
+          setSelectedSuggestionIndex(-1);
+          clearSearchResults();
+          setSearchAnimation("idle");
+        }, 300);
+      }
+      // Close mobile search if clicked outside and search query is empty
+      if (isMobileSearchActive && !isClickOnMobileSearchInput && !isClickOnMobileSearchButton && !isClickOnBackButton && searchQuery.trim() === "") {
+        setMobileSearchAnimation("collapsing");
+        setTimeout(() => {
+          setIsMobileSearchActive(false);
+          setSearchQuery("");
+          setSelectedSuggestionIndex(-1);
+          clearSearchResults();
+          setMobileSearchAnimation("idle");
+        }, 300);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isMobileMenuOpen, isProfileDropdownOpen]);
+  }, [isMobileMenuOpen, isProfileDropdownOpen, isSearchActive, isMobileSearchActive, searchQuery, clearSearchResults]);
 
   // Handle Escape Key
   useEffect(() => {
@@ -276,92 +330,109 @@ const Navbar = () => {
         if (isMobileMenuOpen) toggleMobileMenu();
         if (isProfileDropdownOpen) setIsProfileDropdownOpen(false);
         if (isSearchActive) {
-          setIsSearchActive(false);
-          setSearchQuery("");
-          setSelectedSuggestionIndex(-1);
-          clearSearchResults();
+          if (searchQuery.trim() === "") {
+            setSearchAnimation("collapsing");
+            setTimeout(() => {
+              setIsSearchActive(false);
+              setSearchQuery("");
+              setSelectedSuggestionIndex(-1);
+              clearSearchResults();
+              setSearchAnimation("idle");
+            }, 300);
+          } else {
+            setSearchQuery("");
+          }
         }
         if (isMobileSearchActive) {
-          setIsMobileSearchActive(false);
-          setSearchQuery("");
-          setSelectedSuggestionIndex(-1);
-          clearSearchResults();
+          if (searchQuery.trim() === "") {
+            setMobileSearchAnimation("collapsing");
+            setTimeout(() => {
+              setIsMobileSearchActive(false);
+              setSearchQuery("");
+              setSelectedSuggestionIndex(-1);
+              clearSearchResults();
+              setMobileSearchAnimation("idle");
+            }, 300);
+          } else {
+            setSearchQuery("");
+          }
         }
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isMobileMenuOpen, isProfileDropdownOpen, isSearchActive, isMobileSearchActive, clearSearchResults]);
+  }, [isMobileMenuOpen, isProfileDropdownOpen, isSearchActive, isMobileSearchActive, searchQuery, clearSearchResults]);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg transition-colors duration-300">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-onyx/60 backdrop-blur-lg transition-all duration-300">
       <div className="container mx-auto px-2 sm:px-4 lg:px-8 h-18 flex items-center justify-between min-w-0">
-        {/* Left Section - Logo */}
-        <div className="flex items-center flex-shrink-0 min-w-0">
-          {!isSearchActive && !isMobileSearchActive && (
-            <Link to="/" className="flex items-center space-x-2 group flex-shrink-0">
-              <img src={logo} alt="Scholara Collective Logo" className="h-10 w-auto flex-shrink-0 max-w-[120px] sm:max-w-[200px]" />
-            </Link>
-          )}
-          {(isSearchActive || isMobileSearchActive) && (
-            <button
-              onClick={isMobileSearchActive ? toggleMobileSearch : toggleSearch}
-              className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0"
-              aria-label="Close search"
-            >
-              <ArrowLeft size={24} />
-            </button>
-          )}
+        {/* Left Section - Logo (Hidden on small screens when search is active) */}
+        <div className={`flex items-center flex-shrink-0 min-w-0 lg:flex ${isMobileSearchActive ? 'hidden' : ''}`}>
+          <Link to="/" className="flex items-center space-x-2 group flex-shrink-0">
+            <img src={logo} alt="Scholara Collective Logo" className="h-10 w-auto flex-shrink-0 max-w-[120px] sm:max-w-[200px]" />
+          </Link>
         </div>
 
         {/* Center Section - Navigation Links or Search Bar */}
-        <div className="flex-1 max-w-2xl mx-4">
+        <div className={`flex-1 mx-4 ${isMobileSearchActive ? 'max-w-full' : 'max-w-2xl'}`}>
+          {/* Desktop Search */}
           <div className="hidden lg:block">
             {isSearchActive ? (
-              <form onSubmit={handleSearchSubmit} className="w-full">
-                <div className="relative">
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(e)}
-                    placeholder="Search resources..."
-                    className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out"
-                  />
-                  <Search
-                    size={18}
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
-                  />
-                  <button
-                    type="submit"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full transition-colors duration-200"
-                  >
-                    <Search size={14} />
-                  </button>
-                  {/* Suggestions Dropdown */}
-                  {suggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-charcoal rounded-xl shadow-xl border border-gray-200 dark:border-charcoal z-50 max-h-60 overflow-y-auto">
-                      {suggestions.map((suggestion, index) => (
-                        <button
-                          key={suggestion._id || index}
-                          onClick={() => handleSuggestionClick(suggestion)}
-                          className={`w-full px-4 py-3 text-left transition-colors duration-200 flex items-center gap-3 border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${
-                            index === selectedSuggestionIndex
-                              ? "bg-gray-50 dark:bg-gray-700"
-                              : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                          }`}
-                        >
-                          <Search className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {suggestion.title}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </form>
+              <div 
+                ref={searchContainerRef} 
+                className={`w-full flex justify-center transition-all duration-300 ease-out ${
+                  searchAnimation === "expanding" 
+                    ? "animate-expand-search" 
+                    : searchAnimation === "collapsing" 
+                      ? "animate-collapse-search" 
+                      : ""
+                }`}
+              >
+                <form onSubmit={handleSearchSubmit} className="w-full max-w-xl transition-all duration-300 ease-out">
+                  <div className="relative">
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e)}
+                      placeholder="Search resources..."
+                      className="w-full px-4 py-3 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 shadow-lg"
+                    />
+                    <Search
+                      size={18}
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                    />
+                    <button
+                      type="submit"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full transition-colors duration-200 shadow-md"
+                    >
+                      <Search size={14} />
+                    </button>
+                    {/* Suggestions Dropdown */}
+                    {suggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-charcoal rounded-xl shadow-xl border border-gray-200 dark:border-charcoal z-50 max-h-60 overflow-y-auto animate-fade-in">
+                        {suggestions.map((suggestion, index) => (
+                          <button
+                            key={suggestion._id || index}
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            className={`w-full px-4 py-3 text-left transition-colors duration-200 flex items-center gap-3 border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${
+                              index === selectedSuggestionIndex
+                                ? "bg-gray-50 dark:bg-gray-700"
+                                : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                            }`}
+                          >
+                            <Search className="w-4 h-4 text-gray-400" />
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {suggestion.title}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </form>
+              </div>
             ) : (
               <div className="flex items-center justify-center space-x-6 transition-all duration-300">
                 <DesktopNavLink to="/" text="Home" />
@@ -377,58 +448,85 @@ const Navbar = () => {
               </div>
             )}
           </div>
+          {/* Mobile Search */}
           <div className="lg:hidden">
             {isMobileSearchActive && (
-              <form onSubmit={handleSearchSubmit} className="w-full">
-                <div className="relative">
-                  <input
-                    ref={mobileSearchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(e, true)}
-                    placeholder="Search resources..."
-                    className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out"
-                  />
-                  <Search
-                    size={18}
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
-                  />
-                  <button
-                    type="submit"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full transition-colors duration-200"
-                  >
-                    <Search size={14} />
-                  </button>
-                  {/* Suggestions Dropdown */}
-                  {suggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-charcoal rounded-xl shadow-xl border border-gray-200 dark:border-charcoal z-50 max-h-60 overflow-y-auto">
-                      {suggestions.map((suggestion, index) => (
-                        <button
-                          key={suggestion._id || index}
-                          onClick={() => handleSuggestionClick(suggestion)}
-                          className={`w-full px-4 py-3 text-left transition-colors duration-200 flex items-center gap-3 border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${
-                            index === selectedSuggestionIndex
-                              ? "bg-gray-50 dark:bg-gray-700"
-                              : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                          }`}
-                        >
-                          <Search className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {suggestion.title}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </form>
+              <div 
+                className={`w-full flex items-center transition-all duration-300 ease-out ${
+                  mobileSearchAnimation === "expanding" 
+                    ? "animate-expand-search" 
+                    : mobileSearchAnimation === "collapsing" 
+                      ? "animate-collapse-search" 
+                      : ""
+                }`}
+              >
+                <button
+                  onClick={toggleMobileSearch}
+                  className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0"
+                  aria-label="Close search"
+                >
+                  <ArrowLeft size={24} />
+                </button>
+                <form onSubmit={handleSearchSubmit} className="flex-1 ml-2">
+                  <div className="relative">
+                    <input
+                      ref={mobileSearchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e, true)}
+                      placeholder="Search resources..."
+                      className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out"
+                    />
+                    <Search
+                      size={18}
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                    />
+                    <button
+                      type="submit"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full transition-colors duration-200"
+                    >
+                      <Search size={14} />
+                    </button>
+                    {/* Suggestions Dropdown */}
+                    {suggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-charcoal rounded-xl shadow-xl border border-gray-200 dark:border-charcoal z-50 max-h-60 overflow-y-auto">
+                        {suggestions.map((suggestion, index) => (
+                          <button
+                            key={suggestion._id || index}
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            className={`w-full px-4 py-3 text-left transition-colors duration-200 flex items-center gap-3 border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${
+                              index === selectedSuggestionIndex
+                                ? "bg-gray-50 dark:bg-gray-700"
+                                : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                            }`}
+                          >
+                            <Search className="w-4 h-4 text-gray-400" />
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {suggestion.title}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </form>
+              </div>
             )}
           </div>
         </div>
 
-        {(!isSearchActive && !isMobileSearchActive) && (
-          <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0 min-w-0">
+        {/* Right Section - Search and Profile (Hidden on small screens when search is active) */}
+        <div className={`flex items-center space-x-2 sm:space-x-4 flex-shrink-0 min-w-0 lg:flex ${isMobileSearchActive ? 'hidden' : ''}`}>
+          {isSearchActive ? (
+            <button
+              onClick={toggleSearch}
+              className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 flex-shrink-0"
+              aria-label="Close search"
+            >
+              <ArrowLeft size={24} />
+            </button>
+          ) : (
             <button
               onClick={toggleSearch}
               className="hidden lg:block p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
@@ -436,206 +534,209 @@ const Navbar = () => {
             >
               <Search size={20} />
             </button>
-            <div className="hidden lg:flex items-center space-x-3">
-              {isAuthenticated ? (
-                <div className="relative">
-                  <button
-                    ref={profileButtonRef}
-                    onClick={toggleProfileDropdown}
-                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 group relative overflow-hidden hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 z-10"
-                    aria-label="Profile menu"
+          )}
+
+          <div className="hidden lg:flex items-center space-x-3">
+            {isAuthenticated ? (
+              <div className="relative">
+                <button
+                  ref={profileButtonRef}
+                  onClick={toggleProfileDropdown}
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-charcoal rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 group relative overflow-hidden hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 z-10"
+                  aria-label="Profile menu"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                    {user?.username?.charAt(0).toUpperCase() || "U"}
+                  </div>
+                  <span className="hidden xl:block text-gray-700 dark:text-gray-200 font-medium text-sm whitespace-nowrap">
+                    {user?.username || "User"}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 flex-shrink-0 ${
+                      isProfileDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {isProfileDropdownOpen && (
+                  <div
+                    ref={profileDropdownRef}
+                    className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                      {user?.username?.charAt(0).toUpperCase() || "U"}
-                    </div>
-                    <span className="hidden xl:block text-gray-700 dark:text-gray-200 font-medium text-sm whitespace-nowrap">
-                      {user?.username || "User"}
-                    </span>
-                    <ChevronDown
-                      size={16}
-                      className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 flex-shrink-0 ${
-                        isProfileDropdownOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-                  {isProfileDropdownOpen && (
-                    <div
-                      ref={profileDropdownRef}
-                      className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
-                    >
-                      {user && (
-                        <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                            {user.username || "User"}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">
-                            {user.roles || "Member"}
-                          </p>
-                        </div>
-                      )}
-                      <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                        <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
-                        <span className="font-medium">{user?.scholaraCoins || 0} Coins</span>
+                    {user && (
+                      <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {user.username || "User"}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">
+                          {user.roles || "Member"}
+                        </p>
                       </div>
-                      <Link
-                        to="/referral"
-                        onClick={handleProfileDropdownClick(() => navigate("/referral"))}
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                      >
-                        <FontAwesomeIcon
-                          icon={faUserFriends}
-                          className="mr-3 text-amber-500 dark:text-amber-400"
-                          size="sm"
-                        />
-                        Referrals
-                      </Link>
-                      {isAdmin && (
-                        <Link
-                          to="/admin"
-                          onClick={handleProfileDropdownClick(() => navigate("/admin"))}
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                        >
-                          <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
-                        </Link>
-                      )}
-                      <Link
-                        to="/profile"
-                        onClick={handleProfileDropdownClick(() => navigate("/profile"))}
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                      >
-                        <User size={16} className="mr-3" /> Profile
-                      </Link>
-                      <Link
-                        to="/settings"
-                        onClick={handleProfileDropdownClick(() => navigate("/settings"))}
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                      >
-                        <Settings size={16} className="mr-3" /> Settings
-                      </Link>
-                      <div className="border-t border-gray-100 dark:border-charcoal my-1"></div>
-                      <button
-                        onClick={handleProfileDropdownClick(handleLogout)}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                      >
-                        <LogOut size={16} className="mr-3" /> Logout
-                      </button>
+                    )}
+                    <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                      <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
+                      <span className="font-medium">{user?.scholaraCoins || 0} Coins</span>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2 xl:space-x-3">
-                  <Link
-                    to="/login"
-                    className="px-3 xl:px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
-                  >
-                    Log In
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="px-3 xl:px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg text-sm font-medium shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
-                  >
-                    Sign Up
-                  </Link>
-                </div>
-              )}
-            </div>
-            {/* START: Added a separate section for small screen logged-in user profile */}
-            <div className="lg:hidden flex items-center space-x-2">
-              {isAuthenticated ? (
-                <div className="relative">
-                  <button
-                    ref={mobileProfileButtonRef}
-                    onClick={toggleProfileDropdown}
-                    className="flex items-center gap-2 px-2 py-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
-                    aria-label="Profile menu"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                      {user?.username?.charAt(0).toUpperCase() || "U"}
-                    </div>
-                  </button>
-                  {isProfileDropdownOpen && (
-                    <div
-                      ref={mobileProfileDropdownRef}
-                      className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
+                    <Link
+                      to="/referral"
+                      onClick={handleProfileDropdownClick(() => navigate("/referral"))}
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                     >
-                      {user && (
-                        <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                            {user.username || "User"}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">
-                            {user.roles || "Member"}
-                          </p>
-                        </div>
-                      )}
-                      <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
-                        <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
-                        <span className="font-medium">{user?.scholaraCoins || 0} Coins</span>
+                      <FontAwesomeIcon
+                        icon={faUserFriends}
+                        className="mr-3 text-amber-500 dark:text-amber-400"
+                        size="sm"
+                      />
+                      Referrals
+                    </Link>
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        onClick={handleProfileDropdownClick(() => navigate("/admin"))}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
+                      </Link>
+                    )}
+                    <Link
+                      to="/profile"
+                      onClick={handleProfileDropdownClick(() => navigate("/profile"))}
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      <User size={16} className="mr-3" /> Profile
+                    </Link>
+                    <Link
+                      to="/settings"
+                      onClick={handleProfileDropdownClick(() => navigate("/settings"))}
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      <Settings size={16} className="mr-3" /> Settings
+                    </Link>
+                    <div className="border-t border-gray-100 dark:border-charcoal my-1"></div>
+                    <button
+                      onClick={handleProfileDropdownClick(handleLogout)}
+                      className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      <LogOut size={16} className="mr-3" /> Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2 xl:space-x-3">
+                <Link
+                  to="/login"
+                  className="px-3 xl:px-4 py-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
+                >
+                  Log In
+                </Link>
+                <Link
+                  to="/register"
+                  className="px-3 xl:px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg text-sm font-medium shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
+          </div>
+          {/* START: Added a separate section for small screen logged-in user profile */}
+          <div className={`lg:hidden flex items-center space-x-2 ${isMobileSearchActive ? 'hidden' : ''}`}>
+            {isAuthenticated ? (
+              <div className="relative">
+                <button
+                  ref={mobileProfileButtonRef}
+                  onClick={toggleProfileDropdown}
+                  className="flex items-center gap-2 px-2 py-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95"
+                  aria-label="Profile menu"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                    {user?.username?.charAt(0).toUpperCase() || "U"}
+                  </div>
+                </button>
+                {isProfileDropdownOpen && (
+                  <div
+                    ref={mobileProfileDropdownRef}
+                    className="absolute right-0 mt-2 w-48 bg-white dark:bg-charcoal rounded-lg shadow-xl py-2 animate-fade-in ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
+                  >
+                    {user && (
+                      <div className="px-3 py-2 border-b border-gray-200 dark:border-charcoal">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {user.username || "User"}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">
+                          {user.roles || "Member"}
+                        </p>
                       </div>
-                      <Link
-                        to="/referral"
-                        onClick={handleProfileDropdownClick(() => navigate("/referral"))}
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                      >
-                        <FontAwesomeIcon
-                          icon={faUserFriends}
-                          className="mr-3 text-amber-500 dark:text-amber-400"
-                          size="sm"
-                        />
-                        Referrals
-                      </Link>
-                      {isAdmin && (
-                        <Link
-                          to="/admin"
-                          onClick={handleProfileDropdownClick(() => navigate("/admin"))}
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                        >
-                          <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
-                        </Link>
-                      )}
-                      <Link
-                        to="/profile"
-                        onClick={handleProfileDropdownClick(() => navigate("/profile"))}
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                      >
-                        <User size={16} className="mr-3" /> Profile
-                      </Link>
-                      <Link
-                        to="/settings"
-                        onClick={handleProfileDropdownClick(() => navigate("/settings"))}
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                      >
-                        <Settings size={16} className="mr-3" /> Settings
-                      </Link>
-                      <div className="border-t border-gray-100 dark:border-charcoal my-1"></div>
-                      <button
-                        onClick={handleProfileDropdownClick(handleLogout)}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                      >
-                        <LogOut size={16} className="mr-3" /> Logout
-                      </button>
+                    )}
+                    <div className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                      <img src={coin} alt="Scholara Coins" className="w-4 h-4 mr-3" />
+                      <span className="font-medium">{user?.scholaraCoins || 0} Coins</span>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <Link
-                    to="/login"
-                    className="px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
-                  >
-                    Log In
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
-                  >
-                    Sign Up
-                  </Link>
-                </div>
-              )}
-            </div>
-            {/* END: Added a separate section for small screen logged-in user profile */}
-            <div className="lg:hidden flex items-center space-x-2">
+                    <Link
+                      to="/referral"
+                      onClick={handleProfileDropdownClick(() => navigate("/referral"))}
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      <FontAwesomeIcon
+                        icon={faUserFriends}
+                        className="mr-3 text-amber-500 dark:text-amber-400"
+                        size="sm"
+                      />
+                      Referrals
+                    </Link>
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        onClick={handleProfileDropdownClick(() => navigate("/admin"))}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <LayoutDashboard size={16} className="mr-3" /> Admin Dashboard
+                      </Link>
+                    )}
+                    <Link
+                      to="/profile"
+                      onClick={handleProfileDropdownClick(() => navigate("/profile"))}
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      <User size={16} className="mr-3" /> Profile
+                    </Link>
+                    <Link
+                      to="/settings"
+                      onClick={handleProfileDropdownClick(() => navigate("/settings"))}
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      <Settings size={16} className="mr-3" /> Settings
+                    </Link>
+                    <div className="border-t border-gray-100 dark:border-charcoal my-1"></div>
+                    <button
+                      onClick={handleProfileDropdownClick(handleLogout)}
+                      className="flex items-center w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      <LogOut size={16} className="mr-3" /> Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Link
+                  to="/login"
+                  className="px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors duration-200 whitespace-nowrap"
+                >
+                  Log In
+                </Link>
+                <Link
+                  to="/register"
+                  className="px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-glow-sm dark:hover:shadow-glow-sm transform active:scale-95 whitespace-nowrap"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
+          </div>
+          {/* END: Added a separate section for small screen logged-in user profile */}
+          <div className={`lg:hidden flex items-center space-x-2 ${isMobileSearchActive ? 'hidden' : ''}`}>
+            {!isMobileSearchActive && (
               <button
                 onClick={toggleMobileSearch}
                 className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95 flex-shrink-0"
@@ -643,20 +744,20 @@ const Navbar = () => {
               >
                 <Search size={20} />
               </button>
-              <button
-                onClick={toggleMobileMenu}
-                className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95 flex-shrink-0"
-                aria-label="Toggle mobile menu"
-              >
-                {isMobileMenuOpen ? (
-                  <X className="w-6 h-6" />
-                ) : (
-                  <Menu className="w-6 h-6" />
-                )}
-              </button>
-            </div>
+            )}
+            <button
+              onClick={toggleMobileMenu}
+              className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 transform active:scale-95 flex-shrink-0"
+              aria-label="Toggle mobile menu"
+            >
+              {isMobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
+            </button>
           </div>
-        )}
+        </div>
       </div>
       {isMobileMenuOpen && (
         <>
