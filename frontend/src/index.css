@@ -226,7 +226,67 @@ body.dark ::-webkit-scrollbar-track {
   }
 }
 
+/* Enhanced search animations */
+@keyframes expandSearch {
+  0% {
+    transform: scaleX(0.8);
+    opacity: 0;
+    height: 0;
+    margin-top: -10px;
+  }
+  50% {
+    transform: scaleX(1);
+    opacity: 0.8;
+    height: 3.5rem;
+    margin-top: 0;
+  }
+  100% {
+    opacity: 1;
+    height: 3.5rem;
+    margin-top: 0;
+  }
+}
 
+@keyframes collapseSearch {
+  0% {
+    opacity: 1;
+    height: 3.5rem;
+    margin-top: 0;
+  }
+  50% {
+    opacity: 0.8;
+    height: 3.5rem;
+    margin-top: 0;
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(0.8);
+    opacity: 0;
+    height: 0;
+    margin-top: -10px;
+  }
+}
+
+.animate-expand-search {
+  animation: expandSearch 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-collapse-search {
+  animation: collapseSearch 0.3s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+}
+
+/* Enhanced search input styling */
+.search-input-expanded {
+  padding: 0.875rem 1rem 0.875rem 2.5rem;
+  font-size: 1.05rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 2px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Smooth transitions for navbar elements */
+.navbar-transition {
+  transition: all 0.3s ease-in-out;
+}
 
 .modal-backdrop {
   z-index: 9999 !important;
