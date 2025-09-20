@@ -1434,6 +1434,7 @@ const ResourceDetailPage = () => {
                     currentPage={currentPage}
                     pdfDimensions={pdfDimensions}
                     zoom={zoom}
+                    isFullscreen={isFullscreen}
                     onClose={toggleAITools}
                   />
                 ) : (

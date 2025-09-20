@@ -53,7 +53,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const AI_API_URL = import.meta.env.VITE_AI_SERVICE_KEY || "http://localhost:8000";
+const AI_API_URL = import.meta.env.VITE_AI_API_URL || "http://localhost:8000";
 
 const extractTextFromPdfPages = async (pdfDataUrl, selectedPages) => {
   try {
@@ -163,6 +163,7 @@ const AIPageSelector = ({
   pdfDimensions,
   zoom,
   onClose,
+  isFullscreen
 }) => {
   const { isDarkMode } = useTheme();
   const { showModal } = useModal();
@@ -184,6 +185,7 @@ const AIPageSelector = ({
   const scrollContainerRef = useRef(null);
   const lastScrollTimeRef = useRef(0);
   const scrollTimeoutRef = useRef(null);
+  console.log(isFullscreen)
 
   const aiTasks = [
     {
@@ -664,7 +666,7 @@ const AIPageSelector = ({
   return (
     <ErrorBoundary>
       <div
-        className={`w-full h-[600px] scroll-container flex flex-col relative bg-gray-100/95 dark:bg-onyx/95 rounded-lg ${
+        className={`w-full  ${isFullscreen ? "h-screen" : "h-[600px]"} scroll-container flex flex-col relative bg-gray-100/95 dark:bg-onyx/95 rounded-lg ${
           isDropdownOpen ? "pointer-events-none" : ""
         }`}
         ref={containerRef}
