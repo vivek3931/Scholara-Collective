@@ -196,75 +196,108 @@ const MemoizedResourceCard = React.memo(({ resource }) => (
 
 MemoizedResourceCard.displayName = 'MemoizedResourceCard';
 
-// Swiper Component for horizontal scrolling
+// Optimized Swiper Component for horizontal scrolling
 const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, emptyMessage }) => {
   const scrollContainerRef = useRef(null);
+  const scrollRequestRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
 
-  // Debounce scroll updates to prevent excessive re-renders
-  const updateScrollButtons = useCallback(() => {
-    if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
-      const newCanScrollLeft = scrollLeft > 0;
-      const newCanScrollRight = scrollLeft < scrollWidth - clientWidth - 1;
-
-      // Only update state if values actually changed
-      setCanScrollLeft((prev) => (prev !== newCanScrollLeft ? newCanScrollLeft : prev));
-      setCanScrollRight((prev) => (prev !== newCanScrollRight ? newCanScrollRight : prev));
+  // Use requestAnimationFrame for smooth scrolling
+  const smoothScroll = useCallback((targetScroll) => {
+    if (scrollRequestRef.current) {
+      cancelAnimationFrame(scrollRequestRef.current);
     }
+
+    const startTime = performance.now();
+    const startScroll = scrollContainerRef.current.scrollLeft;
+    const distance = targetScroll - startScroll;
+    const duration = 300; // ms
+
+    const animateScroll = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing function for smooth acceleration/deceleration
+      const ease = (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      
+      scrollContainerRef.current.scrollLeft = startScroll + distance * ease(progress);
+      
+      if (progress < 1) {
+        scrollRequestRef.current = requestAnimationFrame(animateScroll);
+      } else {
+        scrollRequestRef.current = null;
+        setIsScrolling(false);
+        updateScrollButtons();
+      }
+    };
+
+    setIsScrolling(true);
+    scrollRequestRef.current = requestAnimationFrame(animateScroll);
   }, []);
 
-  // Debounced version of updateScrollButtons
-  const debouncedUpdateScrollButtons = useMemo(() => {
-    let timeoutId;
-    return () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(updateScrollButtons, 50);
-    };
+  // Update scroll buttons with throttling
+  const updateScrollButtons = useCallback(() => {
+    if (!scrollContainerRef.current || isScrolling) return;
+    
+    const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+    const newCanScrollLeft = scrollLeft > 5;
+    const newCanScrollRight = scrollLeft < scrollWidth - clientWidth - 5;
+
+    setCanScrollLeft(newCanScrollLeft);
+    setCanScrollRight(newCanScrollRight);
+  }, [isScrolling]);
+
+  // Throttled scroll handler
+  const handleScroll = useCallback(() => {
+    if (scrollRequestRef.current) return;
+    
+    scrollRequestRef.current = requestAnimationFrame(() => {
+      scrollRequestRef.current = null;
+      updateScrollButtons();
+    });
   }, [updateScrollButtons]);
 
   useEffect(() => {
-    updateScrollButtons();
     const container = scrollContainerRef.current;
-    if (container) {
-      container.addEventListener('scroll', debouncedUpdateScrollButtons, { passive: true });
-      window.addEventListener('resize', debouncedUpdateScrollButtons, { passive: true });
-      return () => {
-        container.removeEventListener('scroll', debouncedUpdateScrollButtons);
-        window.removeEventListener('resize', debouncedUpdateScrollButtons);
-      };
-    }
-  }, [debouncedUpdateScrollButtons, resources.length]);
+    if (!container) return;
+
+    // Use passive event listener for better performance
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', updateScrollButtons, { passive: true });
+    
+    // Initial check
+    updateScrollButtons();
+
+    return () => {
+      if (scrollRequestRef.current) {
+        cancelAnimationFrame(scrollRequestRef.current);
+      }
+      container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', updateScrollButtons);
+    };
+  }, [handleScroll, updateScrollButtons]);
 
   const scroll = useCallback((direction) => {
-    if (scrollContainerRef.current) {
-      const scrollAmount = 280 + 24; // Adjusted card width (280px) + gap (24px)
-      const currentScroll = scrollContainerRef.current.scrollLeft;
-      const targetScroll =
-        direction === 'left'
-          ? Math.max(0, currentScroll - scrollAmount)
-          : currentScroll + scrollAmount;
+    if (!scrollContainerRef.current || isScrolling) return;
+    
+    const scrollAmount = 280 + 24; // Card width + gap
+    const currentScroll = scrollContainerRef.current.scrollLeft;
+    const targetScroll = direction === 'left' 
+      ? Math.max(0, currentScroll - scrollAmount)
+      : currentScroll + scrollAmount;
 
-      scrollContainerRef.current.scrollTo({
-        left: targetScroll,
-        behavior: 'smooth',
-      });
-      // Trigger immediate scroll button update after programmatic scroll
-      setTimeout(updateScrollButtons, 100);
-    }
-  }, [updateScrollButtons]);
+    smoothScroll(targetScroll);
+  }, [isScrolling, smoothScroll]);
 
-  // Memoize the resource cards
+  // Memoize the resource cards with simplified animations
   const resourceCards = useMemo(
     () =>
-      resources.map((resource, index) => (
-        <motion.div
+      resources.map((resource) => (
+        <div
           key={resource._id}
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: index * 0.05 }}
-          className="flex-shrink-0 snap-start"
+          className="flex-shrink-0"
           style={{ width: '280px' }}
         >
           <div
@@ -276,7 +309,7 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
           >
             <MemoizedResourceCard resource={resource} />
           </div>
-        </motion.div>
+        </div>
       )),
     [resources]
   );
@@ -323,72 +356,69 @@ const ResourceSwiper = React.memo(({ resources, title, icon: Icon, isLoading, em
         </div>
       )}
 
-      {/* Resources Swiper with realistic shadow effects and extreme buttons */}
+      {/* Resources Swiper */}
       {!isLoading && resources.length > 0 && (
         <div className="relative">
           {/* Left shadow effect */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: canScrollLeft ? 1 : 0 }}
-            transition={{ duration: 0.3 }}
-            className="absolute left-0 top-0 bottom-0 w-16 pointer-events-none z-10"
+          <div
+            className={`absolute left-0 top-0 bottom-0 w-16 pointer-events-none z-10 transition-opacity duration-300 ${
+              canScrollLeft ? 'opacity-100' : 'opacity-0'
+            }`}
             style={{
-              boxShadow: canScrollLeft
-                ? 'inset 16px 0 16px -8px rgba(0, 0, 0, 0.15), inset 8px 0 8px -4px rgba(0, 0, 0, 0.1)'
-                : 'none',
+              background: 'linear-gradient(90deg, rgba(0,0,0,0.15) 0%, transparent 100%)',
             }}
           />
 
           {/* Right shadow effect */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: canScrollRight ? 1 : 0 }}
-            transition={{ duration: 0.3 }}
-            className="absolute right-0 top-0 bottom-0 w-16 pointer-events-none z-10"
+          <div
+            className={`absolute right-0 top-0 bottom-0 w-16 pointer-events-none z-10 transition-opacity duration-300 ${
+              canScrollRight ? 'opacity-100' : 'opacity-0'
+            }`}
             style={{
-              boxShadow: canScrollRight
-                ? 'inset -16px 0 16px -8px rgba(0, 0, 0, 0.15), inset -8px 0 8px -4px rgba(0, 0, 0, 0.1)'
-                : 'none',
+              background: 'linear-gradient(270deg, rgba(0,0,0,0.15) 0%, transparent 100%)',
             }}
           />
 
-          {/* Left navigation button - more extreme left */}
+          {/* Navigation buttons */}
           {canScrollLeft && (
             <div className="absolute left-[-1rem] top-1/2 transform -translate-y-1/2 z-20">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.9 }}
+              <button
                 onClick={() => scroll('left')}
                 className="p-3 rounded-xl bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white shadow-md hover:shadow-lg hover:from-orange-500 hover:via-amber-600 hover:to-yellow-600 transition-all duration-200"
+                disabled={isScrolling}
               >
                 <ChevronLeft size={20} />
-              </motion.button>
+              </button>
             </div>
           )}
 
-          {/* Right navigation button - more extreme right */}
           {canScrollRight && (
             <div className="absolute right-[-1rem] top-1/2 transform -translate-y-1/2 z-20">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.9 }}
+              <button
                 onClick={() => scroll('right')}
                 className="p-3 rounded-xl bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white shadow-md hover:shadow-lg hover:from-orange-500 hover:via-amber-600 hover:to-yellow-600 transition-all duration-200"
+                disabled={isScrolling}
               >
                 <ChevronRight size={20} />
-              </motion.button>
+              </button>
             </div>
           )}
 
+          {/* Scroll container with performance optimizations */}
           <div
             ref={scrollContainerRef}
-            className="flex gap-6 overflow-x-auto scrollbar-hide pb-4 scroll-snap-type-x proximity"
+            className="flex gap-6 overflow-x-auto scrollbar-hide pb-4"
             style={{
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
               minHeight: '320px',
               alignItems: 'stretch',
+              // Force GPU acceleration
+              transform: 'translateZ(0)',
+              backfaceVisibility: 'hidden',
+              perspective: '1000px',
+              willChange: 'scroll-position',
             }}
           >
             {resourceCards}
@@ -415,7 +445,7 @@ const CategoryButton = React.memo(({
   selectedCategory, 
   subjectsByCategory, 
   onCategorySelect,
-  size = 'normal' // Added size prop for different button sizes
+  size = 'normal'
 }) => {
   const isSelected = selectedCategory?.id === category.id;
   
@@ -761,19 +791,18 @@ const CategoriesGrid = React.memo(({
             </div>
           </div>
 
-                {categories.length > 8 && (
-                <motion.button
-                  whileHover={{ 
-                  scale: 1.05,
-                  }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={openCategoriesModal}
-                  className="group text-sm relative overflow-hidden flex justify-center items-center gap-3 px-6 py-3 bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white font-medium rounded-xl shadow-lg lg:text-base transition-all duration-200 w-full sm:w-auto"
-                >
-                  {/* Animated background */}
+          {categories.length > 8 && (
+            <motion.button
+              whileHover={{ 
+                scale: 1.05,
+              }}
+              whileTap={{ scale: 0.95 }}
+              onClick={openCategoriesModal}
+              className="group text-sm relative overflow-hidden flex justify-center items-center gap-3 px-6 py-3 bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-500 text-white font-medium rounded-xl shadow-lg lg:text-base transition-all duration-200 w-full sm:w-auto"
+            >
+              {/* Animated background */}
               <div className="absolute inset-0 bg-gradient-to-r from-orange-500 via-amber-600 to-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               
-             
               <span className="relative z-10 font-medium">
                 View All Categories
               </span>
@@ -966,8 +995,6 @@ const EnhancedResourcesSection = React.memo(({
               : "bg-transparent"
           }`}
         >
-          
-
           <div className="max-w-7xl mx-auto px-4 ">
             {/* Page Header */}
             <motion.div
@@ -1022,43 +1049,41 @@ const EnhancedResourcesSection = React.memo(({
             )}
 
             {/* Beautiful Browse All Resources Button */}
-          {!isFullPage && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-              className="text-center mt-12"
-            >
-              <Link to="/resources">
-                <motion.button
-                  whileHover={{ 
-                    scale: 1.05,
-                  }}
-                  whileTap={{ scale: 0.95 }}
-                  className="group relative overflow-hidden inline-flex items-center gap-4 px-4 lg:px-4 py-3 lg:py-4 bg-gradient-to-r from-amber-600 to-amber-500 text-white font-semibold rounded-2xl shadow-2xl transition-all  duration-300"
-                >
-                 
-
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-
-                  <Search size={22} className="relative z-10 group hover:rotate-12 transition-transform duration-300" />
-                  <span className="relative z-10 lg:text-md text-sm">Browse All Resources</span>
-                  <motion.div
-                    className="relative z-10"
-                    animate={{ x: 0 }}
-                    initial={{ x: 20 }}
+            {!isFullPage && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 }}
+                className="text-center mt-12"
+              >
+                <Link to="/resources">
+                  <motion.button
+                    whileHover={{ 
+                      scale: 1.05,
+                    }}
+                    whileTap={{ scale: 0.95 }}
+                    className="group relative overflow-hidden inline-flex items-center gap-4 px-4 lg:px-4 py-3 lg:py-4 bg-gradient-to-r from-amber-600 to-amber-500 text-white font-semibold rounded-2xl shadow-2xl transition-all  duration-300"
                   >
-                    <ArrowRight size={22} />
-                  </motion.div>
-                </motion.button>
-              </Link>
-            </motion.div>
-          )}
-        </div>
-      </motion.div>
-    )}
-  </AnimatePresence>
-);
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+
+                    <Search size={22} className="relative z-10 group hover:rotate-12 transition-transform duration-300" />
+                    <span className="relative z-10 lg:text-md text-sm">Browse All Resources</span>
+                    <motion.div
+                      className="relative z-10"
+                      animate={{ x: 0 }}
+                      initial={{ x: 20 }}
+                    >
+                      <ArrowRight size={22} />
+                    </motion.div>
+                  </motion.button>
+                </Link>
+              </motion.div>
+            )}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 });
 
 EnhancedResourcesSection.displayName = 'EnhancedResourcesSection';
