@@ -53,7 +53,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const AI_API_URL = import.meta.env.VITE_AI_API_URL || "http://localhost:8000";
+const AI_API_URL = import.meta.env.VITE_AI_SERVICE_KEY || "http://localhost:8000";
 
 const extractTextFromPdfPages = async (pdfDataUrl, selectedPages) => {
   try {
