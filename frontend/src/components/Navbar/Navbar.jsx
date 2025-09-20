@@ -263,6 +263,16 @@ const Navbar = () => {
     setTimeout(() => setSearchQuery(""), 100);
   };
 
+  // Clear search input and suggestions
+  const handleClearSearch = () => {
+    setSearchQuery("");
+    setSelectedSuggestionIndex(-1);
+    clearSearchResults();
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  };
+
   // Close handlers for clicking outside dropdowns/menus
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -399,10 +409,21 @@ const Navbar = () => {
                       placeholder="Search resources..."
                       className="w-full px-4 py-3 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 shadow-lg"
                     />
-                    <Search
-                      size={18}
-                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
-                    />
+                    {searchQuery ? (
+                        <button
+                          type="button"
+                          onClick={handleClearSearch}
+                          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 p-1"
+                          aria-label="Clear search"
+                        >
+                          <X size={18} />
+                        </button>
+                      ) : (
+                        <Search
+                          size={18}
+                          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                        />
+                      )}
                     <button
                       type="submit"
                       className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full transition-colors duration-200 shadow-md"
@@ -478,10 +499,21 @@ const Navbar = () => {
                       placeholder="Search resources..."
                       className="w-full px-4 py-2 pl-10 pr-12 text-gray-900 dark:text-white bg-gray-100 dark:bg-charcoal rounded-full border border-gray-300 dark:border-charcoal focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all duration-300 ease-in-out"
                     />
-                    <Search
-                      size={18}
-                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
-                    />
+                    {searchQuery ? (
+                        <button
+                          type="button"
+                          onClick={handleClearSearch}
+                          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 p-1"
+                          aria-label="Clear search"
+                        >
+                          <X size={18} />
+                        </button>
+                      ) : (
+                        <Search
+                          size={18}
+                          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                        />
+                      )}
                     <button
                       type="submit"
                       className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full transition-colors duration-200"
