@@ -682,78 +682,139 @@ const OptimizedPDFViewer = React.memo(({
   const endPage = renderedPages.length > 0 ? renderedPages[renderedPages.length - 1] : 0;
   const paddingBottomHeight = numPages ? (numPages - endPage) * pageContainerHeight : 0;
   const contentHeight = pdfDimensions.height * zoom;
+   const controlsVariants = {
+    hidden: { opacity: 0, y: -10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+  };
+  const buttonVariants = {
+    hover: { scale: 1.1, transition: { type: "spring", stiffness: 400, damping: 10 } },
+    tap: { scale: 0.95, transition: { duration: 0.1 } },
+  };
 
   // PDF Controls Component
   const PDFControls = useMemo(() => (
-    <div className={`flex items-center gap-3 bg-white/95 dark:bg-charcoal/95 backdrop-blur-sm rounded-full shadow-xl border border-gray-200/50 dark:border-charcoal/50 p-2 ${isMobile ? 'p-1.5 gap-1.5' : 'px-4 py-3'}`}>
+    <motion.div
+      className="flex items-center gap-2 bg-white/95 dark:bg-charcoal/95 backdrop-blur-md rounded-full shadow-xl border border-gray-200/30 dark:border-charcoal/30 px-2 py-1.5 w-fit max-w-[320px] mx-auto"
+      variants={controlsVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* AI Tools Button */}
       <motion.button
         onClick={onToggleAITools}
-        className={`p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-onyx/50 transition-colors group relative ${showAITools ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400' : 'text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400'}`}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
+        className={`p-2 rounded-full transition-colors group relative ${
+          showAITools
+            ? "bg-gradient-to-r from-amber-500 to-orange-400 text-white shadow-glow-sm"
+            : "text-gray-700 dark:text-gray-300 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 hover:text-amber-600 dark:hover:text-amber-400"
+        }`}
+        variants={buttonVariants}
+        whileHover="hover"
+        whileTap="tap"
         title="AI Tools"
+        aria-label="Toggle AI Tools"
       >
-        <Sparkles size={isMobile ? 14 : 16} className={`${showAITools ? 'animate-pulse' : 'group-hover:animate-pulse'}`} />
+        <Sparkles
+          size={isMobile ? 14 : 16}
+          className={`${showAITools ? "animate-pulse" : "group-hover:animate-pulse"}`}
+        />
+
+        {/* Tooltip */}
+        <span className="absolute flex gap-2 bottom-full mb-3 left-1/2 -translate-x-1/2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-amber-500 to-orange-400 text-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap">
+        <Sparkles
+          size={isMobile ? 14 : 16}
+          className={`${showAITools ? "animate-pulse" : "group-hover:animate-pulse"}`}
+        />
+  Scholara AI
+  <span className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gradient-to-r from-amber-500 to-orange-400 rotate-45"></span>
+</span>
+
       </motion.button>
-      <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
+
+      {/* Divider */}
+      <div className="h-4 w-px bg-gray-300/50 dark:bg-gray-600/50" />
+
+      {/* Zoom Out */}
       <motion.button
         onClick={onZoomOut}
         disabled={zoom <= 0.5}
-        className="p-1.5 text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 disabled:opacity-50 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-onyx/50"
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
+        className="p-2 text-gray-700 dark:text-gray-300 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 hover:text-amber-600 dark:hover:text-amber-400 disabled:opacity-50 transition-colors rounded-full"
+        variants={buttonVariants}
+        whileHover="hover"
+        whileTap="tap"
         title="Zoom out"
+        aria-label="Zoom out"
       >
         <ZoomOut size={isMobile ? 14 : 16} />
       </motion.button>
-      <div className="text-xs font-medium text-gray-600 dark:text-gray-400 min-w-[35px] text-center">
+
+      {/* Zoom Level Display */}
+      <div className="text-xs font-medium text-gray-600 dark:text-gray-400 min-w-[40px] text-center">
         {Math.round(zoom * 100)}%
       </div>
+
+      {/* Zoom In */}
       <motion.button
         onClick={onZoomIn}
         disabled={zoom >= 2}
-        className="p-1.5 text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 disabled:opacity-50 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-onyx/50"
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
+        className="p-2 text-gray-700 dark:text-gray-300 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 hover:text-amber-600 dark:hover:text-amber-400 disabled:opacity-50 transition-colors rounded-full"
+        variants={buttonVariants}
+        whileHover="hover"
+        whileTap="tap"
         title="Zoom in"
+        aria-label="Zoom in"
       >
         <ZoomIn size={isMobile ? 14 : 16} />
       </motion.button>
+
+      {/* Reset Zoom */}
       <motion.button
         onClick={onResetZoom}
-        className="p-1.5 text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-onyx/50"
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
+        className={`p-2 text-gray-700 dark:text-gray-300 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 hover:text-amber-600 dark:hover:text-amber-400 transition-colors rounded-full ${isMobile ? 'hidden' : 'visible'}`}
+        variants={buttonVariants}
+        whileHover="hover"
+        whileTap="tap"
         title="Reset zoom"
+        aria-label="Reset zoom"
       >
         <RefreshCw size={isMobile ? 14 : 16} />
       </motion.button>
-      <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
+
+      {/* Divider */}
+      <div className="h-4 w-px bg-gray-300/50 dark:bg-gray-600/50" />
+
+      {/* Fullscreen Toggle */}
       <motion.button
         onClick={onToggleFullscreen}
-        className="p-1.5 text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-onyx/50"
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
+        className="p-2 text-gray-700 dark:text-gray-300 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 hover:text-amber-600 dark:hover:text-amber-400 transition-colors rounded-full"
+        variants={buttonVariants}
+        whileHover="hover"
+        whileTap="tap"
         title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
       >
         {isFullscreen ? <Minimize2 size={isMobile ? 14 : 16} /> : <Maximize2 size={isMobile ? 14 : 16} />}
       </motion.button>
+
+      {/* Download Button (Conditional) */}
       {canDownload && (
         <>
-          <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
+          <div className="h-4 w-px bg-gray-300/50 dark:bg-gray-600/50" />
           <motion.button
             onClick={onDownload}
-            className="p-1.5 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-onyx/50"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            className="p-2 text-gray-700 dark:text-gray-300 hover:bg-blue-100/50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-full"
+            variants={buttonVariants}
+            whileHover="hover"
+            whileTap="tap"
             title="Download resource"
+            aria-label="Download resource"
           >
             <Download size={isMobile ? 14 : 16} />
           </motion.button>
         </>
       )}
-    </div>
+    </motion.div>
   ), [isMobile, isFullscreen, zoom, canDownload, showAITools, onZoomIn, onZoomOut, onResetZoom, onToggleFullscreen, onToggleAITools, onDownload]);
+
 
   const viewerHeight = isFullscreen ? '100vh' : (isMobile ? '400px' : '600px');
 
@@ -1322,9 +1383,21 @@ const ResourceDetailPage = () => {
     }
   };
   
-  // Zoom handlers
-  const handleZoomIn = useCallback(() => setZoom(prev => Math.min(prev + 0.2, 2)), []);
-  const handleZoomOut = useCallback(() => setZoom(prev => Math.max(prev - 0.2, 0.5)), []);
+  // Smooth zoom handlers with animation
+  const handleZoomIn = useCallback(() => {
+    setZoom(prev => {
+      const newZoom = Math.min(prev + 0.2, 3);
+      return parseFloat(newZoom.toFixed(1));
+    });
+  }, []);
+  
+  const handleZoomOut = useCallback(() => {
+    setZoom(prev => {
+      const newZoom = Math.max(prev - 0.2, 0.5);
+      return parseFloat(newZoom.toFixed(1));
+    });
+  }, []);
+  
   const resetZoom = useCallback(() => setZoom(1), []);
   const toggleFullscreen = useCallback(() => setIsFullscreen(prev => !prev), []);
   const toggleAITools = useCallback(() => setShowAITools(prev => !prev), []);
@@ -1398,7 +1471,7 @@ const ResourceDetailPage = () => {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.4, delay: 0.1 }}
                 ref={previewContainerRef}
-                className={`bg-white dark:bg-onyx/60   rounded-2xl shadow-glow-sm ${showAITools ? "p-0" : "p-6"} relative`}              
+                className={`bg-white dark:bg-onyx/60 rounded-2xl shadow-glow-sm ${showAITools ? "p-0" : "p-6"} relative`}              
                 style={{ overflow: isMobile && zoom > 1 ? 'visible' : 'hidden' }}
               >
                 {!showPreview ? (
@@ -1434,6 +1507,7 @@ const ResourceDetailPage = () => {
                     currentPage={currentPage}
                     pdfDimensions={pdfDimensions}
                     zoom={zoom}
+                    isMobile={isMobile}
                     isFullscreen={isFullscreen}
                     onClose={toggleAITools}
                   />
@@ -1635,6 +1709,7 @@ const ResourceDetailPage = () => {
                 pdfDimensions={pdfDimensions}
                 zoom={zoom}
                 isFullscreen={isFullscreen}
+                isMobile={isMobile}
                 onClose={toggleAITools}
               />
             ) : (
